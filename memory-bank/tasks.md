@@ -63,13 +63,13 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Define `Base` for declarative models (`declarative_base`).
 
 5.  **Task 1.5: Implement `/start` and `/help` Commands**
-    *   [ ] Create `app/telegram_handlers/command_handlers.py`.
-    *   [ ] Implement `start_command` handler function.
-        *   [ ] Send a welcome message.
-    *   [ ] Implement `help_command` handler function.
-        *   [ ] Send a message listing basic commands (initially just `/start`, `/help`).
-    *   [ ] Register these handlers in `main.py`.
-    *   [ ] Test bot connection and these basic commands.
+    *   [x] Create `app/telegram_handlers/command_handlers.py`.
+    *   [x] Implement `start_command` handler function.
+        *   [x] Send a welcome message.
+    *   [x] Implement `help_command` handler function.
+        *   [x] Send a message listing basic commands (initially just `/start`, `/help`).
+    *   [x] Register these handlers in `main.py`.
+    *   [x] Test bot connection and these basic commands.
 
 ## Phase 2: User Management and Core Proposal Features (Static)
 
