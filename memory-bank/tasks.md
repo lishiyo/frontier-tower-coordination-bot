@@ -50,16 +50,15 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Initialize `ConfigService`.
         *   [x] Initialize `python-telegram-bot.Application` with the bot token.
 
-4.  **Task 1.4: Database Setup (PostgreSQL & Alembic)**
-    *   [ ] Ensure PostgreSQL server is running and accessible.
-    *   [ ] Create the application database in PostgreSQL.
-    *   [ ] Initialize Alembic (`alembic init alembic`).
-    *   [ ] Configure `alembic/env.py` for PostgreSQL and asynchronous context (target metadata for models).
-    *   [ ] Configure `alembic.ini` with the correct `sqlalchemy.url`.
+4.  **Task 1.4: Database Setup (Supabase PostgreSQL & Alembic)**
+    *   [ ] Create a new project in Supabase.
+    *   [ ] Obtain the Supabase PostgreSQL connection string (URI).
+    *   [ ] Update your `.env` file with the Supabase connection details (host, port, user, password, db name will be derived from the Supabase URI).
+    *   [ ] Initialize Alembic (`alembic init alembic`) if not already done.
+    *   [ ] Configure `alembic/env.py` for PostgreSQL and asynchronous context (target metadata for models). Ensure it uses the Supabase connection URI from `ConfigService`.
+    *   [ ] Configure `alembic.ini` with the correct `sqlalchemy.url` (this should also dynamically pull from `ConfigService` or be set to the Supabase URI).
     *   [ ] Implement `app/persistence/database.py`:
-        *   [ ] Setup asynchronous SQLAlchemy engine (`create_async_engine`).
-        *   [ ] Define `AsyncSessionLocal` for database sessions.
-        *   [ ] Define `Base` for declarative models (`declarative_base`).
+        *   [ ] Setup asynchronous SQLAlchemy engine (`create_async_engine`) using the Supabase URI from `ConfigService`.
 
 5.  **Task 1.5: Implement `/start` and `/help` Commands**
     *   [ ] Create `app/telegram_handlers/command_handlers.py`.

@@ -136,7 +136,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
 *   **NFR1. Usability:** Intuitive commands, clear instructions, responsive feedback.
 *   **NFR2. Reliability:** High uptime. Scheduler must reliably trigger deadline processing.
 *   **NFR3. Performance:** Bot responses should be timely (within a few seconds for most operations). RAG queries may take slightly longer.
-*   **NFR4. Scalability:** Able to handle hundreds of users and dozens of concurrent proposals. Database choice (SQLite initially) should allow for future migration if needed.
+*   **NFR4. Scalability:** Able to handle hundreds of users and dozens of concurrent proposals. PostgreSQL (via Supabase) is chosen for its scalability and managed nature.
 *   **NFR5. Security:** Bot token secured. Protection against basic spam if possible (e.g., rate limiting DM commands if it becomes an issue).
 *   **NFR6. Maintainability:** Code should be well-structured, commented, and version-controlled.
 
@@ -345,7 +345,7 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
 
 1.  **Start Small (MVP):**
     *   Focus on `/propose` (with conversational duration), channel posting, inline voting (MC), `/submit` (FF), `/cancel_proposal`, `/edit_proposal`, `/add_proposal_context`, deadline checking, and result announcement first.
-    *   Use PostgreSQL with Alembic for migrations.
+    *   Use PostgreSQL (via Supabase) with Alembic for migrations.
     *   Manual document loading for RAG initially by admin; proposers can add context to their proposals.
 2.  **Error Handling & User Feedback:** Make the bot responsive. Inform users if their commands are malformed, if LLM parsing of duration is ambiguous, if something goes wrong, etc.
 3.  **Security:**
@@ -386,7 +386,7 @@ Here's a structured approach to testing our `CoordinationBot`:
     *   Ideally, get 1-2 colleagues or friends to act as other test users. This helps test multi-user interactions and ensures things look right from different perspectives. They will need to DM your `FrontierTowerTestBot`.
 
 4.  **Test Database:**
-    *   Ensure your bot script connects to a separate database for testing (e.g., `frontier_tower_test.db` if using SQLite). You don't want to pollute your production database with test data.
+    *   Ensure your bot script connects to a separate database for testing (e.g., a different Supabase project or a local PostgreSQL instance if preferred for isolated testing, though Supabase staging environments are also an option). You don't want to pollute your production database with test data.
     *   Have an easy way to wipe and reset this test database.
 
 5.  **Local RAG Setup:**

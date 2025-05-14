@@ -6,9 +6,9 @@ See also [systemPatterns.md](./systemPatterns.md) for target architecture and co
     *   **`python-telegram-bot` (PTB):** The most popular and well-documented library. Excellent for handling updates, commands, inline keyboards, etc.
 
 **Database:**
-    *   **PostgreSQL:** Chosen for its robustness and scalability.
-    *   **SQLAlchemy:** An ORM (Object Relational Mapper) to interact with PostgreSQL in a Pythonic way, using the **`asyncpg`** driver for asynchronous operations.
-    *   **Database Migrations:** **Alembic** will be used for managing schema changes.
+    *   **PostgreSQL (via Supabase):** Supabase will be used as the managed PostgreSQL provider. This offers ease of setup, scalability, and additional features like auth and real-time capabilities (though we'll primarily use its core PostgreSQL functionality).
+    *   **SQLAlchemy:** An ORM (Object Relational Mapper) to interact with the Supabase PostgreSQL database in a Pythonic way, using the **`asyncpg`** driver for asynchronous operations.
+    *   **Database Migrations:** **Alembic** will be used for managing schema changes against the Supabase database.
 
 **Context Engine (RAG - Retrieval Augmented Generation):**
     *   **Vector Database:**
