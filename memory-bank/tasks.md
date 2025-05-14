@@ -52,13 +52,15 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 4.  **Task 1.4: Database Setup (Supabase PostgreSQL & Alembic)**
     *   [ ] Create a new project in Supabase.
-    *   [ ] Obtain the Supabase PostgreSQL connection string (URI).
-    *   [ ] Update your `.env` file with the Supabase connection details (host, port, user, password, db name will be derived from the Supabase URI).
+    *   [ ] From the Supabase PostgreSQL connection string, extract the component parts (host, port, user, password, database name).
+    *   [ ] Update your `.env` file with these component parts for the variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, and `POSTGRES_DB`.
     *   [ ] Initialize Alembic (`alembic init alembic`) if not already done.
-    *   [ ] Configure `alembic/env.py` for PostgreSQL and asynchronous context (target metadata for models). Ensure it uses the Supabase connection URI from `ConfigService`.
-    *   [ ] Configure `alembic.ini` with the correct `sqlalchemy.url` (this should also dynamically pull from `ConfigService` or be set to the Supabase URI).
+    *   [ ] Configure `alembic/env.py` for PostgreSQL and asynchronous context (target metadata for models). Ensure it uses the database URL constructed in `ConfigService`.
+    *   [ ] Configure `alembic.ini` with a placeholder `sqlalchemy.url` (the actual connection details will be loaded dynamically from `ConfigService` in `env.py`).
     *   [ ] Implement `app/persistence/database.py`:
-        *   [ ] Setup asynchronous SQLAlchemy engine (`create_async_engine`) using the Supabase URI from `ConfigService`.
+        *   [ ] Setup asynchronous SQLAlchemy engine (`create_async_engine`) using the database URL from `ConfigService`.
+        *   [ ] Define `AsyncSessionLocal` for database sessions.
+        *   [ ] Define `Base` for declarative models (`declarative_base`).
 
 5.  **Task 1.5: Implement `/start` and `/help` Commands**
     *   [ ] Create `app/telegram_handlers/command_handlers.py`.
