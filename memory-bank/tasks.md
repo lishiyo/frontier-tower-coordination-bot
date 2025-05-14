@@ -38,17 +38,17 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Install dependencies (`pip install -r requirements.txt`).
 
 3.  **Task 1.3: Configure Basic Bot (`main.py`, `app/config.py`)**
-    *   [ ] Create `app/config.py` to load settings from environment variables (`.env` file).
-        *   [ ] Load `TELEGRAM_BOT_TOKEN`.
-        *   [ ] Load `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`.
-        *   [ ] Load `OPENAI_API_KEY`.
-        *   [ ] Load `ADMIN_TELEGRAM_IDS` (comma-separated string).
-        *   [ ] Load `TARGET_CHANNEL_ID`.
-    *   [ ] Create `.env.example` with placeholder values.
-    *   [ ] Create `.env` file locally (and add to `.gitignore`).
-    *   [ ] Create `main.py` as the bot entry point.
-        *   [ ] Initialize `ConfigService`.
-        *   [ ] Initialize `python-telegram-bot.Application` with the bot token.
+    *   [x] Create `app/config.py` to load settings from environment variables (`.env` file).
+        *   [x] Load `TELEGRAM_BOT_TOKEN`.
+        *   [x] Load `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`.
+        *   [x] Load `OPENAI_API_KEY`.
+        *   [x] Load `ADMIN_TELEGRAM_IDS` (comma-separated string).
+        *   [x] Load `TARGET_CHANNEL_ID`.
+    *   [x] Create `.env.example` with placeholder values.
+    *   [x] Create `.env` file locally (and add to `.gitignore`).
+    *   [x] Create `main.py` as the bot entry point.
+        *   [x] Initialize `ConfigService`.
+        *   [x] Initialize `python-telegram-bot.Application` with the bot token.
 
 4.  **Task 1.4: Database Setup (PostgreSQL & Alembic)**
     *   [ ] Ensure PostgreSQL server is running and accessible.
