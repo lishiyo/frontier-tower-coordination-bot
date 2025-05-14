@@ -150,7 +150,7 @@ See [systemPatterns.md](./systemPatterns.md) for core components and architectur
 
 **II. Data Models (Simplified - using SQLAlchemy)**
 
-Here, submissions represent votes. 
+Here, submissions represent votes.
 
 *   **`User` Table:**
     *   `telegram_id` (Integer, Primary Key): Telegram user ID.
