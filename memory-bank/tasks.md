@@ -11,31 +11,31 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 1.1: Setup Project Structure & Version Control**
-    *   [ ] Create main project directory (`telegram_bot/`).
+    *   [x] Create main project directory (`telegram_bot/`).
     *   [x] Initialize Git repository (`git init`).
-    *   [ ] Create initial directory structure as outlined in `systemPatterns.md` (e.g., `app/`, `tests/`, `alembic/`).
+    *   [x] Create initial directory structure as outlined in `systemPatterns.md` (e.g., `app/`, `tests/`, `alembic/`).
     *   [x] Create `.gitignore` file (add `.env`, `__pycache__/`, `*.db` if SQLite were used, etc.).
-    *   [ ] Create `README.md` (basic project description).
+    *   [x] Create `README.md` (basic project description).
     *   [x] Create `systemPatterns.md` (already done).
     *   [x] Create `bot_commands.md` (already done).
     *   [x] Create this `tasks.md` file (already done).
 
 2.  **Task 1.2: Setup Python Environment & Dependencies**
-    *   [ ] Create and activate a Python virtual environment (e.g., using `venv`).
-    *   [ ] Create `requirements.txt`.
-    *   [ ] Add initial core dependencies to `requirements.txt`:
-        *   [ ] `python-telegram-bot`
-        *   [ ] `SQLAlchemy`
-        *   [ ] `asyncpg` (for PostgreSQL)
-        *   [ ] `alembic`
-        *   [ ] `psycopg2-binary` (often needed for Alembic with PostgreSQL, even with asyncpg for runtime)
-        *   [ ] `python-dotenv`
-        *   [ ] `pylint`
-        *   [ ] `pytest`
-        *   [ ] `openai`
-        *   [ ] `chromadb`
-        *   [ ] `APScheduler`
-    *   [ ] Install dependencies (`pip install -r requirements.txt`).
+    *   [x] Create and activate a Python virtual environment (e.g., using `venv`).
+    *   [x] Create `requirements.txt`.
+    *   [x] Add initial core dependencies to `requirements.txt`:
+        *   [x] `python-telegram-bot`
+        *   [x] `SQLAlchemy`
+        *   [x] `asyncpg` (for PostgreSQL)
+        *   [x] `alembic`
+        *   [x] `psycopg2-binary` (often needed for Alembic with PostgreSQL, even with asyncpg for runtime)
+        *   [x] `python-dotenv`
+        *   [x] `pylint`
+        *   [x] `pytest`
+        *   [x] `openai`
+        *   [x] `chromadb`
+        *   [x] `APScheduler`
+    *   [x] Install dependencies (`pip install -r requirements.txt`).
 
 3.  **Task 1.3: Configure Basic Bot (`main.py`, `app/config.py`)**
     *   [ ] Create `app/config.py` to load settings from environment variables (`.env` file).
