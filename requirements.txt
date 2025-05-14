@@ -1,0 +1,11 @@
+python-telegram-bot
+SQLAlchemy
+asyncpg
+alembic
+psycopg2-binary
+python-dotenv
+pylint
+pytest
+openai
+chromadb
+APScheduler 
