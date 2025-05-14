@@ -71,7 +71,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
 **5.3. Proposal Broadcasting & Interaction**
     *   **FR3.1:** Bot posts new proposal to designated Telegram Channel.
         *   **Multiple Choice:** Message includes title, description, proposer, deadline, and inline keyboard buttons for each voting option. Callback data for buttons includes `proposal_id` and `option_index` (0-based index of the option).
-        *   **Free Form:** Message includes title, description, proposer, deadline, and clear instructions on how to submit via DM (e.g., "DM me `/submit <proposal_id> Your idea here`"). Proposal ID should be clearly visible. May include a `switch_inline_query_current_chat` button to prefill the `/submit` command.
+        *   **Free Form:** Message includes title, description, proposer, deadline, and clear instructions on how to submit via DM (e.g., "DM me `/submit <proposal_id> Your idea here`"). Proposal ID should be clearly visible. Includes an inline button "💬 Submit Your Idea" using `switch_inline_query_current_chat` to prefill the `/submit <proposal_id> ` command in the user's DM with the bot.
     *   **FR3.2:** Store `channel_message_id` for future updates (e.g., posting results).
 
 **5.4. Voting & Submission**
@@ -242,7 +242,7 @@ This is a free-form submission. To submit your idea, DM me (the bot) with:
 `/submit [proposal_id] Your idea here` (Proposal ID: `[proposal_id]`)
 
 Submissions end: [Date & Time]"
-                *   (Optional) Inline Button: A button like "💬 Submit Your Idea" using `switch_inline_query_current_chat` to prefill `/submit [proposal_id] ` in the user's DM with the bot.
+                *   Inline Button: A button like "💬 Submit Your Idea" using `switch_inline_query_current_chat` to prefill `/submit [proposal_id] ` in the user's DM with the bot.
         *   Stores the `channel_message_id` from the sent message in the `Proposal` table.
 
 4.  **Voting (for Multiple Choice) & Submitting (for Free Form):**
