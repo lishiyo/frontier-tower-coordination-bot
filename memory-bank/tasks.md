@@ -111,6 +111,8 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Send confirmation DM to proposer.
     *   [ ] Post a basic proposal message to the `TARGET_CHANNEL_ID`.
         *   [ ] Create `app/utils/telegram_utils.py` for formatting messages.
+        *   [ ] Ensure message for "free_form" proposals clearly displays Proposal ID and includes an inline button ("💬 Submit Your Idea") using `switch_inline_query_current_chat` to prefill the `/submit <proposal_id>` command.
+        *   [ ] Ensure message for "multiple_choice" proposals will later include inline keyboard for options (Task 4.2).
         *   [ ] Store `channel_message_id` by calling `ProposalRepository.update_proposal_message_id(...)`.
 
 ## Phase 3: Conversational Proposal Creation & Initial Context
@@ -161,7 +163,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Call `ProposalService.create_proposal(...)` (as in Phase 2.4, but now with LLM-parsed duration).
         *   [ ] Update `Document` with `proposal_id` if initial context was added.
         *   [ ] Send confirmation DM (including "use `/add_proposal_context` for more").
-        *   [ ] Post proposal to channel (Phase 2.4 logic).
+        *   [ ] Post proposal to channel (Phase 2.4 logic, ensuring free-form proposals get the "Submit Idea" button and multiple-choice proposals are ready for option buttons in Phase 4).
         *   [ ] End conversation.
     *   [ ] Add `app/telegram_handlers/conversation_defs.py` for state constants.
     *   [ ] Add necessary message handlers for `ConversationHandler` in `app/telegram_handlers/message_handlers.py`.
@@ -183,7 +185,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 2.  **Task 4.2: Multiple-Choice Voting (`CallbackQueryHandler`)**
     *   [ ] In `app/utils/telegram_utils.py`, add helper to create inline keyboard for proposal options (using `option_index` in callback data: `vote_[proposal_id]_[option_index]`).
-    *   [ ] Modify `ProposalService.create_proposal` and channel posting logic to include this inline keyboard for "multiple_choice" types.
+    *   [ ] Modify `ProposalService.create_proposal` and channel posting logic (specifically the part in Task 2.4 and Task 3.4 that posts to channel) to include this inline keyboard for "multiple_choice" types. Ensure this doesn't conflict with the "Submit Idea" button logic for free-form types.
     *   [ ] Create `app/telegram_handlers/callback_handlers.py`.
     *   [ ] Implement `handle_vote_callback` for `CallbackQueryHandler` matching `vote_.*`.
         *   [ ] Parse `proposal_id` and `option_index` from callback data.
