@@ -14,7 +14,7 @@ See also [systemPatterns.md](./systemPatterns.md) for target architecture and co
     *   **Vector Database:**
         *   **ChromaDB:** Easy to set up locally, good for development.
     *   **Embedding Model:**
-        *   **OpenAI Embeddings API (`text-embedding-ada-002`):** If you're okay with API calls and costs.
+        *   **OpenAI Embeddings API (`text-embedding-3-small`):** 
     *   **LLM for Answering/Summarization:**
         *   **OpenAI API (GPT-4o or similar):** Easiest to integrate for powerful Q&A, summarization of free-form submissions, and for parsing natural language duration inputs for proposal deadlines.
 
