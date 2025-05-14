@@ -147,7 +147,6 @@ telegram_bot/
 ├── requirements.txt          # Python package dependencies
 ├── pylintrc                  # Pylint configuration file
 ├── README.md
-└── systemPatterns.md         # This file (current document)
 ```
 
 ## IV. Core Data Flows (Examples)

@@ -2,3 +2,6 @@
 .cursor/
 custom_modes/
 venv/
+
+__pycache__/
+*.db
