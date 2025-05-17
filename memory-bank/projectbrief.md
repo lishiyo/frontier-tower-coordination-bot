@@ -60,15 +60,26 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR1.5:** `/privacy` command (DM): Displays the bot's privacy policy, outlining data storage, usage, and anonymity aspects.
 
 **5.2. Proposal Creation**
-    *   **FR2.1 (Proposing):**
-        *   User DMs bot: `/propose <Title>; <Description>; [Options OR "FREEFORM"]` OR User types in an authorized channel: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
-        *   Example (Multiple Choice in DM): `/propose Event Types; What kind of events?; Hackathons, Talks, Socials`
-        *   Example (Free Form in DM): `/propose AI Project Ideas; Suggest cool AI projects!`
-        *   Example (In-Channel): User in `#project-alpha` types `/propose New Feature; Discuss adding X; FREEFORM`
+    *   **FR2.1 (Proposing - Flexible Input):**
+        *   User DMs bot with `/propose [Initial Information]` or types in an authorized channel: `/propose [Initial Information]`.
+        *   `[Initial Information]` can be:
+            *   Empty (just `/propose`).
+            *   Only a title (e.g., `/propose My Proposal Title`).
+            *   A fully structured command (e.g., `/propose Title; Description; Option1, Option2` or `/propose Title; Description; FREEFORM`).
+        *   The bot will initiate a `ConversationHandler` flow.
+        *   **If core details (title, description, options/type) are missing from `[Initial Information]`, the bot will sequentially ask for them.**
+            *   Example interaction if user sends just `/propose`:
+                *   Bot: "Okay, let's create a new proposal! What would you like to name it?"
+                *   User: "Community Event Ideas"
+                *   Bot: "Got it. Can you provide a brief description for 'Community Event Ideas'?"
+                *   User: "Let's brainstorm some fun events for next quarter."
+                *   Bot: "Thanks! Is this a 'multiple_choice' proposal (where you'll list options for people to vote on) or a 'free_form' idea collection? If multiple choice, please list the options separated by commas. Otherwise, just say 'freeform'."
+                *   User: "freeform"
+        *   Once core details are collected conversationally or parsed from a structured command, the flow proceeds to channel determination (if applicable), duration, and initial context. 
 
-        *   **Proposal Initiation Source & Channel Targeting:**
-            *   **FR2.1.A (DM Initiation - Single Channel Mode):** "If a user DMs the bot `/propose...` and the bot is configured with a single default target channel (e.g., via `TARGET_CHANNEL_ID` environment variable), this channel is used as the `target_channel_id`. The bot proceeds to ask for duration."
-            *   **FR2.1.B (DM Initiation - Multi-Channel Mode):** "If a user DMs the bot `/propose...` and the bot is configured for multiple authorized proposal channels (see FR5.9):
+        *   **Proposal Initiation Source & Channel Targeting (remains largely the same, triggered after core details are known):**
+            *   **FR2.1.A (DM Initiation - Single Channel Mode):** If a user DMs the bot and core details are gathered, and the bot is configured with a single default target channel, this channel is used. The bot proceeds to ask for duration.
+            *   **FR2.1.B (DM Initiation - Multi-Channel Mode):** If a user DMs the bot, core details are gathered, and the bot is configured for multiple authorized proposal channels:
                 *   The bot will ask the user (e.g., after parsing the initial title/desc/options): 'Which channel is this proposal for?'
                 *   The bot will present a list of authorized channels (e.g., via inline keyboard in the DM).
                 *   The user's selection will determine the `target_channel_id` for the proposal.
@@ -87,9 +98,9 @@ This document outlines the product requirements for `CoordinationBot`, which is 
             *   The bot will use an LLM to parse this response and determine the `deadline_date`. Bot confirms interpretation with user if ambiguous.
             *   **Bot then asks:** "Great! Your proposal details are set. Do you have any extra context or background information to add? This won't appear in the public poll itself but will be very helpful if users ask questions about the proposal. You can paste text, provide a URL, or just say 'no' for now."
             *   User responds. If context (text/URL) is provided, bot processes and stores it (see FR2.5 logic), associating it with the new proposal.
-    *   **FR2.2:** Bot parses initial command (title, description, options from user input, whether from DM or in-channel message content). Validates title, description, and options (minimum 2 options for multiple-choice). Confirms deadline interpretation with user if ambiguous, or proceeds if confident. (This step now incorporates the channel determination from FR2.1.A/B/C).
-    *   **FR2.3:** Store proposal details in the database, including `proposal_type` ("multiple_choice" or "free_form"), proposer, creation date, LLM-parsed `deadline_date`, and the **`target_channel_id`** (determined from FR2.1.A/B/C). For multiple-choice, `options` are stored as a list of strings.
-    *   **FR2.4:** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel '[Channel Name/ID]' shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`." (Channel name/ID included for clarity in multi-channel scenarios).
+    *   **FR2.2 (Internal Parsing & Validation):** Bot internally parses and validates all collected/provided information (title, description, options, type, deadline, channel). Confirms deadline interpretation with user if ambiguous.
+    *   **FR2.3 (Storage):** Store proposal details in the database, including `proposal_type` ("multiple_choice" or "free_form"), proposer, creation date, LLM-parsed `deadline_date`, and the **`target_channel_id`**. For multiple-choice, `options` are stored as a list of strings.
+    *   **FR2.4 (Confirmation DM):** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel '[Channel Name/ID]' shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`." (Channel name/ID included for clarity in multi-channel scenarios).
     *   **FR2.5 (Adding Context - Proposer - Later or if initial offer declined):** `/add_proposal_context <proposal_id> <URL or paste text OR trigger chat>` (DM)
         *   Allows proposer to upload a document, paste text, or engage in a short chat with the bot to add context to their specific proposal *after* initial creation or if they initially declined to add context.
         *   This content is processed (chunked, embedded) and stored, linked to the `proposal_id` in the `Document` table, for use in RAG when users ask about this proposal. If text is from chat, `source_url` in `Document` table might indicate "proposer_chat_context".
@@ -240,13 +251,14 @@ Here, submissions represent votes.
 
 3.  **Creating a Proposal (DM to Bot):**
 
-*   **Initiation:**
-    *   User DMs bot: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
-    *   OR User types in an *authorized* Telegram channel: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
-        *   Example (Multiple Choice): `/propose Event Types; What kind of events should we do?; Hackathons, Talks, Socials`
-        *   Example (Free Form): `/propose AI Project Ideas; Suggest cool AI projects for the floor!`
-*   Bot:
-    **Channel Determination (FR2.1.A/B/C logic):**
+*   **Initiation (Flexible):**
+    *   User DMs bot with `/propose [Initial Information]` (e.g., just `/propose`, or `/propose <Title>`, or `/propose <Title>; <Description>; [Options OR "FREEFORM"]`).
+    *   OR User types in an *authorized* Telegram channel: `/propose [Initial Information]` (similar flexibility applies, though complex structured input directly in a channel might be less common; bot will likely engage via DM for further details if only a title is given in-channel).
+*   Bot (initiates `ConversationHandler`):
+    *   **Parses `[Initial Information]`.**
+    *   **Collects Missing Core Details (if any):** If title, description, or options/type are not fully provided, the bot asks for them sequentially in the DM.
+        *   Example: Asks for title, then description, then options/type.
+    *   **Channel Determination (FR2.1.A/B/C logic, after core details are known):**
         *   If initiated in an authorized channel: Set `target_channel_id` to this channel's ID. Send DM to user: "Okay, let's continue setting up your proposal for channel '[Channel Name]'. How long..."
         *   If initiated via DM:
             *   If in single-channel mode (only one `TARGET_CHANNEL_ID` configured): Set `target_channel_id` to this default.

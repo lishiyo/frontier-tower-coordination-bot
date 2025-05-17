@@ -38,6 +38,10 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Description:** Shows the user a list of proposals they have voted on or submitted to, including their response and the proposal's current status/outcome.
     *   **Context:** DM with the bot.
 
+*   `/my_proposals`
+    *   **Description:** Shows the user a list of proposals they have proposed, across all channels.
+    *   **Context:** DM with the bot.
+
 *   `/proposals open`
     *   **Description:** Lists all currently open proposals (both multiple-choice and free-form) with their titles and deadlines.
     *   **Context:** DM with the bot.

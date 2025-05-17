@@ -174,11 +174,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Collate all proposal data from conversation context.
         *   [ ] Call `ProposalService.create_proposal(...)` (as in Phase 2.4, but now with LLM-parsed duration).
         *   [ ] Update `Document` with `proposal_id` if initial context was added.
-        *   [ ] Send confirmation DM (including "use `/add_proposal_context` for more").
+        *   [ ] Send confirmation DM (including "use `/add_proposal_context` for more" and the edit and cancel commands).
         *   [ ] Post proposal to channel (Phase 2.4 logic, ensuring free-form proposals get the "Submit Idea" button and multiple-choice proposals are ready for option buttons in Phase 4).
         *   [ ] End conversation.
     *   [ ] Add `app/telegram_handlers/conversation_defs.py` for state constants.
     *   [ ] Add necessary message handlers for `ConversationHandler` in `app/telegram_handlers/message_handlers.py`.
+    *   [ ] Manually test that this is working.
 
 ## Phase 4: Voting and Submission Logic
 

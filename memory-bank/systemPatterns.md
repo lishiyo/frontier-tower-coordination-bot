@@ -155,40 +155,51 @@ telegram_bot/
 
 ### A. Proposal Creation (with Conversational Context)
 
-1.  **User (Telegram):** Sends `/propose <Title>; <Description>; [Options/"FREEFORM"]`.
-2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.start_proposal_conversation`.
+1.  **User (Telegram):** Sends `/propose [Initial Information]` (e.g., just `/propose`, or `/propose <Title>`, or `/propose <Title>; <Description>; [Options/"FREEFORM"]`).
+2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.start_proposal_conversation` (entry point of the `ConversationHandler`).
 3.  **`CommandHandlers.start_proposal_conversation`:**
-    *   Validates initial arguments.
-    *   Determines the target channel for the proposal:
-        *   If initiated in DM and in single-channel mode: Uses the default TARGET_CHANNEL_ID from configuration.
-        *   If initiated in DM and in multi-channel mode: Transitions to ASK_CHANNEL state first to prompt user for channel selection.
-        *   If initiated directly in an authorized channel: Uses that channel's ID as the target_channel_id.
-    *   Starts `ConversationHandler`, transitions to `ASK_DURATION` state (or `ASK_CHANNEL` if channel selection is needed).
-    *   Prompts user for proposal duration/deadline (or channel selection first if needed).
-4.  **User (Telegram):** Replies with duration text (e.g., "7 days").
-5.  **`CommandHandlers.handle_duration` (`ASK_DURATION` state):**
+    *   Parses `[Initial Information]` provided by the user.
+    *   Stores any successfully parsed details (e.g., title, description, options/type) into `context.user_data`.
+    *   Determines the first state of the conversation based on what information is still missing:
+        *   If title is missing: Transitions to `COLLECT_TITLE` state. Prompts user for title.
+        *   Else if description is missing: Transitions to `COLLECT_DESCRIPTION` state. Prompts user for description.
+        *   Else if options/type are missing: Transitions to `COLLECT_OPTIONS_TYPE` state. Prompts user for options or to specify free-form.
+        *   Else (all core details provided): Transitions to `ASK_CHANNEL` (if multi-channel mode active and initiated via DM) or directly to `ASK_DURATION`.
+4.  **`CommandHandlers.handle_collect_title / handle_collect_description / handle_collect_options_type` (New States):**
+    *   User replies with the requested information (title, description, or options/type).
+    *   The respective handler saves the input to `context.user_data`.
+    *   Transitions to the next collection state (e.g., `COLLECT_TITLE` -> `COLLECT_DESCRIPTION` -> `COLLECT_OPTIONS_TYPE`).
+    *   Once all core proposal details (title, description, options/type) are collected, the last handler in this sequence transitions to `ASK_CHANNEL` (if applicable) or `ASK_DURATION`.
+5.  **`CommandHandlers.handle_ask_channel` (Optional state, if multi-channel mode active & DM initiated):**
+    *   Prompts user to select a target channel from a list of authorized channels.
+    *   User selects a channel.
+    *   Handler saves `target_channel_id` to `context.user_data`.
+    *   Transitions to `ASK_DURATION`.
+    *   *Note: If proposal initiated in an authorized channel, `target_channel_id` is set from that channel, and this state is skipped.*
+6.  **User (Telegram):** (Assuming in `ASK_DURATION` state) Replies with duration text (e.g., "7 days").
+7.  **`CommandHandlers.handle_duration` (`ASK_DURATION` state):**
     *   Calls `LLMService.parse_natural_language_duration(text)` to get `deadline_date`.
-    *   Stores `deadline_date` in conversation context.
+    *   Stores `deadline_date` in `context.user_data`.
     *   Transitions to `ASK_CONTEXT` state.
     *   Prompts user for additional context.
-6.  **User (Telegram):** Replies with context (text/URL) or "no".
-7.  **`CommandHandlers.handle_context` (`ASK_CONTEXT` state):**
+8.  **User (Telegram):** Replies with context (text/URL) or "no".
+9.  **`CommandHandlers.handle_context` (`ASK_CONTEXT` state):**
     *   If context provided (text/URL):
         *   Calls `ContextService.process_and_store_document(content=user_input, source_type="proposer_initial_chat", title="Initial context for proposal...")`. This involves:
             *   `ContextService` -> `LLMService` (for text embedding if not URL).
             *   `ContextService` -> `VectorDBService` (to store embeddings).
             *   `ContextService` -> `DocumentRepository` (to save document metadata, returning a `document_id`).
-        *   Stores `document_id` in conversation context.
-    *   Retrieves all proposal data (title, desc, options, deadline, proposer_id, context_doc_id, target_channel_id) from conversation context.
+        *   Stores `document_id` in `context.user_data`.
+    *   Retrieves all proposal data (title, desc, options, type, deadline, proposer_id, context_doc_id, target_channel_id) from `context.user_data`.
     *   Calls `ProposalService.create_new_proposal(proposal_data)`.
-8.  **`ProposalService.create_new_proposal`:**
+10. **`ProposalService.create_new_proposal`:**
     *   Calls `UserRepository.get_or_create(proposer_telegram_id)` to ensure user exists.
     *   Calls `ProposalRepository.add(new_proposal_object)` to save the proposal, getting back the `proposal_id`.
     *   If initial context was added and linked via `document_id` in `proposal_data`, ensures this link is correctly established (e.g., by updating the `Document` entry with the new `proposal_id` if it wasn't known before proposal creation).
-9.  **`CommandHandlers.handle_context`:**
+11. **`CommandHandlers.handle_context`:**
     *   Receives `proposal_id` from `ProposalService`.
     *   Sends confirmation DM to proposer (e.g., "Proposal #`proposal_id` created... use `/add_proposal_context ...` for more later").
-    *   Calls `TelegramUtils.format_proposal_message(...)` and posts it to the channel via PTB's `bot.send_message()`.
+    *   Calls `TelegramUtils.format_proposal_message(...)` and posts it to the proposal's `target_channel_id` (retrieved from context or proposal object) via PTB's `bot.send_message()`.
     *   Updates the proposal in the DB with `channel_message_id` via `ProposalRepository.update_message_id(proposal_id, channel_msg_id)`.
     *   Ends `ConversationHandler`.
 
