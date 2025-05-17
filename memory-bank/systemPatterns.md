@@ -30,6 +30,7 @@ Here's a breakdown of the major components:
     *   **Responsibilities:**
         *   Loads configuration from environment variables (e.g., API tokens, database URL, channel ID) using `python-dotenv` for local development.
         *   Provides type-safe access to configuration values.
+        *   Manages configuration for authorized proposal channels, supporting both single-channel mode (via `TARGET_CHANNEL_ID`) and multi-channel mode (via a list of authorized channel IDs) for the proposal system.
     *   **Interactions:** Used by `BotApplication` and any service needing configuration.
 
 3.  **`TelegramHandlers` (`app/telegram_handlers/`)**
@@ -46,7 +47,7 @@ Here's a breakdown of the major components:
     *   Modules: `user_service.py`, `proposal_service.py`, `submission_service.py`, `context_service.py`.
     *   **Responsibilities (General):** Encapsulate the main business logic (use cases) of the application. They are the orchestrators.
         *   `UserService`: Manages user registration (implicit on first interaction), retrieval.
-        *   `ProposalService`: Handles proposal creation (including orchestrating conversational context gathering), editing, cancellation, closing (triggered by scheduler), and retrieval.
+        *   `ProposalService`: Handles proposal creation (including orchestrating conversational context gathering), editing, cancellation, closing (triggered by scheduler), and retrieval. Supports multi-channel functionality where proposals can be posted to different authorized channels, either specified during DM conversation or detected when initiated in-channel.
         *   `SubmissionService`: Handles recording and validation of votes (multiple-choice) and free-form text submissions.
         *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers or admins), processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval.
     *   **Interactions:** `Repositories` (for data persistence), other `CoreServices` if necessary, `LLMService`, `VectorDBService`, `TelegramUtils` (for direct notifications if needed).
@@ -63,6 +64,7 @@ Here's a breakdown of the major components:
     *   **Modules:**
         *   `database.py`: SQLAlchemy setup (async engine with `asyncpg`), session management (`AsyncSessionLocal`), base for declarative models.
         *   `models/`: Directory containing SQLAlchemy ORM model classes (`User`, `Proposal`, `Submission`, `Document`). Each model in its own file.
+            * `Proposal` model includes fields for the proposer, title, description, options, deadline, and crucially, a `target_channel_id` field to specify which channel the proposal should be posted to, enabling multi-channel support.
         *   `repositories/`: Directory containing repository classes that implement the Repository Pattern. Each repository abstracts data access for a specific model (e.g., `UserRepository`, `ProposalRepository`).
     *   **Responsibilities:**
         *   `database.py`: Provide database connection and session utilities.
@@ -157,8 +159,12 @@ telegram_bot/
 2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.start_proposal_conversation`.
 3.  **`CommandHandlers.start_proposal_conversation`:**
     *   Validates initial arguments.
-    *   Starts `ConversationHandler`, transitions to `ASK_DURATION` state.
-    *   Prompts user for proposal duration/deadline.
+    *   Determines the target channel for the proposal:
+        *   If initiated in DM and in single-channel mode: Uses the default TARGET_CHANNEL_ID from configuration.
+        *   If initiated in DM and in multi-channel mode: Transitions to ASK_CHANNEL state first to prompt user for channel selection.
+        *   If initiated directly in an authorized channel: Uses that channel's ID as the target_channel_id.
+    *   Starts `ConversationHandler`, transitions to `ASK_DURATION` state (or `ASK_CHANNEL` if channel selection is needed).
+    *   Prompts user for proposal duration/deadline (or channel selection first if needed).
 4.  **User (Telegram):** Replies with duration text (e.g., "7 days").
 5.  **`CommandHandlers.handle_duration` (`ASK_DURATION` state):**
     *   Calls `LLMService.parse_natural_language_duration(text)` to get `deadline_date`.
@@ -173,7 +179,7 @@ telegram_bot/
             *   `ContextService` -> `VectorDBService` (to store embeddings).
             *   `ContextService` -> `DocumentRepository` (to save document metadata, returning a `document_id`).
         *   Stores `document_id` in conversation context.
-    *   Retrieves all proposal data (title, desc, options, deadline, proposer_id, context_doc_id) from conversation context.
+    *   Retrieves all proposal data (title, desc, options, deadline, proposer_id, context_doc_id, target_channel_id) from conversation context.
     *   Calls `ProposalService.create_new_proposal(proposal_data)`.
 8.  **`ProposalService.create_new_proposal`:**
     *   Calls `UserRepository.get_or_create(proposer_telegram_id)` to ensure user exists.
@@ -221,7 +227,7 @@ telegram_bot/
             *   Calls `SubmissionRepository.get_submissions_for_proposal(proposal_id)`.
             *   Calls `LLMService.cluster_and_summarize_texts([submission.response_content for submission in submissions])`.
             *   Updates `Proposal.outcome` (summary) and `Proposal.raw_results` (full list) via `ProposalRepository`.
-        *   Calls `TelegramUtils.format_results_message(...)` and posts results to the channel (editing original or new message).
+        *   Calls `TelegramUtils.format_results_message(...)` and posts results to the proposal's `target_channel_id` (retrieving the channel ID from the proposal record).
         *   (Optional v0/Core v1) Prepares and sends notifications to proposer/voters.
 
 ## V. Key Design Patterns & Python Best Practices

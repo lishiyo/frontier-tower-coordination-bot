@@ -99,22 +99,33 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Generate Alembic migration for `Proposal` table and apply.
 
 4.  **Task 2.4: Basic `/propose` Command (Static Duration for now)**
-    *   [ ] In `app/telegram_handlers/command_handlers.py`, implement initial `propose_command` handler.
-        *   [ ] Parse title, description, options/FREEFORM.
-        *   [ ] For now, use a fixed/static duration to calculate `deadline_date` (e.g., 7 days from now). Conversational duration comes later.
-        *   [ ] Get `proposer_id` from the update.
-    *   [ ] Create `app/core/proposal_service.py`.
-        *   [ ] Implement `create_proposal(proposer_id, title, description, proposal_type, options, deadline_date)` function.
-            *   [ ] Call `UserRepository` to ensure proposer exists.
-            *   [ ] Call `ProposalRepository.add_proposal(...)`.
-            *   [ ] Return created proposal object or ID.
-    *   [ ] `propose_command` calls `ProposalService.create_proposal(...)`.
-    *   [ ] Send confirmation DM to proposer.
-    *   [ ] Post a basic proposal message to the `TARGET_CHANNEL_ID`.
-        *   [ ] Create `app/utils/telegram_utils.py` for formatting messages.
-        *   [ ] Ensure message for "free_form" proposals clearly displays Proposal ID and includes an inline button ("💬 Submit Your Idea") using `switch_inline_query_current_chat` to prefill the `/submit <proposal_id>` command.
-        *   [ ] Ensure message for "multiple_choice" proposals will later include inline keyboard for options (Task 4.2).
-        *   [ ] Store `channel_message_id` by calling `ProposalRepository.update_proposal_message_id(...)`.
+    *   [x] In `app/telegram_handlers/command_handlers.py`, implement initial `propose_command` handler.
+        *   [x] Parse title, description, options/FREEFORM.
+        *   [x] For now, use a fixed/static duration to calculate `deadline_date` (e.g., 7 days from now). Conversational duration comes later.
+        *   [x] Get `proposer_id` from the update.
+        *   [x] For now, use the configured `TARGET_CHANNEL_ID` (from env variable) as the `target_channel_id`. Multi-channel support will be added later.
+    *   [x] Create `app/core/proposal_service.py`.
+        *   [x] Implement `create_proposal(proposer_id, title, description, proposal_type, options, deadline_date, target_channel_id)` function.
+            *   [x] Call `UserRepository` to ensure proposer exists.
+            *   [x] Call `ProposalRepository.add_proposal(...)`.
+            *   [x] Return created proposal object or ID.
+    *   [x] `propose_command` calls `ProposalService.create_proposal(...)`.
+    *   [x] Send confirmation DM to proposer.
+    *   [x] Post a basic proposal message to the specified `target_channel_id`.
+        *   [x] Create `app/utils/telegram_utils.py` for formatting messages.
+        *   [x] Ensure message for "free_form" proposals clearly displays Proposal ID and includes an inline button ("💬 Submit Your Idea") using `switch_inline_query_current_chat` to prefill the `/submit <proposal_id>` command.
+        *   [x] Ensure message for "multiple_choice" proposals will later include inline keyboard for options (Task 4.2).
+        *   [x] Store `channel_message_id` by calling `ProposalRepository.update_proposal_message_id(...)`.
+
+5.  **Task 2.5: Add Multi-Channel Support to Proposal Model**
+    *   [ ] Update the `Proposal` SQLAlchemy model in `app/persistence/models/proposal_model.py` to add the `target_channel_id` field.
+    *   [ ] Generate a new Alembic migration for adding this field to the existing `Proposal` table:
+        *   [ ] Run `alembic revision -m "add_target_channel_id_to_proposal"`.
+        *   [ ] Edit the generated migration file to add a new column `target_channel_id` with a default value of the current `TARGET_CHANNEL_ID` from config.
+    *   [ ] Apply the migration using `alembic upgrade head`.
+    *   [ ] Update `app/persistence/repositories/proposal_repository.py` methods to handle the new field.
+    *   [ ] Update `app/core/proposal_service.py` to ensure it properly passes `target_channel_id` to repository methods.
+    *   [ ] Verify that existing proposal functionality works with the new field.
 
 ## Phase 3: Conversational Proposal Creation & Initial Context
 
@@ -241,7 +252,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
                 *   [ ] Call `LLMService.cluster_and_summarize_texts([sub.response_content for sub in submissions])` (needs implementation in `LLMService`).
                 *   [ ] Store summary as `proposal.outcome` and full list of submissions in `proposal.raw_results` via `ProposalRepository`.
             *   [ ] Format results message (using `TelegramUtils`).
-            *   [ ] Post results to channel (edit original or reply, using `channel_message_id` from `Proposal`).
+            *   [ ] Post results to the proposal's `target_channel_id` (using `channel_message_id` from `Proposal` to reply to or edit the original message).
     *   [ ] In `SchedulingService`, define `check_proposal_deadlines_job` that calls `ProposalService.process_expired_proposals()`.
     *   [ ] Add this job to the scheduler (e.g., to run every few minutes).
 
@@ -337,6 +348,15 @@ This document breaks down the implementation of CoordinationBot into manageable 
 7.  **Task 7.7: Implement `/privacy` Command**
     *   [ ] Create a static privacy policy text.
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
+
+8.  **Task 8.8: (Future) Multi-Channel Proposal System Implementation**
+    *   [ ] Expand `ConfigService` to manage a list of authorized proposal channels beyond the default `TARGET_CHANNEL_ID`.
+    *   [ ] Create a new model and repository for `AuthorizedChannel` if needed, or implement a configuration-based approach.
+    *   [ ] Update the `ConversationHandler` for `/propose` to include channel selection flow when in multi-channel mode (new `ASK_CHANNEL` state).
+    *   [ ] Implement logic to detect in-channel `/propose` commands, verify channel authorization, and set that channel as the proposal's `target_channel_id`.
+    *   [ ] Update the channel results posting logic in `SchedulingService`/`ProposalService` to use the proposal's `target_channel_id` instead of a global channel ID.
+    *   [ ] Add commands to manage authorized channels (admin only).
+    *   [ ] Update user-facing proposal listings to include channel information.
 
 ## Phase 8: Comprehensive Testing, Refinement, and Deployment Preparation
 
