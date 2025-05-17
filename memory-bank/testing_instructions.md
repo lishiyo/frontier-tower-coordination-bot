@@ -118,7 +118,8 @@ If the bot doesn't respond or you encounter errors:
      - Your name as the proposer
      - A deadline (currently 7 days from creation)
      - The proposal ID clearly displayed
-     - A "Submit Your Idea" button (that prefills `/submit <proposal_id>` when clicked)
+     - Clear text instructions on how to submit ideas via DM (e.g., "To submit your idea, DM me (the bot) with: /submit [proposal_id] Your idea here")
+     - (Note: The interactive "Submit Your Idea" button has been removed from channel messages due to Telegram API limitations for channel context.)
 
 4. **Test Command Format Variations**
    - Test with missing arguments:

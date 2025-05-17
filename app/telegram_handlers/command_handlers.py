@@ -169,16 +169,27 @@ async def propose_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             channel_message_text = telegram_utils.format_proposal_message(new_proposal, proposer_db_user)
             logger.debug(f"User {user.id}: Formatted channel message text: \"{channel_message_text[:50]}...\"")
             
-            reply_markup = None
-            if new_proposal.proposal_type == ProposalType.FREE_FORM.value:
-                reply_markup = telegram_utils.get_free_form_submit_button(new_proposal.id)
+            # Initialize reply_markup for the channel message
+            channel_reply_markup = None
+
+            if proposal_type == ProposalType.FREE_FORM.value:
+                # Append specific instructions for free-form proposals to the main message text
+                # No interactive button in the channel for free-form submissions due to API limitations.
+                channel_message_text += (
+                    f"\\n\\nTo submit your idea, DM me (the bot) with:\\n"
+                    f"`/submit {new_proposal.id} Your idea here` \\(Proposal ID: `{new_proposal.id}`\\)"
+                )
+            else:
+                # For multiple_choice, buttons will be added in Task 4.2.
+                # For now, no reply_markup is needed for multiple choice either.
+                pass
             
             logger.debug(f"User {user.id}: Attempting to send message to channel {target_channel_id}.")
             sent_channel_message = await context.bot.send_message(
                 chat_id=target_channel_id,
                 text=channel_message_text,
                 parse_mode=ParseMode.MARKDOWN_V2,
-                reply_markup=reply_markup
+                reply_markup=channel_reply_markup # This will be None for free-form and currently for MC too
             )
             logger.debug(f"User {user.id}: Successfully sent message to channel. Message ID: {sent_channel_message.message_id}.")
 
