@@ -17,6 +17,7 @@ class Document(Base):
     
     # Foreign Key to proposals table, nullable as documents can be general context too
     proposal_id = Column(Integer, ForeignKey("proposals.id"), nullable=True, index=True)
+    raw_content = Column(Text, nullable=True) # Stores the raw (or cleaned) text content of the document
     
     # Relationship (optional, if you need to access Document.proposal or Proposal.documents)
     # proposal = relationship("Proposal", back_populates="documents") # Requires back_populates on Proposal

@@ -14,6 +14,7 @@ class DocumentRepository:
         source_url: Optional[str],
         vector_ids: Optional[List[str]], # Assuming vector_ids from ChromaDB are strings
         proposal_id: Optional[int] = None,
+        raw_content: Optional[str] = None,
     ) -> Document:
         """
         Adds a new document record to the database.
@@ -24,7 +25,8 @@ class DocumentRepository:
             content_hash=content_hash,
             source_url=source_url,
             vector_ids=vector_ids,
-            proposal_id=proposal_id
+            proposal_id=proposal_id,
+            raw_content=raw_content
             # upload_date is server_default
         )
         self.db_session.add(new_document)
@@ -55,3 +57,16 @@ class DocumentRepository:
             # await self.db_session.refresh(document) # Can be called by handler after commit if needed.
             return document
         return None 
+
+    async def get_document_by_id(self, document_id: int) -> Optional[Document]:
+        """Fetches a document by its ID, including its raw_content."""
+        result = await self.db_session.execute(
+            select(Document).where(Document.id == document_id)
+        )
+        return result.scalars().first() 
+
+    async def get_documents_by_proposal_id(self, proposal_id: int) -> List[Document]:
+        """Fetches all documents associated with a given proposal_id."""
+        stmt = select(Document).where(Document.proposal_id == proposal_id).order_by(Document.upload_date.desc())
+        result = await self.db_session.execute(stmt)
+        return list(result.scalars().all()) 

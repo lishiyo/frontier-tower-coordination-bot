@@ -131,4 +131,11 @@ class ProposalRepository:
         )
         result = await self.db_session.execute(stmt)
         await self.db_session.commit()
-        return result.scalar_one_or_none() 
+        return result.scalar_one_or_none()
+
+    async def get_proposals_by_channel_id(self, channel_id: str) -> List[Proposal]:
+        """Fetches proposals by their target_channel_id."""
+        # Ensure channel_id is treated as a string if it comes in as a number from Telegram API
+        stmt = select(Proposal).where(Proposal.target_channel_id == str(channel_id)).order_by(Proposal.creation_date.desc())
+        result = await self.db_session.execute(stmt)
+        return list(result.scalars().all()) 

@@ -60,3 +60,8 @@ class ProposalService:
         # await self.db_session.commit() # REMOVED
 
         return new_proposal 
+
+    async def list_proposals_by_channel(self, channel_id: str) -> List[Proposal]:
+        """Lists proposals for a given channel_id."""
+        # Ensure channel_id is a string, as it's stored that way and might come as int from Telegram
+        return await self.proposal_repository.get_proposals_by_channel_id(str(channel_id)) 

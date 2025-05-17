@@ -137,7 +137,8 @@ class ContextService:
             content_hash=content_hash,
             source_url=final_source_url,
             vector_ids=None, # Will update this later
-            proposal_id=proposal_id
+            proposal_id=proposal_id,
+            raw_content=text_content # Storing the raw/cleaned text content
         )
         if not sql_document or not sql_document.id:
             logger.error(f"Failed to store document metadata in SQL DB for title '{title}'.")
@@ -180,4 +181,20 @@ class ContextService:
             # await self.db_session.rollback()
             # SQL doc was created, vectors possibly stored, but link in SQL failed. Potential inconsistency.
             return None # Or return sql_document.id but log the linking failure more severely
+
+    async def get_document_content(self, document_id: int) -> Optional[str]:
+        """Fetches the raw content of a document by its ID."""
+        document = await self.document_repository.get_document_by_id(document_id)
+        if document and document.raw_content:
+            return document.raw_content
+        elif document:
+            logger.warning(f"Document ID {document_id} found, but it has no raw_content.")
+            return None
+        else:
+            logger.warning(f"Document ID {document_id} not found.")
+            return None
+
+    async def list_documents_for_proposal(self, proposal_id: int) -> List[Document]:
+        """Lists all documents associated with a given proposal_id."""
+        return await self.document_repository.get_documents_by_proposal_id(proposal_id)
  

@@ -6,7 +6,10 @@ import telegram.ext.filters as filters # Changed import
 from app.config import ConfigService
 # from app.persistence.database import DatabaseManager # Will be implemented in a future task
 # Import your new command handlers
-from app.telegram_handlers.command_handlers import start_command, help_command, propose_command_entry, cancel_conversation
+from app.telegram_handlers.command_handlers import (
+    start_command, help_command, propose_command_entry, cancel_conversation,
+    view_document_content_command, view_docs_command # Added new handlers
+)
 from app.telegram_handlers.message_handlers import (
     handle_collect_title,
     handle_collect_description,
@@ -65,6 +68,8 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     # application.add_handler(CommandHandler("propose", propose_command)) # Old direct command
     application.add_handler(proposal_conv_handler) # New conversation handler
+    application.add_handler(CommandHandler("view_doc", view_document_content_command))
+    application.add_handler(CommandHandler("view_docs", view_docs_command))
 
     logger.info("Bot application created and command handlers registered.")
 
