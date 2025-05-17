@@ -118,14 +118,14 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Store `channel_message_id` by calling `ProposalRepository.update_proposal_message_id(...)`.
 
 5.  **Task 2.5: Add Multi-Channel Support to Proposal Model**
-    *   [ ] Update the `Proposal` SQLAlchemy model in `app/persistence/models/proposal_model.py` to add the `target_channel_id` field.
-    *   [ ] Generate a new Alembic migration for adding this field to the existing `Proposal` table:
-        *   [ ] Run `alembic revision -m "add_target_channel_id_to_proposal"`.
-        *   [ ] Edit the generated migration file to add a new column `target_channel_id` with a default value of the current `TARGET_CHANNEL_ID` from config.
-    *   [ ] Apply the migration using `alembic upgrade head`.
-    *   [ ] Update `app/persistence/repositories/proposal_repository.py` methods to handle the new field.
-    *   [ ] Update `app/core/proposal_service.py` to ensure it properly passes `target_channel_id` to repository methods.
-    *   [ ] Verify that existing proposal functionality works with the new field.
+    *   [x] Update the `Proposal` SQLAlchemy model in `app/persistence/models/proposal_model.py` to add the `target_channel_id` field.
+    *   [x] Generate a new Alembic migration for adding this field to the existing `Proposal` table:
+        *   [x] Run `alembic revision -m "add_target_channel_id_to_proposal"`.
+        *   [x] Edit the generated migration file to add a new column `target_channel_id` with a default value of the current `TARGET_CHANNEL_ID` from config.
+    *   [x] Apply the migration using `alembic upgrade head`. (User will do this part)
+    *   [x] Update `app/persistence/repositories/proposal_repository.py` methods to handle the new field.
+    *   [x] Update `app/core/proposal_service.py` to ensure it properly passes `target_channel_id` to repository methods.
+    *   [ ] Verify that existing proposal functionality works with the new field. (User will do this part)
 
 ## Phase 3: Conversational Proposal Creation & Initial Context
 

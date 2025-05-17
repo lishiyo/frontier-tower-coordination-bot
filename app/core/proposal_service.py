@@ -26,6 +26,7 @@ class ProposalService:
         proposal_type: ProposalType,
         options: Optional[List[str]],
         deadline_date: datetime,
+        target_channel_id: str,
     ) -> Proposal:
         """
         Creates a new proposal.
@@ -50,6 +51,7 @@ class ProposalService:
             proposal_type=proposal_type,
             options=options,
             deadline_date=deadline_date,
+            target_channel_id=target_channel_id,
             # channel_message_id and status use defaults or are set later.
         )
         

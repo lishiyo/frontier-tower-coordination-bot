@@ -23,6 +23,7 @@ class Proposal(Base):
     description = Column(Text, nullable=False)
     proposal_type = Column(String, nullable=False) # Using String to store enum values
     options = Column(JSON, nullable=True)  # For multiple_choice, stores list of option strings
+    target_channel_id = Column(String, nullable=False) # ID of the channel proposal is for
     channel_message_id = Column(Integer, nullable=True)
     creation_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deadline_date = Column(DateTime(timezone=True), nullable=False)
