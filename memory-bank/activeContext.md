@@ -1,44 +1,46 @@
-# Active Context - Fri May 16 21:25:44 PDT 2025
+# Active Context - Fri May 16 22:41:10 PDT 2025
 
 ## Current Work Focus
-- Completed Task 2.2: Implicit User Registration.
-- Completed Task 2.3: Proposal Model & Repository.
-- Moving to Phase 2, Task 2.4: Basic `/propose` Command (Static Duration for now).
+- Completed Task 2.4: Basic `/propose` command.
+- Preparing for Task 2.5: Database migration to add `target_channel_id` to the `Proposal` model.
 
 ## What's Working
-- Implicit user registration via `UserService` in `start_command`.
-- `Proposal` model and `ProposalRepository` are defined.
-- The `proposals` table has been created in the database via a manually populated Alembic migration (`0cb97eaf1e36_create_proposal_table.py`).
-- Alembic configuration (`alembic.ini`, `env.py`, `models/__init__.py`) updated to best practices for autogeneration, though it required manual intervention for the `proposals` table.
+- Basic `/propose` command functionality (DM-only initiation, static duration, posts to single `TARGET_CHANNEL_ID`).
+- User registration (`/start` command).
+- Error handling for `switch_inline_query_current_chat` button in channel messages (button removed, relying on text instructions).
+- Design documents (`projectbrief.md`, `systemPatterns.md`, `tasks.md`) have been updated to incorporate future multi-channel proposal capabilities and current schema adjustments.
 
 ## What's Broken
-- Alembic autogeneration for new tables was unreliable for the `proposals` table, requiring manual creation of the migration script despite `target_metadata` appearing correct in debug logs. This might need monitoring for future model changes.
+- The `proposals` table schema is missing the `target_channel_id` field, which is planned for multi-channel support. This will be addressed in Task 2.5.
 
 ## Active Decisions and Considerations
-- Proceeding with manually assisted Alembic migrations if autogeneration continues to be problematic, to avoid getting blocked.
-- The `ProposalRepository` includes several methods (`find_expired_open_proposals`, `update_proposal_status`, etc.) that were listed in later tasks but were convenient to add now as they relate directly to the `Proposal` model.
+- Decided to implement `target_channel_id` in the schema now (Task 2.5) to prepare for future multi-channel support, while the current `/propose` implementation (Task 2.4) uses the single `TARGET_CHANNEL_ID` from config.
+- Removed the interactive "Submit Your Idea" button from channel messages for free-form proposals due to Telegram API limitations, opting for clear text-based instructions instead.
 
 ## Learnings and Project Insights
-- Setting `revision_environment = true` in `alembic.ini` is crucial for `env.py` to be loaded during `alembic revision` and for `target_metadata` to be correctly populated for autogeneration.
-- Ensuring `app/persistence/models/__init__.py` imports all model classes can also aid discovery.
-- Even with these settings, Alembic autogeneration might not always detect all changes perfectly, and manual script creation/adjustment can be a necessary fallback.
+- `switch_inline_query_current_chat` buttons are unreliable when used in bot messages posted to channels. Direct text instructions are a more robust alternative for guiding users to DM the bot.
+- It's important to align task planning (`tasks.md`) with model evolution. We identified the need for a new migration task (2.5) after realizing the `target_channel_id` was introduced in design docs but not yet in the implemented `Proposal` model from Task 2.3.
 
 ## Current Database/Model State
 - The `users` table exists.
-- The `proposals` table now exists in the Supabase PostgreSQL database.
-- Schema for `proposals` table:
+- The `proposals` table exists but is missing the `target_channel_id` column. This column will be added in Task 2.5.
+- Schema for `proposals` table (target state after Task 2.5):
     - `id` (Integer, PK, Auto-increment, Index)
     - `proposer_telegram_id` (Integer, FK to `users.telegram_id`, Not Null, Index)
     - `title` (String, Not Null)
     - `description` (Text, Not Null)
-    - `proposal_type` (String, Not Null) (e.g., "multiple_choice", "free_form")
+    - `proposal_type` (String, Not Null)
     - `options` (JSON, Nullable)
+    - `target_channel_id` (String or Integer, Not Null) - NEW, will store the ID of the channel where the proposal is posted.
     - `channel_message_id` (Integer, Nullable)
     - `creation_date` (DateTime with timezone, Not Null, server_default='now()')
     - `deadline_date` (DateTime with timezone, Not Null)
-    - `status` (String, Not Null, server_default='open') (e.g., "open", "closed", "cancelled")
+    - `status` (String, Not Null, server_default='open')
     - `outcome` (Text, Nullable)
     - `raw_results` (JSON, Nullable)
 
 ## Next Steps
-- Task 2.4: Basic `/propose` Command (Static Duration for now).
+- Task 2.5: Add Multi-Channel Support to Proposal Model (Database Migration & Code Updates).
+    - Update `app/persistence/models/proposal_model.py`.
+    - Generate and apply Alembic migration.
+    - Update relevant repository and service methods.

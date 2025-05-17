@@ -1,5 +1,32 @@
 # Progress Log
 
+## Fri May 16 22:41:10 PDT 2025
+
+**Completed:**
+- Task 2.4: Basic `/propose` Command (Static Duration for now).
+    - Implemented `/propose` command handler in `app/telegram_handlers/command_handlers.py`.
+    - `ProposalService.create_proposal` now handles basic proposal creation logic.
+    - Proposals are posted to the `TARGET_CHANNEL_ID`.
+    - DM confirmation sent to proposer.
+    - Channel message ID is stored for future updates.
+- Addressed `telegram.error.BadRequest` for free-form proposals in channels:
+    - Removed `switch_inline_query_current_chat` button from channel messages for free-form proposals in `app/telegram_handlers/command_handlers.py`.
+    - Updated `memory-bank/testing_instructions.md` to reflect that channel messages for free-form proposals will use text instructions instead of an interactive button.
+- Updated design documents for multi-channel proposal handling:
+    - `memory-bank/projectbrief.md`: Updated with multi-channel user stories and functional requirements.
+    - `memory-bank/systemPatterns.md`: Updated to reflect multi-channel capabilities in `ProposalService`, `ConfigService`, data flows, and proposal model.
+    - `memory-bank/tasks.md`: Added `target_channel_id` to `Proposal` model definition (Task 2.3), clarified its usage in single-channel mode for Task 2.4, and added Task 2.5 for database migration and Task 8.8 for full multi-channel implementation.
+
+**Learnings & Fixes:**
+- `switch_inline_query_current_chat` buttons are not suitable for messages posted by a bot to a channel, as they can lead to `telegram.error.BadRequest` if the user hasn't interacted with the bot directly or if the bot's username isn't implicitly known in the channel context. Relying on clear text instructions for such cases is more robust.
+- Ensured task list (`tasks.md`) correctly reflects the need for a database migration (Task 2.5) after realizing `target_channel_id` was not part of the initial Task 2.3 implementation.
+
+**Next Steps:**
+- Task 2.5: Add Multi-Channel Support to Proposal Model
+    - Update the `Proposal` SQLAlchemy model to include `target_channel_id`.
+    - Generate and apply an Alembic migration to add the `target_channel_id` column to the `proposals` table, with a default value for existing records.
+    - Update repository and service layers to correctly handle the new field.
+
 ## Fri May 16 21:25:44 PDT 2025
 
 **Completed:**
