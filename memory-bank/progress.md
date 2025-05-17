@@ -1,6 +1,28 @@
 # Progress Log
 
 
+## Sat May 17 01:24:52 PDT 2025
+
+**Completed:**
+- Task 3.4: ConversationHandler for `/propose` (most sub-items completed).
+    - Implemented conversational flow for collecting title, description, proposal type, options, duration, and initial context.
+    - Fixed `AttributeError: 'int' object has no attribute 'id'` in `handle_ask_context` by correctly handling the integer document ID returned from `ContextService`.
+    - Fixed `Invalid source_type` error by changing `source_type` in `handle_ask_context` to use `user_text` and `user_url` as expected by `ContextService`.
+- Updated `memory-bank/tasks.md`:
+    - Moved multi-channel `ASK_CHANNEL` sub-tasks from Task 3.4 to Task 8.8.
+    - Added Task 3.5: (Utility) Implement Viewing of Stored Document Chunks.
+    - Added Task 6.3: Enhance URL Content Extraction (noting `crawl4ai` as preferred).
+
+**Learnings & Fixes:**
+- Ensured `handle_ask_context` correctly processes the integer `document_id` returned by `ContextService.process_and_store_document`.
+- Verified that `ContextService` expects `source_type` to end with `_url` or `_text` (e.g., `user_text`, `user_url`).
+
+**Next Steps:**
+- Complete any remaining manual testing for Task 3.4 (Conversational `/propose` flow).
+- Proceed with Task 3.5: (Utility) Implement Viewing of Stored Document Chunks.
+- Address Follow-up Task from 3.4: Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction.
+
+
 ## Sat May 17 00:27:46 PDT 2025
 
 **Completed:**

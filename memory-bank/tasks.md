@@ -178,10 +178,6 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Handler for `COLLECT_OPTIONS` state:
             *   [x] Get options string from user. Parse options. Store in `context.user_data`.
             *   [x] Transition to `ASK_DURATION`. Prompt user.
-    *   [ ] Implement/Update handler for `ASK_CHANNEL` state (if multi-channel mode is active):
-        *   [ ] Prompt user to select a channel.
-        *   [ ] Store selected `target_channel_id` in `context.user_data`.
-        *   [ ] Transition to `ASK_DURATION`. Prompt user.
     *   [x] Implement/Update handler for `ASK_DURATION` state:
         *   [x] Get user's natural language duration.
         *   [x] Call `LLMService.parse_natural_language_duration()` to get `deadline_date`.
@@ -205,9 +201,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] `/propose <Title>; <Description>; FREEFORM`
         *   [x] Test with and without providing initial context.
         *   [x] Test cancellation at various stages.
-        *   [ ] Test channel selection if multi-channel mode is notionally active (Future task).
     *   [ ] **Follow-up Task:** Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction.
-    *   [ ] **Follow-up Task:** Implement the `ASK_CHANNEL` state and related logic for multi-channel support (as per FR2.1.B, FR2.1.C, FR5.9).
+
+3.  **Task 3.5: (Utility) Implement Viewing of Stored Document Chunks**
+    *   [ ] In `VectorDBService`, add a method like `get_document_chunks(sql_document_id)` to retrieve all text chunks from ChromaDB associated with a given SQL document ID.
+    *   [ ] (Optional) Create a simple admin command or utility script that uses this service method to allow viewing of stored chunks for debugging or verification purposes.
+
 
 ## Phase 4: Voting and Submission Logic
 
@@ -318,6 +317,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] `add_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_upload", title=...)`.
     *   [ ] Send confirmation to admin.
 
+3.  **Task 6.3: Enhance URL Content Extraction**
+    *   [ ] Research and select a robust HTML parsing/content extraction library or method (e.g., BeautifulSoup, trafilatura, crawl4ai, Firecrawl tools). crawl4ai preferred.
+    *   [ ] Implement the chosen solution within `ContextService._fetch_content_from_url` to replace the basic `response.text`.
+    *   [ ] Ensure the new implementation extracts clean, main content from web pages, stripping HTML tags, scripts, and other noise.
+    *   [ ] Test with various URLs to confirm improved context quality for RAG.
+
 ## Phase 7: User History, Proposal Management Commands & Privacy
 
 **Goal:** Add commands for user history, proposal viewing/management, and privacy policy.
@@ -386,6 +391,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Update the channel results posting logic in `SchedulingService`/`ProposalService` to use the proposal's `target_channel_id` instead of a global channel ID.
     *   [ ] Add commands to manage authorized channels (admin only).
     *   [ ] Update user-facing proposal listings to include channel information.
+    *   [ ] Implement/Update handler for `ASK_CHANNEL` state (if multi-channel mode is active):
+        *   [ ] Prompt user to select a channel.
+        *   [ ] Store selected `target_channel_id` in `context.user_data`.
+        *   [ ] Transition to `ASK_DURATION`. Prompt user.
+    *   [ ] Test channel selection if multi-channel mode is notionally active (Future task).
+
 
 ## Phase 8: Comprehensive Testing, Refinement, and Deployment Preparation
 

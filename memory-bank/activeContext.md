@@ -1,28 +1,27 @@
-# Active Context - Sat May 17 00:27:46 PDT 2025
+# Active Context - Sat May 17 01:24:52 PDT 2025
 
 ## Current Work Focus
-- Completed Task 3.3: Context Service Setup.
-    - `app/core/context_service.py` is implemented and unit tested.
-    - This service handles fetching content (text/URL), chunking, embedding generation, and storage in SQL (DocumentRepository) and VectorDB (VectorDBService).
-- Preparing for Task 3.4: ConversationHandler for `/propose`.
+- Finalizing Task 3.4: ConversationHandler for `/propose` (most sub-items implemented and tested).
+- Preparing for Task 3.5: (Utility) Implement Viewing of Stored Document Chunks.
 
 ## What's Working
-- `LLMService` is functional.
-- `VectorDBService` is functional.
-- `ContextService` (`app/core/context_service.py`) is functional:
-    - `process_and_store_document` successfully processes and stores text and URL content.
-    - Interactions with `LLMService`, `DocumentRepository`, and `VectorDBService` are working.
-- Unit tests for `ContextService` (`tests/unit/core/test_context_service.py`) are passing, including fixes for `httpx` client mocking.
+- Conversational proposal creation flow in `app/telegram_handlers/message_handlers.py` and `app/telegram_handlers/callback_handlers.py` is largely functional up to and including context processing.
+- `handle_ask_context` correctly uses `ContextService.process_and_store_document` and handles the returned document ID.
+- Error with `source_type` (expecting `user_text`/`user_url`) in `ContextService` interaction has been resolved.
+- Error with `document.id` (expecting integer ID) in `handle_ask_context` has been resolved.
 
 ## What's Broken
-- No known issues related to the completed Task 3.3.
+- Final manual testing for all paths/edge cases of Task 3.4 (conversational propose) might still be pending.
+- The `ASK_CHANNEL` state logic, though defined, is not part of the active flow (deferred to Task 8.8).
 
 ## Active Decisions and Considerations
-- The `_fetch_content_from_url` method in `ContextService` currently uses a basic `response.text`. A TODO exists to add more robust HTML parsing or content extraction (e.g., using a library like `trafilatura` or `beautifulsoup4`) for better quality text from web pages.
+- Task 3.5 (viewing stored document chunks) created and prioritized to allow better verification of context processing.
+- Task 6.3 (Enhance URL Content Extraction) created, noting `crawl4ai` as a preferred library for future implementation to improve RAG quality from URLs.
+- The `_fetch_content_from_url` in `ContextService` still uses basic `response.text` and needs enhancement (now tracked in Task 6.3).
 
 ## Learnings and Project Insights
-- Accurate mocking of asynchronous context managers like `httpx.AsyncClient` is essential for reliable unit tests. This involves mocking `__aenter__` and `__aexit__` and ensuring the yielded client and its response objects are correctly configured.
-- For Python scripts within a package that use absolute imports, direct execution (`python path/to/script.py`) can fail with `ModuleNotFoundError`. Running as a module (`python -m package.module`) or adjusting `sys.path` for test/example scripts are common solutions.
+- Careful attention to expected data types (e.g., integer IDs vs. model objects) and string/enum values is crucial when integrating different services/modules.
+- Iteratively adding utility tasks (like viewing stored data) can significantly aid in debugging and verifying complex data processing pipelines.
 
 ## Current Database/Model State
 - `users` table exists.
@@ -31,8 +30,6 @@
 - No new DB schema changes in this step.
 
 ## Next Steps
-- Continue with Phase 3: Conversational Proposal Creation & Initial Context.
-    - Task 3.4: ConversationHandler for `/propose`.
-        - Refactor `propose_command` in `app/telegram_handlers/command_handlers.py` to use `ConversationHandler`.
-        - Define states: `ASK_DURATION`, `ASK_CONTEXT`.
-        - Implement handlers for these states.
+- Complete any remaining manual testing for Task 3.4.
+- Proceed with Task 3.5: (Utility) Implement Viewing of Stored Document Chunks.
+- Address Follow-up Task from 3.4: Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction for atomicity.
