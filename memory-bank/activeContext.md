@@ -1,39 +1,37 @@
-# Active Context - Wed May 14 16:29:25 PDT 2025
+# Active Context - Fri May 16 21:05:44 PDT 2025
 
 ## Current Work Focus
-- Completed Phase 1: Project Foundation & Basic Bot Setup.
-- Moving to Phase 2: User Management and Core Proposal Features (Static), starting with Task 2.1: User Model & Repository.
+- Completed Task 2.1: User Model & Repository.
+- Moving to Phase 2, Task 2.2: Implicit User Registration.
 
 ## What's Working
-- Basic bot structure is in place (`main.py`, `app/config.py`).
-- `/start` and `/help` commands are functional.
-    - Welcome and help messages are displayed.
-    - HTML formatting for help message is working correctly.
-- Bot starts and runs without asyncio event loop errors.
-- Initial unit tests for command handlers are created.
-- Manual testing instructions are documented.
+- Task 2.1 is fully complete.
+    - `User` SQLAlchemy model is defined.
+    - `UserRepository` with `get_or_create_user` and `get_user_by_telegram_id` is implemented.
+    - The `users` table has been successfully migrated to the Supabase PostgreSQL database using Alembic.
+- Database connectivity established using the Supabase connection pooler URL.
+- Core project structure, basic bot commands (`/start`, `/help`), and Alembic setup are functional from Phase 1.
 
-## What's Next
-- Task 2.1: User Model & Repository
-    - Define `User` SQLAlchemy model in `app/persistence/models/user_model.py`.
-    - Create `app/persistence/repositories/user_repository.py` with `get_or_create_user`.
-    - Generate and apply Alembic migration for the `User` table.
+## What's Broken
+- No known issues related to the completed Task 2.1.
 
-## Project Decisions
-- Using Supabase PostgreSQL as the managed database solution.
-- Using SQLAlchemy with `asyncpg` for asynchronous database operations.
-- Using Alembic for database migrations.
-- Using `python-telegram-bot` as the Telegram bot framework.
-- Using HTML (`ParseMode.HTML`) for Telegram message formatting due to better handling of special characters compared to Markdown.
+## Active Decisions and Considerations
+- Confirmed that using the Supabase connection pooler URL is more reliable for database connections than the direct database hostname, which exhibited DNS resolution issues.
 
 ## Learnings and Project Insights
-- `python-telegram-bot`'s `application.run_polling()` manages its own event loop; `asyncio.run()` should not wrap the main function if `run_polling()` is used directly.
-- Telegram's Markdown parsing is strict. HTML parsing (`ParseMode.HTML`) is generally more robust for messages with complex formatting or special characters.
-- `pytest-asyncio` is required for testing `async def` test functions with `pytest`.
-- Commenting out unused imports (like `DatabaseManager` before implementation) prevents `ImportError`.
+- Direct Supabase database hostnames (e.g., `db.<project_ref>.supabase.co`) can sometimes have DNS resolution problems. Connection pooler hostnames (e.g., `aws-0-<region>.pooler.supabase.com`) are a more robust alternative for application connectivity.
+- Always verify hostname resolution (e.g., using `dig @8.8.8.8 <hostname>`) as a first step when troubleshooting database connection errors like `socket.gaierror`.
+- Ensuring `app/config.py` correctly constructs the database URL from individual components is vital if not using a single `DATABASE_URL` environment variable.
+- Explicitly importing models in `alembic/env.py` can improve the reliability of Alembic's autogenerate feature.
 
 ## Current Database/Model State
-- Supabase project created and connection details are in `.env`.
-- Alembic is configured.
-- `app/persistence/database.py` sets up SQLAlchemy Base.
-- No application-specific database tables (e.g., for Users, Proposals) have been defined or migrated yet. Phase 2 will address this.
+- The `users` table now exists in the Supabase PostgreSQL database.
+- Schema for `users` table:
+    - `id` (Integer, Primary Key, Auto-increment)
+    - `telegram_id` (Integer, Unique, Index, Not Null)
+    - `username` (String, Nullable)
+    - `first_name` (String, Nullable)
+    - `last_updated` (DateTime with timezone, Not Null, server_default='now()')
+
+## Next Steps
+- Task 2.2: Implement implicit user registration logic that utilizes the `UserService` and `UserRepository`.

@@ -80,10 +80,10 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 2.1: User Model & Repository**
-    *   [ ] Define `User` SQLAlchemy model in `app/persistence/models/user_model.py` (id, telegram_id, username, first_name, last_updated).
-    *   [ ] Create `app/persistence/repositories/user_repository.py`.
-        *   [ ] Implement `get_or_create_user(telegram_id, username, first_name)` function.
-    *   [ ] Generate initial Alembic migration for the `User` table (`alembic revision -m "create_user_table"`) and apply it (`alembic upgrade head`).
+    *   [x] Define `User` SQLAlchemy model in `app/persistence/models/user_model.py` (id, telegram_id, username, first_name, last_updated).
+    *   [x] Create `app/persistence/repositories/user_repository.py`.
+        *   [x] Implement `get_or_create_user(telegram_id, username, first_name)` function.
+    *   [x] Generate initial Alembic migration for the `User` table (`alembic revision -m "create_user_table"`) and apply it (`alembic upgrade head`).
 
 2.  **Task 2.2: Implicit User Registration**
     *   [ ] Create `app/core/user_service.py`.

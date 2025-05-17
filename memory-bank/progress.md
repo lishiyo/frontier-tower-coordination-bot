@@ -1,5 +1,25 @@
 # Progress Log
 
+## Fri May 16 21:05:44 PDT 2025
+
+**Completed:**
+- Task 2.1: User Model & Repository
+    - Defined `User` SQLAlchemy model in `app/persistence/models/user_model.py`.
+    - Created `UserRepository` in `app/persistence/repositories/user_repository.py` with `get_or_create_user` and `get_user_by_telegram_id` methods.
+    - Populated and applied Alembic migration `8aa34f61aaa0_create_user_table.py` to create the `users` table.
+
+**Learnings & Fixes:**
+- Encountered `socket.gaierror` during `alembic upgrade head` due to DNS resolution issues with the Supabase direct database hostname (e.g., `db.<project_ref>.supabase.co`).
+- Debugged DNS resolution using `dig @8.8.8.8 <hostname>`, which confirmed the direct DB hostname was not resolving publicly (`ANSWER: 0`).
+- The general project API hostname (e.g., `<project_ref>.supabase.co`) and the connection pooler hostname (e.g., `aws-0-<region>.pooler.supabase.com`) were resolvable.
+- Resolved the database connection issue by switching the `POSTGRES_HOST` and `POSTGRES_USER` in `.env` to use the Supabase **connection pooler** details. This allowed `alembic upgrade head` to succeed.
+- Corrected `app/config.py` to ensure `get_database_url()` properly constructs the connection string from individual `POSTGRES_*` environment variables.
+- Added explicit import of `user_model` to `alembic/env.py` for robustness in migration autogeneration.
+
+**Next Steps:**
+- Phase 2: User Management and Core Proposal Features (Static)
+    - Task 2.2: Implicit User Registration
+
 ## Wed May 14 16:29:25 PDT 2025
 
 **Completed:**

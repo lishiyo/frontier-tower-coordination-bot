@@ -9,6 +9,7 @@ See also [systemPatterns.md](./systemPatterns.md) for target architecture and co
     *   **PostgreSQL (via Supabase):** Supabase will be used as the managed PostgreSQL provider. This offers ease of setup, scalability, and additional features like auth and real-time capabilities (though we'll primarily use its core PostgreSQL functionality).
     *   **SQLAlchemy:** An ORM (Object Relational Mapper) to interact with the Supabase PostgreSQL database in a Pythonic way, using the **`asyncpg`** driver for asynchronous operations.
     *   **Database Migrations:** **Alembic** will be used for managing schema changes against the Supabase database.
+    *   **Connection Note:** When connecting to Supabase, prefer using the **Connection Pooler URL** (e.g., `aws-0-<region>.pooler.supabase.com`) provided in the Supabase dashboard. Direct hostnames (e.g., `db.<project_ref>.supabase.co`) may sometimes experience DNS resolution issues, while the pooler endpoint is generally more reliable for application connections.
 
 **Context Engine (RAG - Retrieval Augmented Generation):**
     *   **Vector Database:**
