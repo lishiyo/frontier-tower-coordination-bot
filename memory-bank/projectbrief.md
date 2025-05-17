@@ -150,7 +150,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR6.1:** `/my_submissions` (or `/my_votes`) command (DM): Show list of proposals user voted on/submitted to and their `response_content`.
     *   **FR6.2:** `/proposals open` command (DM): List open proposals with titles and deadlines. (Future: could be filtered by channel if multi-channel is active).
     *   **FR6.3:** `/proposals closed` command (DM): List closed proposals with titles and outcomes. (Future: could be filtered by channel).
-    *   **FR6.4:** `/view_submissions <proposal_id>` command (DM): For closed free-form proposals, lists all anonymized text submissions.
+    *   **FR6.4:** `/view_results <proposal_id>` command (DM): For closed proposals, lists all anonymized text submissions (if freeform) or breakdown of votes (if MC).
 
 **5.7. Contextual Information (RAG)**
     *   **FR7.1 (Admin/Proposer - Adding General/Specific Docs):**
@@ -365,14 +365,14 @@ Thank you for your submissions! Here's a summary of the ideas received:
 
 [LLM Generated Summary of Clusters]
 
-To see all submissions, DM me: `/view_submissions [proposal_id]`"
+To see all submissions, DM me: `/view_results [proposal_id]`"
             *   (Optional v0, Core v1) DM proposers/submitters with the outcome. (Deadline reminders are v1).
 
 6.  **Viewing Proposals & Submission History (DM to Bot):**
     *   `/my_submissions` (or `/my_votes`): Shows a list of proposals the user submitted to, their `response_content`, and the proposal status/outcome.
     *   `/proposals open`: Lists open proposals (both types) with titles and deadlines.
     *   `/proposals closed`: Lists closed proposals (both types) with titles and outcomes. (Future enhancement: allow filtering by channel if many channels are used).
-    *   `/view_submissions <proposal_id>`: For closed free-form proposals, lists all anonymized submissions.
+    *   `/view_results <proposal_id>`: For closed proposals, lists all anonymized submissions (freeform) or vote results (MC).
     *   `/view_docs`: Lists authorized channels the bot is configured with (useful for discovering `channel_id`).
     *   `/view_docs <channel_id>`: Lists proposals within a given channel (useful for discovering `proposal_id`).
     *   `/view_docs <proposal_id>`: Lists context documents attached to a specific proposal (useful for discovering `document_id`).

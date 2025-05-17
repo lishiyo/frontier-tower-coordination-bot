@@ -150,4 +150,6 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 # TODO: Move other document-related commands here:
 # - add_doc_command
+# - edit_doc_command
+# - delete_doc_command
 # - ask_command 

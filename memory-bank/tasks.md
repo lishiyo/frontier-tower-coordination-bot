@@ -411,12 +411,13 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] (Optional) Could initiate a short conversation if no context provided in command.
     *   [ ] Send confirmation/error DM.
 
-6.  **Task 7.6: Implement `/view_submissions` Command**
-    *   [ ] In `ProposalService`, implement `get_all_submissions_for_proposal_view(proposal_id)`:
-        *   [ ] Fetch proposal. Ensure it's "closed" and "free_form".
-        *   [ ] Fetch `proposal.raw_results` (which should contain the list of anonymized submissions).
+6.  **Task 7.6: Implement `/view_results` Command**
+    *   [ ] In `ProposalService`, implement `get_all_results_for_proposal_view(proposal_id)`:
+        *   [ ] Fetch proposal. Ensure it's "closed".
+        *   [ ] Free "multiple_choice" results, fetch the total vote counts for each of the options.
+        *   [ ] For "free_form" results, fetch `proposal.raw_results` (which should contain the list of anonymized submissions).
         *   [ ] Format for display.
-    *   [ ] Implement `view_submissions_command` in `command_handlers.py`.
+    *   [ ] Implement `view_results_command` in `submission_command_handlers.py`.
 
 7.  **Task 7.7: Implement `/privacy` Command**
     *   [ ] Create a static privacy policy text.

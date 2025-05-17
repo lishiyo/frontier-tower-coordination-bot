@@ -62,22 +62,22 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<proposal_id>`: The ID of the proposal to cancel.
     *   **Context:** DM with the bot (proposer only).
 
+*   `/view_results <proposal_id>`
+    *   **Description:** Allows any user to view all anonymized free-form text submissions or breakdown of votes (e.g. "30% A, 70% B") for a specific closed proposal.
+    *   **Parameters:**
+        *   `<proposal_id>`: The ID of the closed proposal.
+    *   **Context:** DM with the bot.
+
+*   `/privacy`
+    *   **Description:** Displays the bot's privacy policy, outlining data storage, usage, and anonymity aspects.
+    *   **Context:** DM with the bot.
+
 *   `/add_doc <proposal_id>`
     *   **Description:** Allows the original proposer to add supplementary context (text, URL, or via chat) to their specific proposal after its initial creation. This context is used by the RAG system for `/ask` queries.
     *   **Parameters:**
         *   `<proposal_id>`: The ID of the proposal to add context to.
         *   (Context can be provided as text/URL directly, or the bot might initiate a short chat).
     *   **Context:** DM with the bot (proposer only).
-
-*   `/view_submissions <proposal_id>`
-    *   **Description:** Allows any user to view all anonymized free-form text submissions for a specific closed idea generation proposal.
-    *   **Parameters:**
-        *   `<proposal_id>`: The ID of the closed free-form proposal.
-    *   **Context:** DM with the bot.
-
-*   `/privacy`
-    *   **Description:** Displays the bot's privacy policy, outlining data storage, usage, and anonymity aspects.
-    *   **Context:** DM with the bot.
 
 *   `/view_docs`
     *   **Description:** Lists all authorized channels the bot is configured to work with. Useful for finding a `channel_id`.
