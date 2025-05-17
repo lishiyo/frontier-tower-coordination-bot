@@ -128,7 +128,15 @@ async def propose_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             logger.debug(f"User {user.id}: Entered propose_command try block.")
             proposal_service = ProposalService(session)
             
-            logger.debug(f"User {user.id}: Calling proposal_service.create_proposal with title='{title}', type='{proposal_type.value}'")
+            # Get the target_channel_id from ConfigService
+            # This is for the single-channel mode as per Task 2.4 and 2.5 scope
+            target_channel_id_for_proposal = ConfigService.get_target_channel_id()
+            if not target_channel_id_for_proposal:
+                logger.error(f"User {user.id}: TARGET_CHANNEL_ID is not configured. Cannot create proposal.")
+                await update.message.reply_text("Error: Bot is not configured with a target channel for proposals. Please contact admin.")
+                return
+
+            logger.debug(f"User {user.id}: Calling proposal_service.create_proposal with title='{title}', type='{proposal_type.value}', target_channel_id='{target_channel_id_for_proposal}'")
             new_proposal = await proposal_service.create_proposal(
                 proposer_telegram_id=user.id,
                 proposer_username=user.username,
@@ -138,6 +146,7 @@ async def propose_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 proposal_type=proposal_type,
                 options=options,
                 deadline_date=deadline_date,
+                target_channel_id=target_channel_id_for_proposal,
             )
             logger.debug(f"User {user.id}: Proposal_service.create_proposal returned proposal ID {new_proposal.id if new_proposal else 'None'}.")
 
@@ -152,11 +161,11 @@ async def propose_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             logger.debug(f"User {user.id}: Successfully sent confirmation DM for proposal {new_proposal.id}.")
 
             # Post to channel
-            target_channel_id = ConfigService.get_target_channel_id()
-            logger.debug(f"User {user.id}: Target channel ID: {target_channel_id}")
-            if not target_channel_id:
-                logger.error("TARGET_CHANNEL_ID is not configured. Cannot post proposal to channel.")
-                await update.message.reply_text("Error: Bot is not configured to post to a channel. Please contact admin.")
+            # target_channel_id is now sourced from new_proposal.target_channel_id
+            logger.debug(f"User {user.id}: Target channel ID from proposal: {new_proposal.target_channel_id}")
+            if not new_proposal.target_channel_id: # Should not happen if creation was successful
+                logger.error("Proposal object has no target_channel_id after creation. Cannot post proposal to channel.")
+                await update.message.reply_text("Error: Proposal created without a channel. Please contact admin.")
                 return
             
             user_repo = UserRepository(session)
@@ -184,9 +193,9 @@ async def propose_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 # For now, no reply_markup is needed for multiple choice either.
                 pass
             
-            logger.debug(f"User {user.id}: Attempting to send message to channel {target_channel_id}.")
+            logger.debug(f"User {user.id}: Attempting to send message to channel {new_proposal.target_channel_id}.")
             sent_channel_message = await context.bot.send_message(
-                chat_id=target_channel_id,
+                chat_id=new_proposal.target_channel_id, # Use target_channel_id from the proposal object
                 text=channel_message_text,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=channel_reply_markup # This will be None for free-form and currently for MC too
@@ -197,7 +206,7 @@ async def propose_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             logger.debug(f"User {user.id}: Updating proposal {new_proposal.id} with channel message ID {sent_channel_message.message_id}.")
             await proposal_repo.update_proposal_message_id(new_proposal.id, sent_channel_message.message_id)
             await session.commit()
-            logger.info(f"Proposal {new_proposal.id} created by user {user.id}, posted to channel {target_channel_id}, message ID updated and committed.")
+            logger.info(f"Proposal {new_proposal.id} created by user {user.id}, posted to channel {new_proposal.target_channel_id}, message ID updated and committed.")
 
         except ValueError as e:
             logger.error(f"ValueError during proposal creation for user {user.id}: {e}", exc_info=True)

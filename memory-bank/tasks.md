@@ -125,7 +125,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Apply the migration using `alembic upgrade head`. (User will do this part)
     *   [x] Update `app/persistence/repositories/proposal_repository.py` methods to handle the new field.
     *   [x] Update `app/core/proposal_service.py` to ensure it properly passes `target_channel_id` to repository methods.
-    *   [ ] Verify that existing proposal functionality works with the new field. (User will do this part)
+    *   [x] Verify that existing proposal functionality works with the new field. (User will do this part)
 
 ## Phase 3: Conversational Proposal Creation & Initial Context
 
