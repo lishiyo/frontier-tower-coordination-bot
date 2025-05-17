@@ -1,5 +1,26 @@
 # Progress Log
 
+## Sat May 17 00:02:53 PDT 2025
+
+**Completed:**
+- Task 3.1: LLM Service Setup
+    - Created `app/services/llm_service.py`.
+    - Implemented `generate_embedding(text)` using OpenAI API.
+    - Implemented `get_completion(prompt)` using OpenAI API.
+    - Implemented `parse_natural_language_duration(text)` using OpenAI API:
+        - Developed a stricter prompt to instruct the LLM to return only a datetime string in 'YYYY-MM-DD HH:MM:SS UTC' format or 'ERROR_CANNOT_PARSE'.
+        - Included current UTC time as context in the prompt for better relative date parsing.
+        - Added logic to parse the LLM's string response into a timezone-aware `datetime` object.
+    - User confirmed the `parse_natural_language_duration` function is working as expected after prompt refinement.
+
+**Learnings & Fixes:**
+- LLMs can be overly verbose. Initial implementation of `parse_natural_language_duration` resulted in the LLM returning explanations along with the date, causing parsing failures.
+- Refining prompts to be very explicit about the desired output format (e.g., "Respond with ONLY...") is crucial for reliable parsing of LLM responses.
+
+**Next Steps:**
+- Continue with Phase 3: Conversational Proposal Creation & Initial Context.
+    - Task 3.2: VectorDB Service Setup & Document Model.
+
 ## Fri May 16 22:51:12 PDT 2025
 
 **Completed:**

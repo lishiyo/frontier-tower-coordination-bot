@@ -137,7 +137,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 1.  **Task 3.1: LLM Service Setup**
     *   [x] Create `app/services/llm_service.py`.
-    *   [ ] Implement `parse_natural_language_duration(text)` function using OpenAI API. (Placeholder added, full implementation pending)
+    *   [x] Implement `parse_natural_language_duration(text)` function using OpenAI API.
     *   [x] Implement `generate_embedding(text)` function using OpenAI API.
     *   [x] Implement `get_completion(prompt)` function using OpenAI API.
 
