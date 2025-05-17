@@ -28,10 +28,10 @@ class DocumentRepository:
             # upload_date is server_default
         )
         self.db_session.add(new_document)
+        await self.db_session.flush()
         # The commit should ideally be handled by the service layer or calling handler
         # to manage transactions across multiple repository calls if needed.
         # For now, let's make this repository method commit itself for simplicity in this step.
-        await self.db_session.commit()
         await self.db_session.refresh(new_document)
         return new_document
 
@@ -51,7 +51,7 @@ class DocumentRepository:
             # For now, let's assume the handler will commit after this call if it's part of a larger transaction.
             # To be safe for now and ensure the link is made if called standalone, I will add a commit here.
             # This is another point of refactoring for better transaction control.
-            await self.db_session.commit()
-            await self.db_session.refresh(document)
+            # await self.db_session.commit() # REMOVED
+            # await self.db_session.refresh(document) # Can be called by handler after commit if needed.
             return document
         return None 
