@@ -80,55 +80,73 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     async with AsyncSessionLocal() as session:
         cfg_service = ConfigService()
         proposal_service = ProposalService(db_session=session)
-        context_service = ContextService(db_session=session, llm_service=None, vector_db_service=None)
+        # Ensure LLMService and VectorDBService are correctly initialized if ContextService needs them
+        # For list_documents_for_proposal, they are likely not needed.
+        llm_service_instance = None # Or initialize properly if needed elsewhere
+        vector_db_service_instance = None # Or initialize properly if needed elsewhere
+        context_service = ContextService(db_session=session, llm_service=llm_service_instance, vector_db_service=vector_db_service_instance)
 
         if not args: # /view_docs (no arguments)
             logger.info(f"User {user_id} requested /view_docs (no args).")
             target_channel_id = cfg_service.get_target_channel_id()
             if target_channel_id:
+                # Attempt to get channel name if possible (future enhancement)
                 await update.message.reply_text(f"Proposals are currently managed in channel: {target_channel_id}")
             else:
-                await update.message.reply_text("The bot is not currently configured with a target proposal channel.")
+                await update.message.reply_text("The bot is not currently configured with a default target proposal channel.")
             return
 
         first_arg = args[0]
+        
         try:
-            proposal_id_arg = int(first_arg)
-            logger.info(f"User {user_id} requested /view_docs for proposal_id: {proposal_id_arg}")
+            # Attempt to parse as an integer first
+            potential_id = int(first_arg)
 
-            # Check if this proposal_id actually exists to differentiate from a numeric channel_id
-            # This is a bit heuristic. A more robust way might be needed if channel IDs can also be purely numeric
-            # and overlap with proposal IDs. For now, assume proposal IDs are primary.
-            # To be safer, we could first try to fetch as proposal. If not found, then try as channel if it's a string.
-            # For now, this logic assumes if it's an int, it *could* be a proposal_id.
-            
-            temp_proposal = await proposal_service.proposal_repository.get_proposal_by_id(proposal_id_arg)
-
-            if temp_proposal:
-                documents = await context_service.list_documents_for_proposal(proposal_id_arg)
+            if potential_id > 0: # Proposal IDs are positive integers
+                logger.info(f"User {user_id} requested /view_docs with potential proposal_id: {potential_id}")
+                # Check if it's a valid proposal and list its documents
+                documents = await context_service.list_documents_for_proposal(potential_id)
                 if documents:
-                    doc_lines = [f"Documents for Proposal ID {proposal_id_arg}:"]
+                    doc_lines = [f"Documents for Proposal ID {potential_id}:"]
                     for doc in documents:
                         doc_lines.append(f"  - ID: {doc.id}, Title: {doc.title or 'N/A'}")
                     await update.message.reply_text("\n".join(doc_lines))
+                    return
                 else:
-                    await update.message.reply_text(f"No documents found for Proposal ID {proposal_id_arg}.")
-                return
+                    # It's a positive integer, but either not a proposal or a proposal with no documents.
+                    # Check if the proposal itself exists to give a more specific message.
+                    proposal_exists = await proposal_service.proposal_repository.get_proposal_by_id(potential_id)
+                    if proposal_exists:
+                        await update.message.reply_text(f"No documents found for Proposal ID {potential_id}.")
+                    else:
+                        # Positive int, but not a proposal ID. It might be an invalid ID or a numeric channel string.
+                        # Fall through to treat as channel_id string.
+                        logger.info(f"Positive integer {potential_id} is not a known proposal ID. Will attempt to treat '{first_arg}' as a channel identifier.")
+                        pass # Fall through to channel_id string logic
             else:
-                pass # Fall through to channel_id logic
-        except ValueError:
-            pass # Fall through to channel_id logic
+                # It's a non-positive integer (e.g., a typical Telegram channel ID like -100...). Treat as channel_id.
+                logger.info(f"Argument '{first_arg}' (parsed as {potential_id}) is non-positive. Treating as channel identifier.")
+                pass # Fall through to channel_id string logic
         
-        channel_id_arg = str(first_arg)
-        logger.info(f"User {user_id} requested /view_docs for channel_id: {channel_id_arg}")
-        proposals = await proposal_service.list_proposals_by_channel(channel_id_arg)
-        if proposals:
-            proposal_lines = [f"Proposals in Channel {channel_id_arg}:"]
-            for prop in proposals:
-                proposal_lines.append(f"  - ID: {prop.id}, Title: {prop.title}, Status: {prop.status}")
+        except ValueError:
+            # Not an integer, so must be a string channel_id (or invalid argument).
+            logger.info(f"Argument '{first_arg}' is not an integer. Treating as channel identifier.")
+            pass # Fall through to channel_id string logic
+
+        # If we reached here, it's either a string, a non-positive int, or a positive int not recognized as a proposal_id.
+        # Treat first_arg as a channel_id string for listing proposals.
+        channel_id_arg_str = str(first_arg)
+        logger.info(f"User {user_id} attempting to list proposals for channel/identifier: {channel_id_arg_str}")
+        
+        proposals_list = await proposal_service.list_proposals_by_channel(channel_id_arg_str) # Renamed variable to avoid conflict
+        if proposals_list:
+            proposal_lines = [f"Proposals for channel/identifier '{channel_id_arg_str}':"]
+            for prop in proposals_list:
+                status_display = prop.status.value if hasattr(prop.status, 'value') else str(prop.status)
+                proposal_lines.append(f"  - ID: {prop.id}, Title: {prop.title}, Status: {status_display}")
             await update.message.reply_text("\n".join(proposal_lines))
         else:
-            await update.message.reply_text(f"No proposals found in Channel {channel_id_arg}, or channel not found/authorized.")
+            await update.message.reply_text(f"No proposals found for channel/identifier '{channel_id_arg_str}', or it's not a recognized proposal ID or channel.")
 
 # TODO: Move other document-related commands here:
 # - add_proposal_context_command
