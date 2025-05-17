@@ -21,6 +21,28 @@
 - Continue with Phase 3: Conversational Proposal Creation & Initial Context.
     - Task 3.2: VectorDB Service Setup & Document Model.
 
+## Sat May 17 00:27:46 PDT 2025
+
+**Completed:**
+- Task 3.3: Context Service Setup
+    - Created `app/core/context_service.py`.
+    - Implemented `ContextService.process_and_store_document` method, including:
+        - URL fetching (`_fetch_content_from_url` using `httpx`).
+        - Text chunking (using `app.utils.text_processing.simple_chunk_text`).
+        - Embedding generation via `LLMService`.
+        - Document metadata storage in `DocumentRepository`.
+        - Embedding storage in `VectorDBService`, linking SQL Document ID and updating SQL document with vector IDs.
+    - Wrote unit tests for `ContextService` in `tests/unit/core/test_context_service.py`.
+    - Addressed and fixed issues with `httpx.AsyncClient` mocking in asynchronous context managers within the tests.
+
+**Learnings & Fixes:**
+- Correctly mocking `httpx.AsyncClient` when used as an asynchronous context manager requires careful setup of `__aenter__` and `__aexit__` methods on the mock instance. `MagicMock` should be used for the client yielded by `__aenter__` and for the response object, especially for synchronous attributes/methods like `response.text` or `response.raise_for_status()`.
+- Running Python scripts that are part of a package directly (e.g., `python app/services/some_service.py`) can lead to `ModuleNotFoundError` if they use absolute imports from the package root. This is because the script's directory is added to `sys.path` but not necessarily the project root. Solutions include running as a module (`python -m app.services.some_service`) or temporarily modifying `sys.path` within `if __name__ == '__main__':` blocks for example/testing scripts.
+
+**Next Steps:**
+- Continue with Phase 3: Conversational Proposal Creation & Initial Context.
+    - Task 3.4: ConversationHandler for `/propose`.
+
 ## Fri May 16 22:51:12 PDT 2025
 
 **Completed:**

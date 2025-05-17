@@ -6,3 +6,5 @@ venv/
 __pycache__/
 *.db
 .DS_Store
+
+test_chroma_db_store/
