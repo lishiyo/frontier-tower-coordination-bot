@@ -4,7 +4,7 @@ We are building a Telegram bot called `CoordinationBot` for policy proposals and
 
 This document outlines the product requirements for `CoordinationBot`, which is designed to facilitate policy proposals, idea generation, voting, and information dissemination within the community. The bot will allow members to create proposals, vote on predefined options or submit free-form responses, access contextual information about policies, and (in the future) receive personalized voting recommendations.
 
-**Core features (v0):
+**Core features (v0):**
 - you can DM the bot to create policy proposals like "what kind of events should we do" and then it will post your proposal in a channel and people can vote on it
 - it will store everyone's voting history, the proposals, the proposals outcomes and so on
 - the answers can be free-form, it's not always select a single option (for example for "what kind of events should we do", that's fill-in)
@@ -13,11 +13,18 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     - the original proposal poster can also ask the bot to post in the full public channel about an update, in order to clarify a question for everyone
 - in the future (v1) it should also be plugged into more context specific to you (chats with you, your own docs etc) beyond just your voting history, so it could recommend you how to vote as well
 
+**(Enhanced) Multi-Channel Proposal Destination (v0.5 / v1):**
+- The bot can be configured to post proposals to a single designated channel (current v0 behavior via `TARGET_CHANNEL_ID`).
+- Future Enhancement: The bot can be configured to operate with multiple authorized channels. Users can then initiate proposals directly within an authorized channel (with follow-up in DM), or when proposing via DM, they can select the target channel from a list of authorized channels.
+
+
 **User Stories**
 
 *   **As a Proposer, I want to:**
-    *   Create a new policy proposal with a title, description, and a set of predefined voting options or a free-form option. The bot will then ask me for the voting deadline (which I can specify as a duration or an end date/time), so that the community can vote on it.
-    *   Create a new idea generation proposal with a title and description, asking for free-form text input from members. The bot will ask me for the submission deadline (which I can specify as a duration or an end date/time), so I can gather diverse ideas.
+    *   Create a new policy proposal with a title, description, and a set of predefined voting options or a free-form option. The bot will then ask me for the voting deadline (which I can specify as a duration or an end date/time), so that the community can vote on it. (Note: This will use the default channel or trigger channel selection if multi-channel is active).
+    *   Create a new idea generation proposal with a title and description, asking for free-form text input from members. The bot will ask me for the submission deadline (which I can specify as a duration or an end date/time), so I can gather diverse ideas. (Note: This will use the default channel or trigger channel selection if multi-channel is active).
+    *   **(New)** Type `/propose` in my project's specific Telegram channel, and have the bot guide me through adding details (like duration and context) via DM, then automatically post the formatted proposal back to that same project channel.
+    *   **(New)** When I DM the bot with `/propose`, if the bot is configured to work with multiple community channels, I want to be asked and be able to select which channel my proposal is for.
     *   Be notified when my proposal is created and when its deadline passes and results are published.
     *   Be able to add more context about my proposal to the bot (e.g., by uploading a document or chatting with the bot about it), so users asking about my proposal can get more detailed information.
     *   Be able to edit the title, description, or options of my proposal if no votes have been cast yet.
@@ -38,6 +45,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   Upload and manage general context documents (e.g., existing policies, guidelines) that the bot can use to answer questions.
     *   Invite the bot to channels.
     *   View all proposals, their outcomes, and (after results are published) who submitted/voted for transparency and record-keeping (for v0).
+    *   **(New)** Configure the bot with one or more 'authorized proposal channel IDs' where proposals can be initiated or targeted.
     *   (Future v1) Cancel or moderate any proposals, edit proposals, extend deadlines, close proposals early, or ban users.
 *   **As a Future User (with consent), I want to:**
     *   Receive personalized recommendations on how to vote based on my past voting history and other relevant personal context (my documents, chats with the bot).
@@ -45,7 +53,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
 **5. Functional Requirements**
 
 **5.1. Core Bot Interaction & User Management**
-    *   **FR1.1:** Bot accessible via Telegram DM and posts to a designated Telegram Channel.
+    *   **FR1.1:** Bot accessible via Telegram DM and posts to a designated Telegram Channel (or multiple, if configured).
     *   **FR1.2:** Implicit user registration: store `telegram_id`, `first_name`, `username` (if available) on first interaction.
     *   **FR1.3:** `/start` command: Welcome message.
     *   **FR1.4:** `/help` command: Display available commands and usage (including `/privacy`).
@@ -53,26 +61,44 @@ This document outlines the product requirements for `CoordinationBot`, which is 
 
 **5.2. Proposal Creation**
     *   **FR2.1 (Proposing):**
-        *   User DMs bot: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
-        *   Example (Multiple Choice): `/propose Event Types; What kind of events?; Hackathons, Talks, Socials`
-        *   Example (Free Form): `/propose AI Project Ideas; Suggest cool AI projects!`
-        *   Bot will then ask: "How long should this proposal be open for voting/submissions, or until when would you like to set the deadline?"
-        *   User provides a natural language response (e.g., "7 days", "until May 21st at 5 PM", "for 3 weeks").
-        *   The bot will use an LLM to parse this response and determine the `deadline_date`. Bot confirms interpretation with user if ambiguous.
-        *   **Bot then asks:** "Great! Your proposal details are set. Do you have any extra context or background information to add? This won't appear in the public poll itself but will be very helpful if users ask questions about the proposal. You can paste text, provide a URL, or just say 'no' for now."
-        *   User responds. If context (text/URL) is provided, bot processes and stores it (see FR2.5 logic), associating it with the new proposal.
-    *   **FR2.2:** Bot parses initial command, validates title, description, and options (minimum 2 options for multiple-choice). Confirms deadline interpretation with user if ambiguous, or proceeds if confident.
-    *   **FR2.3:** Store proposal details in the database, including `proposal_type` ("multiple_choice" or "free_form"), proposer, creation date, LLM-parsed `deadline_date`. For multiple-choice, `options` are stored as a list of strings.
-    *   **FR2.4:** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`."
+        *   User DMs bot: `/propose <Title>; <Description>; [Options OR "FREEFORM"]` OR User types in an authorized channel: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
+        *   Example (Multiple Choice in DM): `/propose Event Types; What kind of events?; Hackathons, Talks, Socials`
+        *   Example (Free Form in DM): `/propose AI Project Ideas; Suggest cool AI projects!`
+        *   Example (In-Channel): User in `#project-alpha` types `/propose New Feature; Discuss adding X; FREEFORM`
+
+        *   **Proposal Initiation Source & Channel Targeting:**
+            *   **FR2.1.A (DM Initiation - Single Channel Mode):** "If a user DMs the bot `/propose...` and the bot is configured with a single default target channel (e.g., via `TARGET_CHANNEL_ID` environment variable), this channel is used as the `target_channel_id`. The bot proceeds to ask for duration."
+            *   **FR2.1.B (DM Initiation - Multi-Channel Mode):** "If a user DMs the bot `/propose...` and the bot is configured for multiple authorized proposal channels (see FR5.9):
+                *   The bot will ask the user (e.g., after parsing the initial title/desc/options): 'Which channel is this proposal for?'
+                *   The bot will present a list of authorized channels (e.g., via inline keyboard in the DM).
+                *   The user's selection will determine the `target_channel_id` for the proposal.
+                *   The rest of the proposal creation flow (duration, context) continues in DM."
+            *   **FR2.1.C (In-Channel Initiation):** "If a user types `/propose...` directly within a Telegram channel where the bot is a member:
+                *   The bot checks if this channel is an 'authorized proposal channel' (see FR5.9).
+                *   If authorized:
+                    *   The bot uses this channel's ID as the `target_channel_id`.
+                    *   The bot sends a DM to the proposing user to continue the setup, (e.g., 'Let\'s continue setting up your proposal \'{Title}\u0027 for the \'{Channel Name}\u0027 channel. How long should it be open for...?'). The bot might need to prompt the user to DM it first if it can't initiate DMs (e.g., user has privacy settings or hasn't started a chat with the bot).
+                    *   The final proposal is posted back to the originating authorized channel.
+                *   If not an authorized channel for proposals, or if the bot cannot DM the user, the bot may post an ephemeral clarifying message in the channel if possible (e.g. 'Please DM me to create proposals, or use an authorized channel.'), or simply not respond to the in-channel `/propose`. Behavior might depend on bot's permissions in that channel."
+
+        *   **(Common Flow after channel is determined):**
+            *   Bot will then ask: "How long should this proposal be open for voting/submissions, or until when would you like to set the deadline?"
+            *   User provides a natural language response (e.g., "7 days", "until May 21st at 5 PM", "for 3 weeks").
+            *   The bot will use an LLM to parse this response and determine the `deadline_date`. Bot confirms interpretation with user if ambiguous.
+            *   **Bot then asks:** "Great! Your proposal details are set. Do you have any extra context or background information to add? This won't appear in the public poll itself but will be very helpful if users ask questions about the proposal. You can paste text, provide a URL, or just say 'no' for now."
+            *   User responds. If context (text/URL) is provided, bot processes and stores it (see FR2.5 logic), associating it with the new proposal.
+    *   **FR2.2:** Bot parses initial command (title, description, options from user input, whether from DM or in-channel message content). Validates title, description, and options (minimum 2 options for multiple-choice). Confirms deadline interpretation with user if ambiguous, or proceeds if confident. (This step now incorporates the channel determination from FR2.1.A/B/C).
+    *   **FR2.3:** Store proposal details in the database, including `proposal_type` ("multiple_choice" or "free_form"), proposer, creation date, LLM-parsed `deadline_date`, and the **`target_channel_id`** (determined from FR2.1.A/B/C). For multiple-choice, `options` are stored as a list of strings.
+    *   **FR2.4:** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel '[Channel Name/ID]' shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`." (Channel name/ID included for clarity in multi-channel scenarios).
     *   **FR2.5 (Adding Context - Proposer - Later or if initial offer declined):** `/add_proposal_context <proposal_id> <URL or paste text OR trigger chat>` (DM)
         *   Allows proposer to upload a document, paste text, or engage in a short chat with the bot to add context to their specific proposal *after* initial creation or if they initially declined to add context.
         *   This content is processed (chunked, embedded) and stored, linked to the `proposal_id` in the `Document` table, for use in RAG when users ask about this proposal. If text is from chat, `source_url` in `Document` table might indicate "proposer_chat_context".
 
 **5.3. Proposal Broadcasting & Interaction**
-    *   **FR3.1:** Bot posts new proposal to designated Telegram Channel.
+    *   **FR3.1:** Bot posts new proposal to the proposal's designated **`target_channel_id`** (as stored in the proposal record).
         *   **Multiple Choice:** Message includes title, description, proposer, deadline, and inline keyboard buttons for each voting option. Callback data for buttons includes `proposal_id` and `option_index` (0-based index of the option).
         *   **Free Form:** Message includes title, description, proposer, deadline, and clear instructions on how to submit via DM (e.g., "DM me `/submit <proposal_id> Your idea here`"). Proposal ID should be clearly visible. Includes an inline button "💬 Submit Your Idea" using `switch_inline_query_current_chat` to prefill the `/submit <proposal_id> ` command in the user's DM with the bot.
-    *   **FR3.2:** Store `channel_message_id` for future updates (e.g., posting results).
+    *   **FR3.2:** Store `channel_message_id` (of the message in the `target_channel_id`) for future updates (e.g., posting results).
 
 **5.4. Voting & Submission**
     *   **FR4.1 (Multiple Choice Voting):**
@@ -93,10 +119,10 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR4.4 (Proposal Editing - Proposer):** `/edit_proposal <proposal_id>` (DM)
         *   Allows proposer to edit `title`, `description`, and `options` (if multiple-choice) of their own proposal.
         *   Condition: Only allowed if no votes/submissions have been made for the proposal yet.
-        *   If edited, bot updates the proposal message in the channel.
+        *   If edited, bot updates the proposal message in the `target_channel_id`.
     *   **FR4.5 (Proposal Cancellation - Proposer):** `/cancel_proposal <proposal_id>` (DM)
         *   Allows proposer to cancel their own proposal if its `status` is "open".
-        *   Bot updates proposal `status` to "cancelled", updates the channel message (e.g., "This proposal has been cancelled by the proposer."), and notifies any existing voters/submitters via DM (optional).
+        *   Bot updates proposal `status` to "cancelled", updates the channel message (e.g., "This proposal has been cancelled by the proposer.") in the `target_channel_id`, and notifies any existing voters/submitters via DM (optional).
 
 **5.5. Deadline Management & Results**
     *   **FR5.1:** Automated scheduler checks for proposals past their deadline.
@@ -104,24 +130,24 @@ This document outlines the product requirements for `CoordinationBot`, which is 
         *   Set proposal `status` to "closed".
         *   **Multiple Choice:** Tally votes from `Submission` table. Determine outcome. If there's a tie, the outcome reflects the tie (e.g., "Tie between Option A and Option B"). Store outcome and vote counts in `Proposal` table.
         *   **Free Form:** Retrieve all `response_content`. Use an LLM to cluster submissions and generate a summary of the main themes/clusters. Store this summary as `Proposal.outcome` and the full list of anonymized submissions in `Proposal.raw_results`.
-    *   **FR5.3:** Bot posts results to the Telegram Channel (e.g., edits original message or replies to it).
+    *   **FR5.3:** Bot posts results to the proposal's `target_channel_id` (e.g., edits original message or replies to it).
         *   **Multiple Choice:** Display winning option(s) (or tie details) and vote counts/percentages for all options.
         *   **Free Form:** Display the LLM-generated summary of submission clusters. Inform users they can get the full list via DM command.
     *   **FR5.4:** (Optional v0, Core v1) DM proposer/voters with results. (Deadline reminders are v1).
 
 **5.6. Information & History**
     *   **FR6.1:** `/my_submissions` (or `/my_votes`) command (DM): Show list of proposals user voted on/submitted to and their `response_content`.
-    *   **FR6.2:** `/proposals open` command (DM): List open proposals with titles and deadlines.
-    *   **FR6.3:** `/proposals closed` command (DM): List closed proposals with titles and outcomes.
+    *   **FR6.2:** `/proposals open` command (DM): List open proposals with titles and deadlines. (Future: could be filtered by channel if multi-channel is active).
+    *   **FR6.3:** `/proposals closed` command (DM): List closed proposals with titles and outcomes. (Future: could be filtered by channel).
     *   **FR6.4:** `/view_submissions <proposal_id>` command (DM): For closed free-form proposals, lists all anonymized text submissions.
 
 **5.7. Contextual Information (RAG)**
     *   **FR7.1 (Admin/Proposer - Adding General/Specific Docs):**
-        *   Admin: `/add_doc <URL or paste text>` command (DM): Admin uploads general document content.
+        *   Admin: `/add_doc <URL or paste text>` command (DM): Admin uploads general document content. (Future: could specify if a doc is for a specific channel or global).
         *   Proposer: Can use `/add_proposal_context <proposal_id>` (see FR2.5) to add documents specific to their proposal.
         *   Bot processes text (chunking, embedding) and stores in vector database & SQL `Document` table (linking to `proposal_id` if applicable).
     *   **FR7.2 (User):** `/ask <question>` or `/ask <proposal_id> <question>` command (DM): User asks a question.
-        *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal.
+        *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal. If multi-channel RAG becomes a feature, context searching might also be scoped by channel.
         *   Bot uses LLM (e.g., GPT) with retrieved context + question to generate an answer.
         *   Bot DMs answer to user, citing sources (e.g., document name/link, or "From the context provided for Proposal X") and showing relevant snippets.
 
@@ -131,13 +157,21 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR8.3:** Published results for multiple-choice proposals are aggregated counts. Published results for free-form proposals are an LLM-generated summary of anonymized submissions; the full list of anonymized submissions is available via DM command.
     *   **FR8.4 (Admin Access to Voter Info):** For v0, admins can view who voted/submitted on a proposal *after* it has closed and results are published, for record-keeping and transparency. This access is logged.
 
+**5.9. (New) Bot Configuration for Proposal Channels**
+    *   **FR5.9.1 (Admin):** An admin (e.g., via DM command or a configuration file/environment variable) can define a list of 'authorized proposal channel IDs'.
+    *   **FR5.9.2:** If only one `TARGET_CHANNEL_ID` is set in `.env` and no other list, it operates in single-channel mode.
+    *   **FR5.9.3:** If multiple authorized channel IDs are configured:
+        *   DM-initiated proposals will trigger the channel selection flow (FR2.1.B).
+        *   In-channel `/propose` commands will only be processed if the command is issued in one of these authorized channels (FR2.1.C).
+    *   **FR5.9.4:** The bot must be a member of any authorized channel and have permissions to read messages (for in-channel `/propose`) and post messages (for broadcasting the proposal).
+
 **6. Non-Functional Requirements**
 
 *   **NFR1. Usability:** Intuitive commands, clear instructions, responsive feedback.
 *   **NFR2. Reliability:** High uptime. Scheduler must reliably trigger deadline processing.
 *   **NFR3. Performance:** Bot responses should be timely (within a few seconds for most operations). RAG queries may take slightly longer.
-*   **NFR4. Scalability:** Able to handle hundreds of users and dozens of concurrent proposals. PostgreSQL (via Supabase) is chosen for its scalability and managed nature.
-*   **NFR5. Security:** Bot token secured. Protection against basic spam if possible (e.g., rate limiting DM commands if it becomes an issue).
+*   **NFR4. Scalability:** Able to handle hundreds of users and dozens of concurrent proposals. PostgreSQL (via Supabase) is chosen for its scalability and managed nature. (Multi-channel support enhances scalability of use cases).
+*   **NFR5. Security:** Bot token secured. Protection against basic spam if possible (e.g., rate limiting DM commands if it becomes an issue). Admin commands for channel configuration should be protected.
 *   **NFR6. Maintainability:** Code should be well-structured, commented, and version-controlled.
 
 --
@@ -146,7 +180,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
 
 See [techContext.md](./techContext.md) for tech stack.
 
-See [systemPatterns.md](./systemPatterns.md) for core components and architecture.
+See [systemPatterns.md](./systemPatterns.md) for core components and architecture. (This will need updates to reflect multi-channel logic).
 
 **II. Data Models (Simplified - using SQLAlchemy)**
 
@@ -164,7 +198,8 @@ Here, submissions represent votes.
     *   `description` (Text, Not Null)
     *   `proposal_type` (Enum/String: `"multiple_choice"`, `"free_form"`, Not Null)
     *   `options` (JSON, Nullable): For `multiple_choice`, stores a list of option strings. For `free_form`, can be NULL.
-    *   `channel_message_id` (Integer, Nullable): Message ID of the proposal in the channel.
+    *   **`target_channel_id` (String, Not Null): The ID of the channel where this proposal is intended to be posted/discussed (could be integer if always numeric).**
+    *   `channel_message_id` (Integer, Nullable): Message ID of the proposal in the `target_channel_id`.
     *   `creation_date` (DateTime, Default current timestamp)
     *   `deadline_date` (DateTime, Not Null)
     *   `status` (Enum/String: `"open"`, `"closed"`, `"cancelled"`, Default `"open"`)
@@ -185,28 +220,42 @@ Here, submissions represent votes.
     *   `upload_date` (DateTime, Default current timestamp)
     *   `vector_ids` (JSON, Nullable): List of IDs corresponding to chunks in the vector database.
     *   `proposal_id` (Integer, Foreign Key to `Proposal.id`, Nullable): Links document to a specific proposal.
+    *   **(Future)** `associated_channel_id` (String, Nullable): If a document is context for a specific channel rather than a proposal.
     *   *(Raw content might be stored here or only in the vector DB's document store if it has one. Content can originate from direct uploads (URL/text by admin/proposer) or from conversational input by the proposer during proposal creation or via `/add_proposal_context`.)*
-
+*   **(New) `AuthorizedChannel` Table (Conceptual for FR5.9 - could also be config-based):**
+    *   `channel_id` (String, Primary Key): The Telegram channel ID.
+    *   `channel_name` (String, Nullable): A human-readable name for the channel.
+    *   `is_proposal_target` (Boolean, Default True): Can proposals be posted here?
+    *   `allow_in_channel_initiation` (Boolean, Default True): Can `/propose` be used directly in this channel?
 
 **III. Bot Workflow & Features**
 
 1.  **Setup & Configuration:**
     *   Bot token from BotFather.
-    *   Target channel ID (where proposals are posted).
-    *   Admin user IDs (optional, for certain commands like `/add_doc`).
+    *   Admin user IDs.
+    *   **(New/Modified)** Configuration for authorized proposal channels (e.g., a list of channel IDs in `.env` or managed via admin commands that populate the `AuthorizedChannel` table). If only one `TARGET_CHANNEL_ID` is set in `.env` and no other list, it operates in single-channel mode.
 
 2.  **User Registration (Implicit):**
     *   When a user interacts with the bot for the first time (e.g., `/start`), store their `telegram_id`, `first_name`, and `username` (if available) in the `User` table.
 
 3.  **Creating a Proposal (DM to Bot):**
-    *   User DMs: `/propose <Title>; <Description>; [Option 1, Option 2, ... OR "FREEFORM"]`
+
+*   **Initiation:**
+    *   User DMs bot: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
+    *   OR User types in an *authorized* Telegram channel: `/propose <Title>; <Description>; [Options OR "FREEFORM"]`
         *   Example (Multiple Choice): `/propose Event Types; What kind of events should we do?; Hackathons, Talks, Socials`
         *   Example (Free Form): `/propose AI Project Ideas; Suggest cool AI projects for the floor!`
-    *   Bot:
+*   Bot:
+    **Channel Determination (FR2.1.A/B/C logic):**
+        *   If initiated in an authorized channel: Set `target_channel_id` to this channel's ID. Send DM to user: "Okay, let's continue setting up your proposal for channel '[Channel Name]'. How long..."
+        *   If initiated via DM:
+            *   If in single-channel mode (only one `TARGET_CHANNEL_ID` configured): Set `target_channel_id` to this default.
+            *   If in multi-channel mode (multiple authorized channels configured): Bot asks user in DM: "Which channel is this proposal for?" (providing options, e.g., via inline keyboard). User selects, setting `target_channel_id`.
+     *   **(Common Flow - continues in DM):**
         *   Asks: "How long should this proposal be open for voting/submissions, or until when would you like to set the deadline?"
         *   User replies with natural language (e.g., "for 2 weeks", "until next Friday at noon"). Bot uses LLM to parse this into a `deadline_date`. Confirms if ambiguous.
-        *   Parses the initial command to extract title, description, proposal type (inferred or explicit), options (if any).
-        *   Validates input (title, desc, options as per FR2.2).
+        *   Parses the initial command to extract title, description, proposal type (inferred or explicit), options (if any). 
+        *   Validates input (title, desc, options as per FR2.2). If anything goes wrong, ask for clarity.
         *   **Asks for Additional Context:** "Great! Your proposal details are set. Do you have any extra context or background information to add? This won't appear in the public poll itself but will be very helpful if users ask questions about the proposal. You can paste text, provide a URL, or just say 'no' for now."
         *   **Handles Context Response:**
             *   If "no": Proceeds.
@@ -245,6 +294,7 @@ Submissions end: [Date & Time]"
                 *   Inline Button: A button like "💬 Submit Your Idea" using `switch_inline_query_current_chat` to prefill `/submit [proposal_id] ` in the user's DM with the bot.
         *   Stores the `channel_message_id` from the sent message in the `Proposal` table.
 
+
 4.  **Voting (for Multiple Choice) & Submitting (for Free Form):**
 
     *   **A. Multiple Choice Voting (via Inline Keyboard in Channel):**
@@ -277,7 +327,7 @@ Submissions end: [Date & Time]"
                 *   Tally votes from the `Submission` table for this `proposal_id`.
                 *   Determine the outcome (e.g., option with most votes wins, or details of a tie).
                 *   Store the `outcome` (e.g., "Option A passed", or "Tie: Option A & B") and `raw_results` (e.g., `{"Option A": 10, "Option B": 10, "Option C": 5}`) in the `Proposal` table.
-                *   **Post Results to Channel:** Edit the original proposal message or send a new message replying to it.
+                *   **Post Results to the proposal's target_channel_id:** Edit the original proposal message or send a new message replying to it.
                     *   Message: "🏁 **Proposal Closed: [Title]**
 
 Results:
@@ -302,7 +352,7 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
 6.  **Viewing Proposals & Submission History (DM to Bot):**
     *   `/my_submissions` (or `/my_votes`): Shows a list of proposals the user submitted to, their `response_content`, and the proposal status/outcome.
     *   `/proposals open`: Lists open proposals (both types) with titles and deadlines.
-    *   `/proposals closed`: Lists closed proposals (both types) with titles and outcomes.
+    *   `/proposals closed`: Lists closed proposals (both types) with titles and outcomes. (Future enhancement: allow filtering by channel if many channels are used).
     *   `/view_submissions <proposal_id>`: For closed free-form proposals, lists all anonymized submissions.
 
 7.  **Getting Info on a Policy (RAG - DM to Bot):**
@@ -321,6 +371,7 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
         *   Queries the vector DB to find the most similar document chunks. If `proposal_id` is specified, relevant proposal-specific documents are prioritized.
         *   Constructs a prompt for the LLM (e.g., OpenAI) including retrieved context and the user's question.
         *   Sends prompt to LLM, gets the answer, and DMs it to the user, citing sources/snippets.
+        * (Future enhancement: RAG could be made channel-aware if documents are associated with specific channels).
 
 **IV. Future: Personalized Recommendations**
 
@@ -344,6 +395,11 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
 **VI. Key Considerations & Next Steps**
 
 1.  **Start Small (MVP):**
+    *   Focus on the current single `TARGET_CHANNEL_ID` implementation first.
+    *   Then, phase in multi-channel:
+        *   Phase 1 (Multi-channel): Allow DM proposal creation with channel selection from a pre-configured list. Add `target_channel_id` to `Proposal` model.
+        *   Phase 2 (Multi-channel): Implement in-channel `/propose` for authorized channels.
+        *   Phase 3 (Multi-channel): Admin commands to manage authorized channels.
     *   Focus on `/propose` (with conversational duration), channel posting, inline voting (MC), `/submit` (FF), `/cancel_proposal`, `/edit_proposal`, `/add_proposal_context`, deadline checking, and result announcement first.
     *   Use PostgreSQL (via Supabase) with Alembic for migrations.
     *   Manual document loading for RAG initially by admin; proposers can add context to their proposals.
