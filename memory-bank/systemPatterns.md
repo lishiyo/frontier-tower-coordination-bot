@@ -118,7 +118,7 @@ telegram_bot/
 │   │   │   ├── user_model.py
 │   │   │   ├── proposal_model.py
 │   │   │   ├── submission_model.py
-│   │   │   └── document_model.py
+│   │   │   └── document_model.py # Defines Document schema (id, title, hash, url, vector_ids, proposal_id, raw_content)
 │   │   ├── repositories/       # Repository pattern for DB access logic
 │   │   │   ├── __init__.py
 │   │   │   ├── base_repository.py # Optional: Base repository with common CRUD methods
@@ -240,6 +240,27 @@ telegram_bot/
             *   Updates `Proposal.outcome` (summary) and `Proposal.raw_results` (full list) via `ProposalRepository`.
         *   Calls `TelegramUtils.format_results_message(...)` and posts results to the proposal's `target_channel_id` (retrieving the channel ID from the proposal record).
         *   (Optional v0/Core v1) Prepares and sends notifications to proposer/voters.
+
+### D. Viewing Document Context
+
+1.  **User (Telegram):** Sends `/view_docs` (or `/view_docs <channel_id>` or `/view_docs <proposal_id>`).
+2.  **`main.py`/PTB `Application`:** Routes to a new command handler, e.g., `CommandHandlers.handle_view_documents_router`.
+3.  **`CommandHandlers.handle_view_documents_router`:**
+    *   Inspects arguments provided.
+    *   If no arguments (`/view_docs`): Calls a service (e.g., `ConfigService` or a dedicated `ChannelService`) to get the list of authorized channels. Formats and DMs the list to the user.
+    *   If `<channel_id>` argument (`/view_docs <channel_id>`): Calls `ProposalService.list_proposals_by_channel(channel_id)`. Formats and DMs the list of proposals to the user, showing their titles (if available, or a snippet/source) and their unique document IDs.
+    *   If `<proposal_id>` argument (`/view_docs <proposal_id>`): Calls `ContextService.list_documents_for_proposal(proposal_id)`. Formats and DMs the list of documents to the user, showing their titles (if available, or a snippet/source) and their unique document IDs.
+4.  **User (Telegram):** Sends `/view_doc <document_id>`.
+5.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.handle_view_document_content`.
+6.  **`CommandHandlers.handle_view_document_content`:**
+    *   Parses `document_id`.
+    *   Calls `ContextService.get_document_content(document_id)`.
+7.  **`ContextService.get_document_content`:**
+    *   Calls `DocumentRepository.get_document_by_id(document_id)` to fetch the full `Document` object.
+    *   Returns the `document.raw_content`.
+8.  **`CommandHandlers.handle_view_document_content`:**
+    *   Receives the raw text content.
+    *   Formats it if necessary (e.g., handling long messages for Telegram) and DMs it to the user.
 
 ## V. Key Design Patterns & Python Best Practices
 

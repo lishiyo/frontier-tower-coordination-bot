@@ -79,6 +79,28 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Description:** Displays the bot's privacy policy, outlining data storage, usage, and anonymity aspects.
     *   **Context:** DM with the bot.
 
+*   `/view_docs`
+    *   **Description:** Lists all authorized channels the bot is configured to work with. Useful for finding a `channel_id`.
+    *   **Context:** DM with the bot.
+
+*   `/view_docs <channel_id>`
+    *   **Description:** Lists all proposals (ID, title, status) within a specific channel. Useful for finding a `proposal_id`.
+    *   **Parameters:**
+        *   `<channel_id>`: The ID of the channel to inspect.
+    *   **Context:** DM with the bot.
+
+*   `/view_docs <proposal_id>`
+    *   **Description:** Lists all context documents (ID, title) attached to a specific proposal. Useful for finding a `document_id`.
+    *   **Parameters:**
+        *   `<proposal_id>`: The ID of the proposal to inspect.
+    *   **Context:** DM with the bot.
+
+*   `/view_doc <document_id>`
+    *   **Description:** Displays the full text content of a specific context document.
+    *   **Parameters:**
+        *   `<document_id>`: The ID of the document to view.
+    *   **Context:** DM with the bot.
+
 ## Admin Commands (v0)
 
 *   `/add_doc <URL or paste text>`

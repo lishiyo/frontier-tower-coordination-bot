@@ -103,7 +103,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR2.4 (Confirmation DM):** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel '[Channel Name/ID]' shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`." (Channel name/ID included for clarity in multi-channel scenarios).
     *   **FR2.5 (Adding Context - Proposer - Later or if initial offer declined):** `/add_proposal_context <proposal_id> <URL or paste text OR trigger chat>` (DM)
         *   Allows proposer to upload a document, paste text, or engage in a short chat with the bot to add context to their specific proposal *after* initial creation or if they initially declined to add context.
-        *   This content is processed (chunked, embedded) and stored, linked to the `proposal_id` in the `Document` table, for use in RAG when users ask about this proposal. If text is from chat, `source_url` in `Document` table might indicate "proposer_chat_context".
+        *   This content is processed (chunked, embedded) and stored, linked to the `proposal_id` in the `Document` table, for use in RAG when users ask about this proposal. If text is from chat, `source_url` in `Document` table might indicate "proposer_chat_context". The full text content is also stored directly for later viewing.
 
 **5.3. Proposal Broadcasting & Interaction**
     *   **FR3.1:** Bot posts new proposal to the proposal's designated **`target_channel_id`** (as stored in the proposal record).
@@ -156,11 +156,17 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR7.1 (Admin/Proposer - Adding General/Specific Docs):**
         *   Admin: `/add_doc <URL or paste text>` command (DM): Admin uploads general document content. (Future: could specify if a doc is for a specific channel or global).
         *   Proposer: Can use `/add_proposal_context <proposal_id>` (see FR2.5) to add documents specific to their proposal.
-        *   Bot processes text (chunking, embedding) and stores in vector database & SQL `Document` table (linking to `proposal_id` if applicable).
+        *   Bot processes text (chunking, embedding) and stores in vector database & SQL `Document` table (linking to `proposal_id` if applicable). The full text content is also stored directly for later viewing.
     *   **FR7.2 (User):** `/ask <question>` or `/ask <proposal_id> <question>` command (DM): User asks a question.
         *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal. If multi-channel RAG becomes a feature, context searching might also be scoped by channel.
         *   Bot uses LLM (e.g., GPT) with retrieved context + question to generate an answer.
         *   Bot DMs answer to user, citing sources (e.g., document name/link, or "From the context provided for Proposal X") and showing relevant snippets.
+
+    *   **FR7.3 (User - Viewing Context Documents):**
+        *   `/view_docs` command (DM): Lists all authorized channels the bot is configured with, showing channel names and IDs.
+        *   `/view_docs <channel_id>` command (DM): Lists all proposals (ID, title, status) within a specific authorized channel.
+        *   `/view_docs <proposal_id>` command (DM): Lists all context documents (ID, title) attached to a specific proposal.
+        *   `/view_doc <document_id>` command (DM): Displays the full text content of a specific context document.
 
 **5.8. Anonymity & Privacy**
     *   **FR8.1:** Individual votes/submissions are not publicly visible or attributable to specific users before the proposal deadline.
@@ -231,6 +237,7 @@ Here, submissions represent votes.
     *   `upload_date` (DateTime, Default current timestamp)
     *   `vector_ids` (JSON, Nullable): List of IDs corresponding to chunks in the vector database.
     *   `proposal_id` (Integer, Foreign Key to `Proposal.id`, Nullable): Links document to a specific proposal.
+    *   `raw_content` (Text, Nullable): Stores the raw (or cleaned) text content of the document.
     *   **(Future)** `associated_channel_id` (String, Nullable): If a document is context for a specific channel rather than a proposal.
     *   *(Raw content might be stored here or only in the vector DB's document store if it has one. Content can originate from direct uploads (URL/text by admin/proposer) or from conversational input by the proposer during proposal creation or via `/add_proposal_context`.)*
 *   **(New) `AuthorizedChannel` Table (Conceptual for FR5.9 - could also be config-based):**
@@ -366,6 +373,10 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
     *   `/proposals open`: Lists open proposals (both types) with titles and deadlines.
     *   `/proposals closed`: Lists closed proposals (both types) with titles and outcomes. (Future enhancement: allow filtering by channel if many channels are used).
     *   `/view_submissions <proposal_id>`: For closed free-form proposals, lists all anonymized submissions.
+    *   `/view_docs`: Lists authorized channels the bot is configured with (useful for discovering `channel_id`).
+    *   `/view_docs <channel_id>`: Lists proposals within a given channel (useful for discovering `proposal_id`).
+    *   `/view_docs <proposal_id>`: Lists context documents attached to a specific proposal (useful for discovering `document_id`).
+    *   `/view_doc <document_id>`: Displays the full text content of a specific document.
 
 7.  **Getting Info on a Policy (RAG - DM to Bot):**
     *   **Admin/Proposer Command to Add Context:**

@@ -201,9 +201,43 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] `/propose <Title>; <Description>; FREEFORM`
         *   [x] Test with and without providing initial context.
         *   [x] Test cancellation at various stages.
-    *   [ ] **Follow-up Task:** Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction.
+    *   [x] **Follow-up Task:** Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction.
 
-3.  **Task 3.5: (Utility) Implement Viewing of Stored Document Chunks**
+3.  **Task 3.5: Implement Document Storage with Full Content and Basic Viewing Commands (Single-Channel)**
+    *   [ ] **Schema Change:**
+        *   [ ] Add `raw_content (Text, nullable=True)` field to `app/persistence/models/document_model.py`.
+        *   [ ] Generate Alembic migration for adding `raw_content` to `documents` table (`alembic revision -m "add_raw_content_to_documents"`) and apply it (`alembic upgrade head`).
+    *   [ ] **Update Document Ingestion:**
+        *   [ ] Modify `ContextService.process_and_store_document` to save the fetched/provided text into the new `raw_content` field of the `Document` object before saving to the database via `DocumentRepository.add_document`.
+    *   [ ] **Implement `/view_doc <document_id>` Command:**
+        *   [ ] In `app/persistence/repositories/document_repository.py`, add `get_document_by_id(document_id)` method that fetches a `Document` by its ID, including the `raw_content`.
+        *   [ ] In `app/core/context_service.py`, add `get_document_content(document_id)` method that calls `DocumentRepository.get_document_by_id()` and returns `document.raw_content`.
+        *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `view_document_content_command` that takes `<document_id>`, calls `ContextService.get_document_content()`, and DMs the content to the user (handle potential long messages).
+    *   [ ] **Implement `/view_docs` (no arguments - Single Channel Behavior):**
+        *   [ ] In `app/telegram_handlers/command_handlers.py`, implement the base `view_docs_command` (handling no arguments).
+        *   [ ] This handler should retrieve the `TARGET_CHANNEL_ID` from `ConfigService`.
+        *   [ ] Format and DM a message to the user indicating this is the current proposal channel (e.g., "Proposals are currently managed in channel: [Channel ID/Name if available]").
+    *   [ ] **Implement `/view_docs <channel_id>` (Single Channel Behavior):**
+        *   [ ] In `app/persistence/repositories/proposal_repository.py`, add `get_proposals_by_channel_id(channel_id)` method.
+        *   [ ] In `app/core/proposal_service.py`, add `list_proposals_by_channel(channel_id)` that calls the new repository method and formats a list of proposals (ID, title, status).
+        *   [ ] Modify `view_docs_command` in `command_handlers.py` to handle the `<channel_id>` argument.
+        *   [ ] If `<channel_id>` is provided, it should call `ProposalService.list_proposals_by_channel()`. (Initially, this will only meaningfully work if the provided ID matches `TARGET_CHANNEL_ID`).
+        *   [ ] DM the list of proposals to the user.
+    *   [ ] **Implement `/view_docs <proposal_id>`:**
+        *   [ ] In `app/persistence/repositories/document_repository.py`, add `get_documents_by_proposal_id(proposal_id)` method.
+        *   [ ] In `app/core/context_service.py`, add `list_documents_for_proposal(proposal_id)` that calls the new repository method and formats a list of documents (ID, title).
+        *   [ ] Modify `view_docs_command` in `command_handlers.py` to handle the `<proposal_id>` argument.
+        *   [ ] If `<proposal_id>` is provided, it should call `ContextService.list_documents_for_proposal()`.
+        *   [ ] DM the list of documents to the user.
+    *   [ ] **Command Registration:** Ensure all new `/view_docs` and `/view_doc` handlers are registered in `main.py`.
+    *   [ ] **Testing (Single Channel):**
+        *   [ ] Test adding documents with context and ensure `raw_content` is stored.
+        *   [ ] Test `/view_doc <document_id>` to see content.
+        *   [ ] Test `/view_docs` (no args) shows the target channel.
+        *   [ ] Test `/view_docs <target_channel_id>` lists proposals.
+        *   [ ] Test `/view_docs <proposal_id>` lists documents for that proposal.
+
+4.  **Task 3.6: (Utility) Implement Viewing of Stored Document Chunks (Optional - for Debugging)**
     *   [ ] In `VectorDBService`, add a method like `get_document_chunks(sql_document_id)` to retrieve all text chunks from ChromaDB associated with a given SQL document ID.
     *   [ ] (Optional) Create a simple admin command or utility script that uses this service method to allow viewing of stored chunks for debugging or verification purposes.
 
@@ -383,22 +417,49 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Create a static privacy policy text.
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
 
-8.  **Task 8.8: (Future) Multi-Channel Proposal System Implementation**
+## Phase 8: Multi-Channel Support Enhancements
+
+**Goal:** Extend multi-channel capabilities to proposal creation, listing, and context document viewing.
+
+**Dependencies:** Initial multi-channel setup (from previous Phase 8 tasks if they exist, or core single-channel features). Core document viewing from Task 3.5.
+
+**Subtasks:**
+
+1.  **Task 8.1: Multi-Channel Proposal System Implementation (Core)**
+    *   (This task might already exist or be partially done if Phase 8 was previously just about proposal multi-channel support. Adjust as needed.)
     *   [ ] Expand `ConfigService` to manage a list of authorized proposal channels beyond the default `TARGET_CHANNEL_ID`.
-    *   [ ] Create a new model and repository for `AuthorizedChannel` if needed, or implement a configuration-based approach.
-    *   [ ] Update the `ConversationHandler` for `/propose` to include channel selection flow when in multi-channel mode (new `ASK_CHANNEL` state).
-    *   [ ] Implement logic to detect in-channel `/propose` commands, verify channel authorization, and set that channel as the proposal's `target_channel_id`.
-    *   [ ] Update the channel results posting logic in `SchedulingService`/`ProposalService` to use the proposal's `target_channel_id` instead of a global channel ID.
-    *   [ ] Add commands to manage authorized channels (admin only).
-    *   [ ] Update user-facing proposal listings to include channel information.
-    *   [ ] Implement/Update handler for `ASK_CHANNEL` state (if multi-channel mode is active):
+    *   [ ] Create a new model and repository for `AuthorizedChannel` (e.g., `app/persistence/models/authorized_channel_model.py` and `app/persistence/repositories/authorized_channel_repository.py`) if opting for DB-based management, or implement a purely configuration-based approach in `ConfigService`.
+        *   [ ] Include fields like `channel_id` (PK), `channel_name` (optional).
+        *   [ ] Add Alembic migration if model is created.
+    *   [ ] Implement admin commands to add/list/remove authorized channels if using DB-based management.
+    *   [ ] Update the `ConversationHandler` for `/propose` (`ASK_CHANNEL` state) to fetch and display these authorized channels when initiated via DM in multi-channel mode.
         *   [ ] Prompt user to select a channel.
-        *   [ ] Store selected `target_channel_id` in `context.user_data`.
+        *   [ ] Store selected `target_channel_id` in `context.
+        user_data`.
         *   [ ] Transition to `ASK_DURATION`. Prompt user.
-    *   [ ] Test channel selection if multi-channel mode is notionally active (Future task).
+    *   [ ] Implement logic to detect in-channel `/propose` commands, verify channel authorization against the configured list/table, and set that channel as the proposal's `target_channel_id`.
+    *   [ ] Update the channel results posting logic in `SchedulingService`/`ProposalService` to use the proposal's `target_channel_id`.
+    *   [ ] Update user-facing proposal listings (like `/proposals open/closed`) to potentially include channel information or allow filtering.
+
+2.  **Task 8.2: Enhance `/view_docs` for Multi-Channel Support**
+    *   [ ] **`/view_docs` (no arguments):**
+        *   [ ] Modify handler to retrieve the list of *all* authorized channels from `ConfigService` (or `AuthorizedChannelRepository`).
+        *   [ ] Format and DM this list (channel IDs and names if available) to the user.
+    *   [ ] **`/view_docs <channel_id>`:**
+        *   [ ] Ensure this command correctly lists proposals for *any* valid authorized `channel_id` (not just the old single `TARGET_CHANNEL_ID`). No significant change if `ProposalService.list_proposals_by_channel` already just takes a `channel_id`.
+    *   [ ] **General Document Association (Future Consideration for RAG):**
+        *   [ ] Consider if general documents (added via `/add_doc`) should be associable with specific authorized channels (new `associated_channel_id` field in `Document` model).
+        *   [ ] If so, `/view_docs <channel_id>` could also list general documents associated with that channel.
+        *   [ ] RAG queries via `/ask` could then also be filtered/prioritized by documents relevant to the channel a user is in or asking about.
+
+3.  **Task 8.3: Testing Multi-Channel Document Viewing**
+    *   [ ] Configure multiple authorized channels.
+    *   [ ] Test `/view_docs` (no args) lists all configured channels.
+    *   [ ] Test `/view_docs <channel_id>` for different authorized channels, ensuring correct proposal listings.
+    *   [ ] Ensure `/view_docs <proposal_id>` and `/view_doc <document_id>` continue to function correctly regardless of how many channels are configured.
 
 
-## Phase 8: Comprehensive Testing, Refinement, and Deployment Preparation
+## Phase 9: Comprehensive Testing, Refinement, and Deployment Preparation
 
 **Goal:** Ensure bot stability, reliability, and user-friendliness; prepare for deployment.
 
@@ -406,36 +467,36 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 **Subtasks:**
 
-1.  **Task 8.1: Unit & Integration Testing (`pytest`)**
+1.  **Task 9.1: Unit & Integration Testing (`pytest`)**
     *   [ ] Write unit tests for all core service methods.
     *   [ ] Write unit tests for repository methods (can use in-memory SQLite for some if PostgreSQL is complex to mock, or mock DB session).
     *   [ ] Write unit tests for utility functions.
     *   [ ] Write integration tests for key flows (e.g., proposal creation -> voting -> results).
     *   [ ] Setup `tests/conftest.py` for fixtures (e.g., mock bot, mock db session).
 
-2.  **Task 8.2: Linters and Code Quality Checks**
+2.  **Task 9.2: Linters and Code Quality Checks**
     *   [ ] Run `pylint` regularly and address issues.
     *   [ ] Ensure consistent code formatting.
 
-3.  **Task 8.3: End-to-End Testing**
+3.  **Task 9.3: End-to-End Testing**
     *   [ ] Manually test all commands and user flows as described in `projectbrief.md` testing plan.
     *   [ ] Test with multiple users if possible.
     *   [ ] Test edge cases and error conditions.
 
-4.  **Task 8.4: Logging and Error Handling Refinement**
+4.  **Task 9.4: Logging and Error Handling Refinement**
     *   [ ] Review all logging statements for clarity and usefulness.
     *   [ ] Ensure all user-facing errors are handled gracefully and provide helpful messages.
     *   [ ] Implement more specific custom exceptions where appropriate.
 
-5.  **Task 8.5: Configuration for Production**
+5.  **Task 9.5: Configuration for Production**
     *   [ ] Finalize `.env.example` for production environment variables.
     *   [ ] Prepare deployment scripts/Dockerfile if containerizing.
 
-6.  **Task 8.6: Documentation Review**
+6.  **Task 9.6: Documentation Review**
     *   [ ] Review `README.md` for setup and usage instructions.
     *   [ ] Ensure all major code components have docstrings.
 
-7.  **Task 8.7: (Future) Admin Access to Voter Info (Post-Closure)**
+7.  **Task 9.7: (Future) Admin Access to Voter Info (Post-Closure)**
     *   [ ] Design how admins access this (e.g., a new admin command `/view_proposal_voters <proposal_id>`).
     *   [ ] Implement necessary service and repository methods.
     *   [ ] Ensure clear logging of this access.
