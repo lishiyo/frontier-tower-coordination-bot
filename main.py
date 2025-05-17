@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler
 from app.config import ConfigService
 # from app.persistence.database import DatabaseManager # Will be implemented in a future task
 # Import your new command handlers
-from app.telegram_handlers.command_handlers import start_command, help_command
+from app.telegram_handlers.command_handlers import start_command, help_command, propose_command
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +28,7 @@ def main() -> None:
     # Register command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("propose", propose_command))
 
     logger.info("Bot application created and command handlers registered.")
 
