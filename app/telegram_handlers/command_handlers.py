@@ -63,7 +63,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "  /ask &lt;question&gt; - Ask a general question.\n"
         "  /ask &lt;proposal_id&gt; &lt;question&gt; - Ask a question specific to a proposal.\n\n"
         "<b>Admin (Future - for now, `/add_doc` might be restricted):</b>\n"
-        "  /add_doc &lt;URL or paste text&gt; - Add a general context document (DM only).\n\n"
+        "  /add_global_doc &lt;URL or paste text&gt; - Add a general context document (DM only).\n\n"
         "Remember to interact with me via Direct Message (DM) for most commands, especially when creating proposals or submitting responses."
     )
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)

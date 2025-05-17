@@ -26,9 +26,11 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **(New)** Type `/propose` in my project's specific Telegram channel, and have the bot guide me through adding details (like duration and context) via DM, then automatically post the formatted proposal back to that same project channel.
     *   **(New)** When I DM the bot with `/propose`, if the bot is configured to work with multiple community channels, I want to be asked and be able to select which channel my proposal is for.
     *   Be notified when my proposal is created and when its deadline passes and results are published.
-    *   Be able to add more context about my proposal to the bot (e.g., by uploading a document or chatting with the bot about it), so users asking about my proposal can get more detailed information.
+    *   Be able to add more context about my proposal to the bot using `/add_doc <proposal_id>` (e.g., by uploading a document or chatting with the bot about it), so users asking about my proposal can get more detailed information.
     *   Be able to edit the title, description, or options of my proposal if no votes have been cast yet.
     *   Be able to cancel my active proposals before their deadline.
+    *   Be able to edit a document I previously added to my proposal using `/edit_doc <document_id>`.
+    *   Be able to delete a document I previously added to my proposal using `/delete_doc <document_id>`.
 *   **As a Voter/Submitter, I want to:**
     *   Be notified in a central channel when a new proposal is available.
     *   Easily vote on a multiple-choice proposal using inline buttons in Telegram.
@@ -39,10 +41,10 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   Be notified of the outcome of proposals.
 *   **As a Community Member, I want to:**
     *   View all open proposals and their deadlines.
-    *   View all closed proposals and their outcomes (including aggregated vote counts or a list of free-form submissions).
+    *   View all closed proposals and their outcomes (including aggregated vote counts for multiple-choice or a list/summary of free-form submissions via `/view_results <proposal_id>`).
     *   DM the bot to ask questions about existing policies or context documents and receive relevant answers.
 *   **As an Admin/Moderator, I want to:**
-    *   Upload and manage general context documents (e.g., existing policies, guidelines) that the bot can use to answer questions.
+    *   Upload general context documents using `/add_global_doc <URL or paste text>`, view them with `/view_global_docs`, edit them with `/edit_global_doc <document_id>`, and delete them with `/delete_global_doc <document_id>`, so the bot can use these for answering questions.
     *   Invite the bot to channels.
     *   View all proposals, their outcomes, and (after results are published) who submitted/voted for transparency and record-keeping (for v0).
     *   **(New)** Configure the bot with one or more 'authorized proposal channel IDs' where proposals can be initiated or targeted.
@@ -105,6 +107,17 @@ This document outlines the product requirements for `CoordinationBot`, which is 
         *   Allows proposer to upload a document, paste text, or engage in a short chat with the bot to add context to their specific proposal *after* initial creation or if they initially declined to add context.
         *   This content is processed (chunked, embedded) and stored, linked to the `proposal_id` in the `Document` table, for use in RAG when users ask about this proposal. If text is from chat, `source_url` in `Document` table might indicate "proposer_chat_context". The full text content is also stored directly for later viewing.
 
+**5.2.B Document Management (Proposer-Specific)**
+    *   **FR2.6 (Editing Proposal Document - Proposer):** `/edit_doc <document_id>` (DM)
+        *   Allows the original proposer to edit the content of a specific context document they previously added to one of their proposals.
+        *   Bot verifies the user is the proposer of the proposal linked to the `document_id`.
+        *   Bot may initiate a conversation to get the new content for the document.
+        *   Updates the `raw_content` in the `Document` table and re-processes for vector DB if necessary.
+    *   **FR2.7 (Deleting Proposal Document - Proposer):** `/delete_doc <document_id>` (DM)
+        *   Allows the original proposer to delete a specific context document they previously added to one of their proposals.
+        *   Bot verifies the user is the proposer of the proposal linked to the `document_id`.
+        *   Removes the document record from the `Document` table and associated chunks from the vector DB.
+
 **5.3. Proposal Broadcasting & Interaction**
     *   **FR3.1:** Bot posts new proposal to the proposal's designated **`target_channel_id`** (as stored in the proposal record).
         *   **Multiple Choice:** Message includes title, description, proposer, deadline, and inline keyboard buttons for each voting option. Callback data for buttons includes `proposal_id` and `option_index` (0-based index of the option).
@@ -143,20 +156,24 @@ This document outlines the product requirements for `CoordinationBot`, which is 
         *   **Free Form:** Retrieve all `response_content`. Use an LLM to cluster submissions and generate a summary of the main themes/clusters. Store this summary as `Proposal.outcome` and the full list of anonymized submissions in `Proposal.raw_results`.
     *   **FR5.3:** Bot posts results to the proposal's `target_channel_id` (e.g., edits original message or replies to it).
         *   **Multiple Choice:** Display winning option(s) (or tie details) and vote counts/percentages for all options.
-        *   **Free Form:** Display the LLM-generated summary of submission clusters. Inform users they can get the full list via DM command.
+        *   **Free Form:** Display the LLM-generated summary of submission clusters. Inform users they can get the full list via DM command (`/view_results <proposal_id>`).
     *   **FR5.4:** (Optional v0, Core v1) DM proposer/voters with results. (Deadline reminders are v1).
 
 **5.6. Information & History**
     *   **FR6.1:** `/my_submissions` (or `/my_votes`) command (DM): Show list of proposals user voted on/submitted to and their `response_content`.
     *   **FR6.2:** `/proposals open` command (DM): List open proposals with titles and deadlines. (Future: could be filtered by channel if multi-channel is active).
     *   **FR6.3:** `/proposals closed` command (DM): List closed proposals with titles and outcomes. (Future: could be filtered by channel).
-    *   **FR6.4:** `/view_results <proposal_id>` command (DM): For closed proposals, lists all anonymized text submissions (if freeform) or breakdown of votes (if MC).
+    *   **FR6.4:** `/view_results <proposal_id>` command (DM): For closed proposals, lists all anonymized text submissions (if freeform) or breakdown of votes (e.g. "30% A, 70% B") for multiple-choice.
 
 **5.7. Contextual Information (RAG)**
     *   **FR7.1 (Admin/Proposer - Adding General/Specific Docs):**
         *   Admin: `/add_global_doc <URL or paste text>` command (DM): Admin uploads general document content. (Future: could specify if a doc is for a specific channel or global).
         *   Proposer: Can use `/add_doc <proposal_id>` (see FR2.5) to add documents specific to their proposal.
-        *   Bot processes text (chunking, embedding) and stores in vector database & SQL `Document` table (linking to `proposal_id` if applicable). The full text content is also stored directly for later viewing.
+        *   Bot processes text (chunking, embedding) and stores in vector database & SQL `Document` table (linking to `proposal_id` if applicable, or marked as global if from admin). The full text content is also stored directly for later viewing.
+    *   **FR7.1.A (Admin - Managing Global Docs):**
+        *   `/view_global_docs` (DM): Admin lists all global documents (ID, title).
+        *   `/edit_global_doc <document_id>` (DM): Admin edits a global document. Bot may initiate a conversation for new content. Updates `raw_content` and re-processes for vector DB.
+        *   `/delete_global_doc <document_id>` (DM): Admin deletes a global document. Removes from `Document` table and vector DB.
     *   **FR7.2 (User):** `/ask <question>` or `/ask <proposal_id> <question>` command (DM): User asks a question.
         *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal. If multi-channel RAG becomes a feature, context searching might also be scoped by channel.
         *   Bot uses LLM (e.g., GPT) with retrieved context + question to generate an answer.
@@ -236,10 +253,10 @@ Here, submissions represent votes.
     *   `source_url` (String, Nullable)
     *   `upload_date` (DateTime, Default current timestamp)
     *   `vector_ids` (JSON, Nullable): List of IDs corresponding to chunks in the vector database.
-    *   `proposal_id` (Integer, Foreign Key to `Proposal.id`, Nullable): Links document to a specific proposal.
+    *   `proposal_id` (Integer, Foreign Key to `Proposal.id`, Nullable): Links document to a specific proposal. If NULL, it might be a global document.
     *   `raw_content` (Text, Nullable): Stores the raw (or cleaned) text content of the document.
     *   **(Future)** `associated_channel_id` (String, Nullable): If a document is context for a specific channel rather than a proposal.
-    *   *(Raw content might be stored here or only in the vector DB's document store if it has one. Content can originate from direct uploads (URL/text by admin/proposer) or from conversational input by the proposer during proposal creation or via `/add_doc`.)*
+    *   *(Raw content might be stored here or only in the vector DB's document store if it has one. Content can originate from direct uploads (URL/text by admin using `/add_global_doc` or proposer using `/add_doc`) or from conversational input by the proposer during proposal creation or via `/add_doc`.)*
 *   **(New) `AuthorizedChannel` Table (Conceptual for FR5.9 - could also be config-based):**
     *   `channel_id` (String, Primary Key): The Telegram channel ID.
     *   `channel_name` (String, Nullable): A human-readable name for the channel.
@@ -380,8 +397,8 @@ To see all submissions, DM me: `/view_results [proposal_id]`"
 
 7.  **Getting Info on a Policy (RAG - DM to Bot):**
     *   **Admin/Proposer Command to Add Context:**
-        *   Admin: `/add_global_doc <URL or paste text>` (for general documents)
-        *   Proposer: `/add_doc <proposal_id> <URL or paste text OR trigger chat with bot>` (for proposal-specific documents, can be used after initial creation or if context wasn't added during the creation flow)
+        *   Admin: `/add_global_doc <URL or paste text>` (for general documents). Admins can also use `/view_global_docs`, `/edit_global_doc <document_id>`, and `/delete_global_doc <document_id>` to manage these.
+        *   Proposer: `/add_doc <proposal_id> <URL or paste text OR trigger chat with bot>` (for proposal-specific documents, can be used after initial creation or if context wasn't added during the creation flow). Proposers can also use `/edit_doc <document_id>` and `/delete_doc <document_id>` for documents they added to their proposals.
         *   *Context can also be added by the proposer conversationally during the initial proposal setup flow.* (As described in section III.3)
         *   Bot downloads/receives text.
         *   Generates embeddings for chunks of the text.
@@ -423,9 +440,9 @@ To see all submissions, DM me: `/view_results [proposal_id]`"
         *   Phase 1 (Multi-channel): Allow DM proposal creation with channel selection from a pre-configured list. Add `target_channel_id` to `Proposal` model.
         *   Phase 2 (Multi-channel): Implement in-channel `/propose` for authorized channels.
         *   Phase 3 (Multi-channel): Admin commands to manage authorized channels.
-    *   Focus on `/propose` (with conversational duration), channel posting, inline voting (MC), `/submit` (FF), `/cancel_proposal`, `/edit_proposal`, `/add_proposal_doc`, deadline checking, and result announcement first.
+    *   Focus on `/propose` (with conversational duration), channel posting, inline voting (MC), `/submit` (FF), `/cancel_proposal`, `/edit_proposal`, `/add_doc <proposal_id>`, deadline checking, and result announcement first.
     *   Use PostgreSQL (via Supabase) with Alembic for migrations.
-    *   Manual document loading for RAG initially by admin; proposers can add context to their proposals.
+    *   Manual document loading for RAG initially by admin (`/add_global_doc`); proposers can add context to their proposals (`/add_doc <proposal_id>`).
 2.  **Error Handling & User Feedback:** Make the bot responsive. Inform users if their commands are malformed, if LLM parsing of duration is ambiguous, if something goes wrong, etc.
 3.  **Security:**
     *   Your `TOKEN` is sensitive. Use environment variables or a config file (not committed to Git).

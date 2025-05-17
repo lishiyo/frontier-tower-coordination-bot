@@ -350,10 +350,11 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] `ask_command` calls `ContextService.get_answer_for_question()` and DMs response.
 
 2.  **Task 6.2: Implement `/add_global_doc` Admin Command**
-    *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `add_doc_command` handler.
+    *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or appropriate admin command handler file), implement `add_global_doc_command` handler.
         *   [ ] Check if user is an admin (loaded from `ConfigService`).
         *   [ ] Parse URL or pasted text.
-    *   [ ] `add_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_upload", title=...)`.
+        *   [ ] Prompt for a document title if not easily inferable.
+    *   [ ] `add_global_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_global_upload", title=user_provided_title, proposal_id=None)`.
     *   [ ] Send confirmation to admin.
 
 3.  **Task 6.3: Enhance URL Content Extraction**
@@ -422,6 +423,55 @@ This document breaks down the implementation of CoordinationBot into manageable 
 7.  **Task 7.7: Implement `/privacy` Command**
     *   [ ] Create a static privacy policy text.
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
+
+8.  **Task 7.8: Implement Proposer Document Editing and Deletion**
+    *   **Implement `/edit_doc <document_id>` Command (Proposer Only):**
+        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `edit_doc_command`.
+        *   [ ] Handler parses `document_id`.
+        *   [ ] In `ContextService`, add `can_user_edit_document(user_id, document_id)`: 
+            *   [ ] Fetches document, then its associated proposal, then proposal's `proposer_id`.
+            *   [ ] Returns `True` if `user_id` matches `proposer_id` and document is linked to a proposal.
+        *   [ ] Verify user is the proposer of the proposal linked to the document using `ContextService.can_user_edit_document()`.
+        *   [ ] Initiate a conversation (or expect further message) to get the new document content (text or URL).
+        *   [ ] In `ContextService`, add `update_document_content(document_id, new_content, new_title=None)`:
+            *   [ ] Updates `raw_content` and `title` (if provided) in `DocumentRepository`.
+            *   [ ] Re-chunks, re-embeds, and updates embeddings in `VectorDBService`.
+            *   [ ] Updates `content_hash`.
+        *   [ ] Call `ContextService.update_document_content()`.
+        *   [ ] Send confirmation/error DM.
+    *   **Implement `/delete_doc <document_id>` Command (Proposer Only):**
+        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `delete_doc_command`.
+        *   [ ] Handler parses `document_id`.
+        *   [ ] Use `ContextService.can_user_edit_document()` (or a similar `can_user_delete_document`) to verify proposer.
+        *   [ ] In `ContextService`, add `delete_document(document_id)`:
+            *   [ ] Removes associated embeddings from `VectorDBService`.
+            *   [ ] Deletes document from `DocumentRepository`.
+        *   [ ] Call `ContextService.delete_document()`.
+        *   [ ] Send confirmation/error DM.
+
+9.  **Task 7.9: Implement Admin Global Document Management (List, Edit, Delete)**
+    *   **Implement `/view_global_docs` Command (Admin Only):**
+        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `view_global_docs_command`.
+        *   [ ] Verify user is an admin.
+        *   [ ] In `DocumentRepository`, add `get_global_documents()` (e.g., where `proposal_id` is NULL).
+        *   [ ] In `ContextService`, add `list_global_documents()` that calls the repository method and formats a list (ID, title).
+        *   [ ] DM the list to the admin.
+    *   **Implement `/edit_global_doc <document_id>` Command (Admin Only):**
+        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `edit_global_doc_command`.
+        *   [ ] Verify user is an admin.
+        *   [ ] Handler parses `document_id`.
+        *   [ ] In `ContextService`, add `is_global_document(document_id)` (checks if `proposal_id` is NULL).
+        *   [ ] Verify document is a global document using `ContextService.is_global_document()`.
+        *   [ ] Initiate a conversation (or expect further message) for new content/title.
+        *   [ ] Call `ContextService.update_document_content()` (from Task 7.8).
+        *   [ ] Send confirmation/error DM.
+    *   **Implement `/delete_global_doc <document_id>` Command (Admin Only):**
+        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `delete_global_doc_command`.
+        *   [ ] Verify user is an admin.
+        *   [ ] Handler parses `document_id`.
+        *   [ ] Verify document is a global document using `ContextService.is_global_document()`.
+        *   [ ] Call `ContextService.delete_document()` (from Task 7.8).
+        *   [ ] Send confirmation/error DM.
 
 ## Phase 8: Multi-Channel Support Enhancements
 

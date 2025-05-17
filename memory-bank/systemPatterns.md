@@ -49,7 +49,7 @@ Here's a breakdown of the major components:
         *   `UserService`: Manages user registration (implicit on first interaction), retrieval.
         *   `ProposalService`: Handles proposal creation (including orchestrating conversational context gathering), editing, cancellation, closing (triggered by scheduler), and retrieval. Supports multi-channel functionality where proposals can be posted to different authorized channels, either specified during DM conversation or detected when initiated in-channel.
         *   `SubmissionService`: Handles recording and validation of votes (multiple-choice) and free-form text submissions.
-        *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers or admins), processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval.
+        *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers via `/add_doc <proposal_id>` or admins via `/add_global_doc`), editing/deleting these documents, processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval.
     *   **Interactions:** `Repositories` (for data persistence), other `CoreServices` if necessary, `LLMService`, `VectorDBService`, `TelegramUtils` (for direct notifications if needed).
 
 5.  **`ExternalServices` (`app/services/`)**
@@ -198,7 +198,7 @@ telegram_bot/
     *   If initial context was added and linked via `document_id` in `proposal_data`, ensures this link is correctly established (e.g., by updating the `Document` entry with the new `proposal_id` if it wasn't known before proposal creation).
 11. **`CommandHandlers.handle_context`:**
     *   Receives `proposal_id` from `ProposalService`.
-    *   Sends confirmation DM to proposer (e.g., "Proposal #`proposal_id` created... use `/add_doc ...` for more later").
+    *   Sends confirmation DM to proposer (e.g., "Proposal #`proposal_id` created... use `/add_doc <proposal_id> ...` for more later").
     *   Calls `TelegramUtils.format_proposal_message(...)` and posts it to the proposal's `target_channel_id` (retrieved from context or proposal object) via PTB's `bot.send_message()`.
     *   Updates the proposal in the DB with `channel_message_id` via `ProposalRepository.update_message_id(proposal_id, channel_msg_id)`.
     *   Ends `ConversationHandler`.
@@ -247,10 +247,11 @@ telegram_bot/
 2.  **`main.py`/PTB `Application`:** Routes to a new command handler, e.g., `CommandHandlers.handle_view_documents_router`.
 3.  **`CommandHandlers.handle_view_documents_router`:**
     *   Inspects arguments provided.
-    *   If no arguments (`/view_docs`): Calls a service (e.g., `ConfigService` or a dedicated `ChannelService`) to get the list of authorized channels. Formats and DMs the list to the user.
+    *   If no arguments (`/view_docs`): Calls a service (e.g., `ConfigService` or a dedicated `ChannelService`) to get the list of authorized channels. Formats and DMs the list to the user. (Admins can use `/view_global_docs` to list all non-proposal-specific documents).
     *   If `<channel_id>` argument (`/view_docs <channel_id>`): Calls `ProposalService.list_proposals_by_channel(channel_id)`. Formats and DMs the list of proposals to the user, showing their titles (if available, or a snippet/source) and their unique document IDs.
     *   If `<proposal_id>` argument (`/view_docs <proposal_id>`): Calls `ContextService.list_documents_for_proposal(proposal_id)`. Formats and DMs the list of documents to the user, showing their titles (if available, or a snippet/source) and their unique document IDs.
 4.  **User (Telegram):** Sends `/view_doc <document_id>`.
+    *   Note: This command can be used to view both proposal-specific and global documents.
 5.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.handle_view_document_content`.
 6.  **`CommandHandlers.handle_view_document_content`:**
     *   Parses `document_id`.
