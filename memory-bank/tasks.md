@@ -256,28 +256,29 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 4.1: Submission Model & Repository**
-    *   [ ] Define `Submission` SQLAlchemy model in `app/persistence/models/submission_model.py` (id, proposal_id, submitter_id, response_content, timestamp; unique constraint on proposal_id, submitter_id).
-    *   [ ] Generate Alembic migration for `Submission` table and apply.
-    *   [ ] Create `app/persistence/repositories/submission_repository.py`.
-        *   [ ] Implement `add_or_update_submission(proposal_id, submitter_id, response_content)`.
-        *   [ ] Implement `get_submissions_for_proposal(proposal_id)`.
+    *   [x] Define `Submission` SQLAlchemy model in `app/persistence/models/submission_model.py` (id, proposal_id, submitter_id, response_content, timestamp; unique constraint on proposal_id, submitter_id).
+    *   [x] Generate Alembic migration for `Submission` table and apply.
+    *   [x] Create `app/persistence/repositories/submission_repository.py`.
+        *   [x] Implement `add_or_update_submission(proposal_id, submitter_id, response_content)`.
+        *   [x] Implement `get_submissions_for_proposal(proposal_id)`.
 
 2.  **Task 4.2: Multiple-Choice Voting (`CallbackQueryHandler`)**
-    *   [ ] In `app/utils/telegram_utils.py`, add helper to create inline keyboard for proposal options (using `option_index` in callback data: `vote_[proposal_id]_[option_index]`).
-    *   [ ] Modify `ProposalService.create_proposal` and channel posting logic (specifically the part in Task 2.4 and Task 3.4 that posts to channel) to include this inline keyboard for "multiple_choice" types. Ensure this doesn't conflict with the "Submit Idea" button logic for free-form types.
-    *   [ ] Create `app/telegram_handlers/callback_handlers.py`.
-    *   [ ] Implement `handle_vote_callback` for `CallbackQueryHandler` matching `vote_.*`.
-        *   [ ] Parse `proposal_id` and `option_index` from callback data.
-        *   [ ] Get `user_id` (submitter_id).
-    *   [ ] Create `app/core/submission_service.py`.
-        *   [ ] Implement `record_vote(proposal_id, submitter_id, option_index)`:
-            *   [ ] Call `ProposalRepository.get_proposal_by_id()`. Check if open & "multiple_choice".
-            *   [ ] Get the actual option string from `proposal.options` using `option_index`.
-            *   [ ] Call `UserRepository` to ensure voter exists.
-            *   [ ] Call `SubmissionRepository.add_or_update_submission(...)` with the option string.
-            *   [ ] Return success/failure.
-    *   [ ] `handle_vote_callback` calls `SubmissionService.record_vote(...)`.
-    *   [ ] Send ephemeral confirmation to user (`answer_callback_query`).
+    *   [x] In `app/utils/telegram_utils.py`, add helper to create inline keyboard for proposal options (using `option_index` in callback data: `vote_[proposal_id]_[option_index]`).
+    *   [x] Modify `ProposalService.create_proposal` and channel posting logic (specifically the part in Task 2.4 and Task 3.4 that posts to channel) to include this inline keyboard for "multiple_choice" types. Ensure this doesn't conflict with the "Submit Idea" button logic for free-form types.
+    *   [x] Create `app/telegram_handlers/callback_handlers.py`.
+    *   [x] Implement `handle_vote_callback` for `CallbackQueryHandler` matching `vote_.*`.
+        *   [x] Parse `proposal_id` and `option_index` from callback data.
+        *   [x] Get `user_id` (submitter_id).
+    *   [x] Create `app/core/submission_service.py`.
+        *   [x] Implement `record_vote(proposal_id, submitter_id, option_index)`:
+            *   [x] Call `ProposalRepository.get_proposal_by_id()`. Check if open & "multiple_choice".
+            *   [x] Get the actual option string from `proposal.options` using `option_index`.
+            *   [x] Call `UserRepository` to ensure voter exists.
+            *   [x] Call `SubmissionRepository.add_or_update_submission(...)` with the option string.
+            *   [x] Return success/failure.
+    *   [x] `handle_vote_callback` calls `SubmissionService.record_vote(...)`.
+    *   [x] Send ephemeral confirmation to user (`answer_callback_query`).
+    *   [ ] Test this is working manually.
 
 3.  **Task 4.3: Free-Form Submission (`/submit` Command)**
     *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `submit_command` handler.
