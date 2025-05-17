@@ -513,6 +513,24 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Test `/view_docs <channel_id>` for different authorized channels, ensuring correct proposal listings.
     *   [ ] Ensure `/view_docs <proposal_id>` and `/view_doc <document_id>` continue to function correctly regardless of how many channels are configured.
 
+4.  **Task 8.4: Implement Intelligent Help via LLM (`/help <question>`)**
+    *   **Goal:** Allow users to ask natural language questions about bot functionality using `/help <question>` and receive LLM-generated answers based on `bot_commands.md`.
+    *   **Dependencies:** `LLMService` (Phase 3.1), `ContextService` (Phase 3.3, or a new dedicated `HelpService`), completed `bot_commands.md`.
+    *   **Subtasks:**
+        *   [ ] Modify `help_command` in `app/telegram_handlers/command_handlers.py`:
+            *   [ ] If arguments are present after `/help`, capture them as the `question_text`.
+            *   [ ] If `question_text` exists, call a new service method (e.g., `ContextService.get_intelligent_help(question_text)`).
+            *   [ ] If no arguments, display the standard help message (list of commands).
+        *   [ ] Implement `get_intelligent_help(question_text)` in `app/core/context_service.py` (or a new `HelpService`):
+            *   [ ] Load the content of `memory-bank/bot_commands.md`.
+            *   [ ] Call a new method in `LLMService` (e.g., `LLMService.answer_question_from_docs(question, docs_content)`) providing the user's question and the content of `bot_commands.md`.
+            *   [ ] Return the LLM's formatted answer.
+        *   [ ] Implement `answer_question_from_docs(question, docs_content)` in `app/services/llm_service.py`:
+            *   [ ] Construct a prompt for the LLM that includes the `docs_content` and the user's `question`.
+            *   [ ] The prompt should instruct the LLM to use the provided `docs_content` to answer the `question` by explaining relevant commands and their usage.
+            *   [ ] Call the LLM completion endpoint and return the answer.
+        *   [ ] Ensure the `help_command` handler sends the response from the service back to the user via DM.
+        *   [ ] Test with various questions to ensure clarity and accuracy of LLM responses.
 
 ## Phase 9: Comprehensive Testing, Refinement, and Deployment Preparation
 

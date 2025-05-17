@@ -37,7 +37,7 @@ Here's a breakdown of the major components:
     *   **Modules:** `command_handlers.py`, `callback_handlers.py`, `message_handlers.py` (for conversation steps).
     *   **Responsibilities:**
         *   Define PTB handler functions for specific Telegram updates.
-        *   Parse incoming data from Telegram updates (user messages, button clicks).
+        *   Parse incoming data from Telegram updates (user messages, button clicks, command arguments including optional questions for `/help`).
         *   Manage conversation flows using `ConversationHandler` (e.g., for multi-step proposal creation).
         *   Delegate business logic to appropriate `CoreServices` (`UserService`, `ProposalService`, `SubmissionService`, `ContextService`).
         *   Format responses and send messages back to Telegram (often via `TelegramUtils`).
@@ -49,13 +49,13 @@ Here's a breakdown of the major components:
         *   `UserService`: Manages user registration (implicit on first interaction), retrieval.
         *   `ProposalService`: Handles proposal creation (including orchestrating conversational context gathering), editing, cancellation, closing (triggered by scheduler), and retrieval. Supports multi-channel functionality where proposals can be posted to different authorized channels, either specified during DM conversation or detected when initiated in-channel.
         *   `SubmissionService`: Handles recording and validation of votes (multiple-choice) and free-form text submissions.
-        *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers via `/add_doc <proposal_id>` or admins via `/add_global_doc`), editing/deleting these documents, processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval.
+        *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers via `/add_doc <proposal_id>` or admins via `/add_global_doc`), editing/deleting these documents, processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval. It also handles intelligent help requests by using `LLMService` to interpret user questions against the `bot_commands.md` documentation.
     *   **Interactions:** `Repositories` (for data persistence), other `CoreServices` if necessary, `LLMService`, `VectorDBService`, `TelegramUtils` (for direct notifications if needed).
 
 5.  **`ExternalServices` (`app/services/`)**
     *   Modules: `llm_service.py`, `vector_db_service.py`, `scheduling_service.py`.
     *   **Responsibilities (General):** Abstract interactions with external systems or complex shared functionalities.
-        *   `LLMService`: Manages all interactions with the OpenAI API (or other LLM providers). This includes generating embeddings, getting chat completions for Q&A, parsing natural language for proposal durations, and clustering free-form submissions.
+        *   `LLMService`: Manages all interactions with the OpenAI API (or other LLM providers). This includes generating embeddings, getting chat completions for Q&A, parsing natural language for proposal durations, clustering free-form submissions, and answering natural language questions based on provided context text (e.g., for the enhanced `/help` command using `bot_commands.md`).
         *   `VectorDBService`: Manages all interactions with the vector database (ChromaDB). Stores, searches, and retrieves text embeddings/chunks.
         *   `SchedulingService`: Configures and runs `APScheduler`. Defines scheduled jobs (e.g., checking for proposal deadlines) that trigger actions in `CoreServices`.
     *   **Interactions:** External APIs (OpenAI), ChromaDB library, `APScheduler` library, `CoreServices`.
@@ -262,6 +262,26 @@ telegram_bot/
 8.  **`CommandHandlers.handle_view_document_content`:**
     *   Receives the raw text content.
     *   Formats it if necessary (e.g., handling long messages for Telegram) and DMs it to the user.
+
+### E. Intelligent Help (`/help <question>`)
+
+1.  **User (Telegram):** Sends `/help how do I see my votes?`.
+2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.handle_help_command`.
+3.  **`CommandHandlers.handle_help_command`:**
+    *   Parses the question (e.g., "how do I see my votes?") from the command arguments.
+    *   If a question is present, calls `ContextService.get_intelligent_help(question_text)`.
+    *   If no question, displays the standard list of commands.
+4.  **`ContextService.get_intelligent_help`:**
+    *   Loads or accesses the content of `bot_commands.md` (this could be cached or read on demand).
+    *   Calls `LLMService.answer_question_from_text(question_text, bot_commands_content)`.
+5.  **`LLMService.answer_question_from_text`:**
+    *   Constructs a prompt for the LLM, including the user's `question_text` and the `bot_commands_content` as context.
+    *   The prompt instructs the LLM to explain how the user can achieve their goal by referencing specific commands and their usage as described in the provided documentation.
+    *   Sends the prompt to the LLM and receives the generated explanation.
+    *   Returns the formatted explanation.
+6.  **`CommandHandlers.handle_help_command`:**
+    *   Receives the formatted explanation from `ContextService`.
+    *   Sends the explanation back to the user via DM.
 
 ## V. Key Design Patterns & Python Best Practices
 

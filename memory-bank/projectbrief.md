@@ -43,6 +43,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   View all open proposals and their deadlines.
     *   View all closed proposals and their outcomes (including aggregated vote counts for multiple-choice or a list/summary of free-form submissions via `/view_results <proposal_id>`).
     *   DM the bot to ask questions about existing policies or context documents and receive relevant answers.
+    *   **(New)** Type `/help <my question about how to use the bot>` and get an intelligent answer explaining the relevant commands and steps, so I don't have to read the full command list or documentation every time.
 *   **As an Admin/Moderator, I want to:**
     *   Upload general context documents using `/add_global_doc <URL or paste text>`, view them with `/view_global_docs`, edit them with `/edit_global_doc <document_id>`, and delete them with `/delete_global_doc <document_id>`, so the bot can use these for answering questions.
     *   Invite the bot to channels.
@@ -58,7 +59,9 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   **FR1.1:** Bot accessible via Telegram DM and posts to a designated Telegram Channel (or multiple, if configured).
     *   **FR1.2:** Implicit user registration: store `telegram_id`, `first_name`, `username` (if available) on first interaction.
     *   **FR1.3:** `/start` command: Welcome message.
-    *   **FR1.4:** `/help` command: Display available commands and usage (including `/privacy`).
+    *   **FR1.4:** `/help` command (DM):
+        *   If no arguments are provided, displays a list of available commands and their basic usage (including `/privacy`).
+        *   If a question is provided (e.g., `/help how do I find a document ID?`), the bot uses an LLM to analyze the question and consults the `bot_commands.md` file (or a similar internal representation of command functionalities) to provide a helpful, natural language explanation and guide the user to the relevant commands or steps.
     *   **FR1.5:** `/privacy` command (DM): Displays the bot's privacy policy, outlining data storage, usage, and anonymity aspects.
 
 **5.2. Proposal Creation**
@@ -412,6 +415,16 @@ To see all submissions, DM me: `/view_results [proposal_id]`"
         *   Constructs a prompt for the LLM (e.g., OpenAI) including retrieved context and the user's question.
         *   Sends prompt to LLM, gets the answer, and DMs it to the user, citing sources/snippets.
         * (Future enhancement: RAG could be made channel-aware if documents are associated with specific channels).
+
+8.  **Intelligent Help (LLM-Powered - DM to Bot):**
+    *   User DMs bot: `/help <natural language question about bot usage>`
+        *   Example: `/help how do I find the ID for a document I added?`
+        *   Example: `/help what's the command to see the results of a vote?`
+    *   Bot:
+        *   Parses the question from the `/help` command.
+        *   Retrieves the content of `bot_commands.md` (or an equivalent structured representation of commands and their descriptions).
+        *   Constructs a prompt for an LLM, providing the user's question and the command documentation as context. The prompt will ask the LLM to explain how the user can achieve their goal by referencing specific commands and their usage.
+        *   Sends the prompt to the LLM, gets the explanatory answer, and DMs it to the user.
 
 **IV. Future: Personalized Recommendations**
 

@@ -9,7 +9,7 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Context:** DM with the bot.
 
 *   `/help`
-    *   **Description:** Shows a list of available commands, their usage, and a brief explanation of the bot's purpose.
+    *   **Description:** Shows a list of available commands. If a question is provided (e.g., `/help how do I see results?`), it uses an LLM to try and answer based on the command descriptions in this document.
     *   **Context:** DM with the bot.
 
 *   `/propose <Title>; <Description>; [Option1, Option2, ... OR "FREEFORM"]`
