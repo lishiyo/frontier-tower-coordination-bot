@@ -141,6 +141,75 @@ If the bot doesn't respond or you encounter errors:
    - Verify the proposal has been stored in the database (using application logs or direct database check if possible)
    - Confirm the channel message ID has been recorded (log should indicate this)
 
+## 10. Testing Document Viewing Commands (Task 3.5)
+
+These tests verify the functionality of document storage and viewing commands, primarily focusing on single-channel behavior as outlined in Task 3.5. You will need the `TARGET_CHANNEL_ID` from your `.env` file for some tests.
+
+1.  **Preparation: Create a Proposal with Context**
+    *   Use the `/propose` command conversationally to create a new proposal.
+    *   When prompted for context, provide a short piece of text (e.g., "This is some sample context for testing document storage."). Note the content.
+    *   Let the proposal creation complete. Note the `Proposal ID` and the `Document ID` if provided in confirmation messages or logs. (If Document ID isn't easily available, you might need to infer it from logs or by listing documents for the proposal in a later step).
+
+2.  **Test `/view_doc <document_id>`**
+    *   If you have a `Document ID` from the previous step, use it:
+        ```
+        /view_doc <your_document_id>
+        ```
+    *   **Expected Result:**
+        *   The bot should DM you the raw content of the document.
+        *   Verify this content matches what you provided during proposal creation.
+        *   If the content is long, verify it's handled appropriately (e.g., sent in multiple messages or truncated with a notice).
+    *   **Test with Invalid/Non-existent Document ID:**
+        ```
+        /view_doc 99999
+        ```
+    *   **Expected Result:** The bot should respond with a message indicating the document was not found or an error occurred.
+
+3.  **Test `/view_docs` (No Arguments)**
+    *   Send the command:
+        ```
+        /view_docs
+        ```
+    *   **Expected Result:**
+        *   The bot should DM you a message indicating the current primary proposal channel, which should match your `TARGET_CHANNEL_ID` from the `.env` file. (e.g., "Proposals are currently managed in channel: [Your Target Channel ID]").
+
+4.  **Test `/view_docs <channel_id>`**
+    *   First, ensure you have at least one proposal created (e.g., the one from step 1).
+    *   Send the command using your `TARGET_CHANNEL_ID`:
+        ```
+        /view_docs <your_target_channel_id>
+        ```
+    *   **Expected Result:**
+        *   The bot should DM you a list of proposals associated with that channel.
+        *   Verify the proposal(s) you created appear in this list (e.g., showing Proposal ID, title, status).
+    *   **Test with an unauthorized/invalid Channel ID (Optional, if supported):**
+        ```
+        /view_docs <some_other_channel_id>
+        ```
+    *   **Expected Result:** The bot might indicate no proposals found or that the channel is not monitored, depending on implementation.
+
+5.  **Test `/view_docs <proposal_id>`**
+    *   Use the `Proposal ID` from the proposal you created in step 1.
+        ```
+        /view_docs <your_proposal_id>
+        ```
+    *   **Expected Result:**
+        *   The bot should DM you a list of documents associated with that proposal.
+        *   Verify the document you added as context (in step 1) is listed (e.g., showing Document ID and title).
+    *   **Test with a Proposal ID that has no documents:**
+        *   Create a new proposal without adding any context. Note its `Proposal ID`.
+        *   Send `/view_docs <new_proposal_id_without_docs>`.
+    *   **Expected Result:** The bot should indicate that no documents are associated with this proposal.
+    *   **Test with an invalid/non-existent Proposal ID:**
+        ```
+        /view_docs 99999
+        ```
+    *   **Expected Result:** The bot should respond with a message indicating the proposal was not found or an error.
+
+6.  **Verify Logs**
+    *   Throughout these tests, monitor the bot's terminal logs for any errors or unexpected messages.
+    *   Confirm that commands are being logged as executed.
+
 ---
 
 **Note:** This document will be expanded as more features are implemented.

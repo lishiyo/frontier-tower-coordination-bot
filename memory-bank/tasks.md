@@ -204,32 +204,37 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] **Follow-up Task:** Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction.
 
 3.  **Task 3.5: Implement Document Storage with Full Content and Basic Viewing Commands (Single-Channel)**
-    *   [ ] **Schema Change:**
-        *   [ ] Add `raw_content (Text, nullable=True)` field to `app/persistence/models/document_model.py`.
-        *   [ ] Generate Alembic migration for adding `raw_content` to `documents` table (`alembic revision -m "add_raw_content_to_documents"`) and apply it (`alembic upgrade head`).
-    *   [ ] **Update Document Ingestion:**
-        *   [ ] Modify `ContextService.process_and_store_document` to save the fetched/provided text into the new `raw_content` field of the `Document` object before saving to the database via `DocumentRepository.add_document`.
-    *   [ ] **Implement `/view_doc <document_id>` Command:**
-        *   [ ] In `app/persistence/repositories/document_repository.py`, add `get_document_by_id(document_id)` method that fetches a `Document` by its ID, including the `raw_content`.
-        *   [ ] In `app/core/context_service.py`, add `get_document_content(document_id)` method that calls `DocumentRepository.get_document_by_id()` and returns `document.raw_content`.
-        *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `view_document_content_command` that takes `<document_id>`, calls `ContextService.get_document_content()`, and DMs the content to the user (handle potential long messages).
-    *   [ ] **Implement `/view_docs` (no arguments - Single Channel Behavior):**
-        *   [ ] In `app/telegram_handlers/command_handlers.py`, implement the base `view_docs_command` (handling no arguments).
-        *   [ ] This handler should retrieve the `TARGET_CHANNEL_ID` from `ConfigService`.
-        *   [ ] Format and DM a message to the user indicating this is the current proposal channel (e.g., "Proposals are currently managed in channel: [Channel ID/Name if available]").
-    *   [ ] **Implement `/view_docs <channel_id>` (Single Channel Behavior):**
-        *   [ ] In `app/persistence/repositories/proposal_repository.py`, add `get_proposals_by_channel_id(channel_id)` method.
-        *   [ ] In `app/core/proposal_service.py`, add `list_proposals_by_channel(channel_id)` that calls the new repository method and formats a list of proposals (ID, title, status).
-        *   [ ] Modify `view_docs_command` in `command_handlers.py` to handle the `<channel_id>` argument.
-        *   [ ] If `<channel_id>` is provided, it should call `ProposalService.list_proposals_by_channel()`. (Initially, this will only meaningfully work if the provided ID matches `TARGET_CHANNEL_ID`).
-        *   [ ] DM the list of proposals to the user.
-    *   [ ] **Implement `/view_docs <proposal_id>`:**
-        *   [ ] In `app/persistence/repositories/document_repository.py`, add `get_documents_by_proposal_id(proposal_id)` method.
-        *   [ ] In `app/core/context_service.py`, add `list_documents_for_proposal(proposal_id)` that calls the new repository method and formats a list of documents (ID, title).
-        *   [ ] Modify `view_docs_command` in `command_handlers.py` to handle the `<proposal_id>` argument.
-        *   [ ] If `<proposal_id>` is provided, it should call `ContextService.list_documents_for_proposal()`.
-        *   [ ] DM the list of documents to the user.
-    *   [ ] **Command Registration:** Ensure all new `/view_docs` and `/view_doc` handlers are registered in `main.py`.
+    *   [x] **Schema Change:**
+        *   [x] Add `raw_content (Text, nullable=True)` field to `app/persistence/models/document_model.py`.
+        *   [x] Generate Alembic migration for adding `raw_content` to `documents` table (`alembic revision -m "add_raw_content_to_documents"`) and apply it (`alembic upgrade head`).
+    *   [x] **Update Document Ingestion:**
+        *   [x] Modify `ContextService.process_and_store_document` to save the fetched/provided text into the new `raw_content` field of the `Document` object before saving to the database via `DocumentRepository.add_document`.
+    *   [x] **Implement `/view_doc <document_id>` Command:**
+        *   [x] In `app/persistence/repositories/document_repository.py`, add `get_document_by_id(document_id)` method that fetches a `Document` by its ID, including the `raw_content`.
+        *   [x] In `app/core/context_service.py`, add `get_document_content(document_id)` method that calls `DocumentRepository.get_document_by_id()` and returns `document.raw_content`.
+        *   [x] In `app/telegram_handlers/command_handlers.py`, implement `view_document_content_command` that takes `<document_id>`, calls `ContextService.get_document_content()`, and DMs the content to the user (handle potential long messages).
+    *   [x] **Implement `/view_docs` (no arguments - Single Channel Behavior):**
+        *   [x] In `app/telegram_handlers/command_handlers.py`, implement the base `view_docs_command` (handling no arguments).
+        *   [x] This handler should retrieve the `TARGET_CHANNEL_ID` from `ConfigService`.
+        *   [x] Format and DM a message to the user indicating this is the current proposal channel (e.g., "Proposals are currently managed in channel: [Channel ID/Name if available]").
+    *   [x] **Implement `/view_docs <channel_id>` (Single Channel Behavior):**
+        *   [x] In `app/persistence/repositories/proposal_repository.py`, add `get_proposals_by_channel_id(channel_id)` method.
+        *   [x] In `app/core/proposal_service.py`, add `list_proposals_by_channel(channel_id)` that calls the new repository method and formats a list of proposals (ID, title, status).
+        *   [x] Modify `view_docs_command` in `command_handlers.py` to handle the `<channel_id>` argument.
+        *   [x] If `<channel_id>` is provided, it should call `ProposalService.list_proposals_by_channel()`. (Initially, this will only meaningfully work if the provided ID matches `TARGET_CHANNEL_ID`).
+        *   [x] DM the list of proposals to the user.
+    *   [x] **Implement `/view_docs <proposal_id>`:**
+        *   [x] In `app/persistence/repositories/document_repository.py`, add `get_documents_by_proposal_id(proposal_id)` method.
+        *   [x] In `app/core/context_service.py`, add `list_documents_for_proposal(proposal_id)` that calls the new repository method and formats a list of documents (ID, title).
+        *   [x] Modify `view_docs_command` in `command_handlers.py` to handle the `<proposal_id>` argument.
+        *   [x] If `<proposal_id>` is provided, it should call `ContextService.list_documents_for_proposal()`.
+        *   [x] DM the list of documents to the user.
+    *   [x] **Command Registration:** Ensure all new `/view_docs` and `/view_doc` handlers are registered in `main.py`.
+    *   [ ] **Refactor Command Handlers (Task 3.5.1):**
+        *   [ ] Create new files in `app/telegram_handlers/` for different command categories (e.g., `document_commands.py`, `proposal_commands.py`, `submission_commands.py`).
+        *   [ ] Move relevant command handler functions from `command_handlers.py` to these new files.
+        *   [ ] Keep `command_handlers.py` for shared logic, core commands.
+        *   [ ] Update imports in `main.py` to reflect the new locations of command handlers and register them accordingly.
     *   [ ] **Testing (Single Channel):**
         *   [ ] Test adding documents with context and ensure `raw_content` is stored.
         *   [ ] Test `/view_doc <document_id>` to see content.
@@ -434,8 +439,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Implement admin commands to add/list/remove authorized channels if using DB-based management.
     *   [ ] Update the `ConversationHandler` for `/propose` (`ASK_CHANNEL` state) to fetch and display these authorized channels when initiated via DM in multi-channel mode.
         *   [ ] Prompt user to select a channel.
-        *   [ ] Store selected `target_channel_id` in `context.
-        user_data`.
+        *   [ ] Store selected `target_channel_id` in `context.user_data`.
         *   [ ] Transition to `ASK_DURATION`. Prompt user.
     *   [ ] Implement logic to detect in-channel `/propose` commands, verify channel authorization against the configured list/table, and set that channel as the proposal's `target_channel_id`.
     *   [ ] Update the channel results posting logic in `SchedulingService`/`ProposalService` to use the proposal's `target_channel_id`.

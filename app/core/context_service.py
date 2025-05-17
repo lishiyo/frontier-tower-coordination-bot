@@ -1,6 +1,6 @@
 import logging
 import hashlib
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import httpx # For fetching content from URLs
 
 from app.services.llm_service import LLMService
@@ -8,6 +8,9 @@ from app.services.vector_db_service import VectorDBService
 from app.persistence.repositories.document_repository import DocumentRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.text_processing import simple_chunk_text # Moved import
+from app.persistence.models.proposal_model import Proposal
+from app.persistence.models.document_model import Document
+from app.persistence.repositories.proposal_repository import ProposalRepository
 
 logger = logging.getLogger(__name__)
 

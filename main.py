@@ -5,24 +5,20 @@ import telegram.ext.filters as filters # Changed import
 
 from app.config import ConfigService
 # from app.persistence.database import DatabaseManager # Will be implemented in a future task
-# Import your new command handlers
-from app.telegram_handlers.command_handlers import (
-    start_command, help_command, propose_command_entry, cancel_conversation,
-    view_document_content_command, view_docs_command # Added new handlers
-)
-from app.telegram_handlers.message_handlers import (
-    handle_collect_title,
-    handle_collect_description,
-    handle_collect_options, # Renamed from handle_collect_options_type
-    handle_ask_duration,
-    handle_ask_context
-)
-from app.telegram_handlers.callback_handlers import handle_collect_proposal_type_callback # Specific handler for proposal type callback
 
-from app.telegram_handlers.conversation_defs import (
-    COLLECT_TITLE, COLLECT_DESCRIPTION, COLLECT_PROPOSAL_TYPE, COLLECT_OPTIONS, 
-    ASK_DURATION, ASK_CONTEXT, PROPOSAL_TYPE_CALLBACK
+# Import command handlers from their new locations
+from app.telegram_handlers.command_handlers import (
+    start_command, help_command # cancel_conversation is used in proposal_conv_handler, not directly in main
 )
+from app.telegram_handlers.document_command_handlers import (
+    view_document_content_command, view_docs_command
+)
+from app.telegram_handlers.proposal_command_handlers import (
+    proposal_conv_handler # propose_command_entry is used within this handler
+)
+
+# message_handlers, callback_handlers, and conversation_defs are now used within proposal_command_handlers.py
+# and no longer need to be directly imported into main.py
 
 # Configure logging
 logging.basicConfig(
@@ -42,34 +38,19 @@ def main() -> None:
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(config_service.get_bot_token()).build()
 
-    # Proposal Conversation Handler
-    proposal_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("propose", propose_command_entry)],
-        states={
-            COLLECT_TITLE: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_collect_title)],
-            COLLECT_DESCRIPTION: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_collect_description)],
-            COLLECT_PROPOSAL_TYPE: [
-                CallbackQueryHandler(handle_collect_proposal_type_callback, pattern=f"^{PROPOSAL_TYPE_CALLBACK}"),
-                # Allow text input for proposal type as well, as per message_handler logic
-                MessageHandler(filters.TEXT & (~filters.COMMAND), handle_collect_proposal_type_callback) 
-            ],
-            COLLECT_OPTIONS: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_collect_options)],
-            ASK_DURATION: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_ask_duration)],
-            ASK_CONTEXT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_ask_context)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_conversation)],
-        # per_message=True, # Consider if needed for specific scenarios
-        # name="proposal_creation_conversation", # Optional: for debugging or specific handler management
-        # persistent=False, # Set to True if you want to use persistence across restarts
-    )
-
     # Register command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    # application.add_handler(CommandHandler("propose", propose_command)) # Old direct command
-    application.add_handler(proposal_conv_handler) # New conversation handler
+    
+    # Proposal Conversation Handler registration (now imported)
+    application.add_handler(proposal_conv_handler) 
+
+    # Document related commands
     application.add_handler(CommandHandler("view_doc", view_document_content_command))
     application.add_handler(CommandHandler("view_docs", view_docs_command))
+
+    # TODO: Register other command handlers from their new files as they are created/moved
+    # e.g., submission_command_handlers, other proposal_command_handlers
 
     logger.info("Bot application created and command handlers registered.")
 
