@@ -2,6 +2,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI # Using AsyncOpenAI for non-blocking calls
 from app.config import ConfigService
+from datetime import datetime, timezone # Added timezone
 
 logger = logging.getLogger(__name__)
 
@@ -19,34 +20,63 @@ class LLMService:
             self.client = None # Ensure client is None if initialization fails
             # Depending on strictness, could re-raise or allow degraded functionality
 
-    async def parse_natural_language_duration(self, text: str) -> Optional[Dict[str, Any]]:
+    async def parse_natural_language_duration(self, text: str) -> Optional[datetime]:
         """
-        Parses natural language text to extract a duration or a specific deadline date.
-        Example: "7 days", "for 3 weeks", "until May 21st at 5 PM"
-        Returns a dictionary representing the duration (e.g., {"days": 7}) or deadline, 
-        or None if parsing fails.
-        This will require a carefully crafted prompt.
+        Parses natural language text to extract a specific deadline datetime object using an LLM.
+        Example: "7 days from now", "for 3 weeks from today", "until May 21st at 5 PM", "next Monday at noon"
+        Returns a timezone-aware datetime object (UTC) if successful, or None if parsing fails.
         """
         if not self.client:
             logger.error("LLMService client not initialized. Cannot parse duration.")
             return None
-        
-        # Placeholder for actual implementation
-        logger.info(f"Attempting to parse duration from text: '{text}'")
-        # TODO: Implement LLM call to parse duration.
-        # This is a complex task and might involve:
-        # 1. Crafting a prompt that asks the LLM to convert text to a structured date/duration.
-        # 2. Defining a function call or expecting JSON output for easy parsing.
-        # 3. Handling various date/time formats and relative durations.
-        
-        # Example of what the LLM might be guided to return (simplified):
-        # For "7 days from now": {"type": "relative", "days": 7}
-        # For "until May 21st 2024 at 5 PM": {"type": "absolute", "year": 2024, "month": 5, "day": 21, "hour": 17, "minute": 0}
-        
-        # For now, returning None as it's not implemented.
-        await self.get_completion(f"Parse this duration: {text}") # Dummy call to test client
-        logger.warning("parse_natural_language_duration is not fully implemented yet.")
-        return None
+
+        # Get current time in UTC to provide as context to the LLM
+        # This helps the LLM resolve relative dates like "tomorrow" or "next week"
+        now_utc = datetime.now(timezone.utc)
+        current_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+        prompt = (
+            f"You are a precise date parsing assistant. Your sole task is to convert user input into a specific datetime format. "
+            f"Given the current time is {current_time_str}, parse the following user input to determine a future deadline date and time. "
+            f"User input: '{text}'.\n"
+            f"VERY IMPORTANT: Respond with ONLY the absolute date and time in the exact format 'YYYY-MM-DD HH:MM:SS UTC'. "
+            f"Do NOT include any other text, explanations, or conversational phrases in your response. "
+            f"Your entire response must be just the date string.\n"
+            f"For example, if the current time is 2024-05-15 10:00:00 UTC and the user input is 'tomorrow at 5pm', your response must be exactly: 2024-05-16 17:00:00 UTC\n"
+            f"If the input is a duration like '7 days', calculate the date 7 days from the current time ({current_time_str}) and return it in the same format.\n"
+            f"If the input is too vague, clearly not a date/time, or cannot be reliably parsed into the specified format, respond with the exact string: ERROR_CANNOT_PARSE"
+        )
+
+        logger.info(f"Attempting to parse duration from text: '{text}' with current time context: {current_time_str}")
+
+        try:
+            response_text = await self.get_completion(prompt, model="gpt-4o") # Using a capable model
+
+            if not response_text or response_text == "ERROR_CANNOT_PARSE":
+                logger.warning(f"LLM could not parse duration string: '{text}'. Response: '{response_text}'")
+                return None
+
+            logger.info(f"LLM response for duration parsing of '{text}': '{response_text}'")
+            
+            # Attempt to parse the LLM's response into a datetime object
+            # Expected format: "YYYY-MM-DD HH:MM:SS UTC"
+            parsed_datetime = datetime.strptime(response_text, "%Y-%m-%d %H:%M:%S %Z")
+            # Ensure it's timezone-aware (strptime with %Z should handle UTC)
+            # If it somehow becomes naive, make it UTC
+            if parsed_datetime.tzinfo is None:
+                parsed_datetime = parsed_datetime.replace(tzinfo=timezone.utc)
+            else:
+                parsed_datetime = parsed_datetime.astimezone(timezone.utc) # Convert to UTC if it was parsed with another tz
+
+            logger.info(f"Successfully parsed '{text}' to datetime: {parsed_datetime}")
+            return parsed_datetime
+
+        except ValueError as ve:
+            logger.error(f"Failed to parse LLM response '{response_text}' into datetime for input '{text}': {ve}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during natural language duration parsing for '{text}': {e}", exc_info=True)
+            return None
 
     async def generate_embedding(self, text: str, model: str = "text-embedding-3-small") -> Optional[List[float]]:
         """
