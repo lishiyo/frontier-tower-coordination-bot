@@ -79,6 +79,67 @@ If the bot doesn't respond or you encounter errors:
 1. After testing, stop the bot by pressing `Ctrl+C` in your terminal
 2. Verify the shutdown sequence log messages appear
 
+## 9. Testing `/propose` Command
+
+1. **Basic Command Format**
+   - Send the `/propose` command with proper arguments:
+     ```
+     /propose Title; Description; Option1, Option2, Option3
+     ```
+     **OR**
+     ```
+     /propose Title; Description; FREEFORM
+     ```
+   - Example (Multiple Choice):
+     ```
+     /propose Community Lunch; What should we order for next week's lunch?; Pizza, Sushi, Salad, Sandwiches
+     ```
+   - Example (Free Form):
+     ```
+     /propose Project Ideas; Please share your ideas for our next project!; FREEFORM
+     ```
+
+2. **Expected Results for Multiple Choice Proposal**
+   - The bot should send you a DM confirmation that includes:
+     - The proposal ID
+     - A preview of the proposal details
+     - Information about the proposal being posted to the channel
+   - The proposal should appear in the configured target channel with:
+     - The title and description
+     - Your name as the proposer
+     - A deadline (currently 7 days from creation)
+     - The provided options
+     - (Note: Voting buttons will be implemented in a future task)
+
+3. **Expected Results for Free Form Proposal**
+   - The bot should send you a DM confirmation similar to multiple choice
+   - The proposal should appear in the configured target channel with:
+     - The title and description
+     - Your name as the proposer
+     - A deadline (currently 7 days from creation)
+     - The proposal ID clearly displayed
+     - A "Submit Your Idea" button (that prefills `/submit <proposal_id>` when clicked)
+
+4. **Test Command Format Variations**
+   - Test with missing arguments:
+     ```
+     /propose Just A Title
+     ```
+     Expected: The bot should respond with guidance on the correct format
+   
+   - Test with missing options in a multiple-choice proposal:
+     ```
+     /propose Title; Description
+     ```
+     Expected: The bot should interpret this as a free-form proposal or prompt for clarification
+
+   - Test with very long titles/descriptions/options to verify proper handling
+
+5. **Verify Logs and Database**
+   - Check your terminal to see logs confirming proposal creation
+   - Verify the proposal has been stored in the database (using application logs or direct database check if possible)
+   - Confirm the channel message ID has been recorded (log should indicate this)
+
 ---
 
 **Note:** This document will be expanded as more features are implemented.
