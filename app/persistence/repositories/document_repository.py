@@ -1,6 +1,7 @@
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.persistence.models.document_model import Document
+from sqlalchemy.future import select
 
 class DocumentRepository:
     def __init__(self, db_session: AsyncSession):
@@ -32,4 +33,25 @@ class DocumentRepository:
         # For now, let's make this repository method commit itself for simplicity in this step.
         await self.db_session.commit()
         await self.db_session.refresh(new_document)
-        return new_document 
+        return new_document
+
+    async def link_document_to_proposal(self, document_id: int, proposal_id: int) -> Optional[Document]:
+        """Links an existing document to a proposal by setting its proposal_id."""
+        result = await self.db_session.execute(
+            select(Document).where(Document.id == document_id)
+        )
+        document = result.scalars().first()
+
+        if document:
+            document.proposal_id = proposal_id
+            # The commit for this update should be handled by the calling service/handler
+            # to ensure it's part of the overall transaction related to proposal creation.
+            # However, if process_and_store_document (which calls add_document) already committed
+            # the document, then this linking step might also need its own commit if done separately.
+            # For now, let's assume the handler will commit after this call if it's part of a larger transaction.
+            # To be safe for now and ensure the link is made if called standalone, I will add a commit here.
+            # This is another point of refactoring for better transaction control.
+            await self.db_session.commit()
+            await self.db_session.refresh(document)
+            return document
+        return None 

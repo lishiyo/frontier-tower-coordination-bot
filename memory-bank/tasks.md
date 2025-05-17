@@ -160,48 +160,54 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Store embeddings in `VectorDBService` (linking to SQL Document ID, and updating SQL doc with vector IDs).
 
 4.  **Task 3.4: ConversationHandler for `/propose`**
-    *   [ ] Refactor/Implement `propose_command` in `app/telegram_handlers/command_handlers.py` as the entry point for a `ConversationHandler`.
-        *   [ ] Parse initial user input from `/propose [Initial Information]`.
-        *   [ ] Store any provided details (title, description, options/type) in `context.user_data`.
-        *   [ ] Determine the first state based on missing information.
-    *   [ ] Define states in `app/telegram_handlers/conversation_defs.py`: `COLLECT_TITLE`, `COLLECT_DESCRIPTION`, `COLLECT_OPTIONS_TYPE`, `ASK_CHANNEL` (if multi-channel), `ASK_DURATION`, `ASK_CONTEXT`.
-    *   [ ] Implement handlers in `app/telegram_handlers/message_handlers.py` for new states:
-        *   [ ] Handler for `COLLECT_TITLE` state:
-            *   [ ] Get title from user, store in `context.user_data`.
-            *   [ ] Transition to `COLLECT_DESCRIPTION`. Prompt user.
-        *   [ ] Handler for `COLLECT_DESCRIPTION` state:
-            *   [ ] Get description from user, store in `context.user_data`.
-            *   [ ] Transition to `COLLECT_OPTIONS_TYPE`. Prompt user.
-        *   [ ] Handler for `COLLECT_OPTIONS_TYPE` state:
-            *   [ ] Get options string or "freeform" from user. Parse options if provided. Store in `context.user_data`.
-            *   [ ] Transition to `ASK_CHANNEL` (if applicable) or `ASK_DURATION`. Prompt user.
+    *   [x] Refactor/Implement `propose_command` in `app/telegram_handlers/command_handlers.py` as the entry point for a `ConversationHandler`.
+        *   [x] Parse initial user input from `/propose [Initial Information]`.
+        *   [x] Store any provided details (title, description, options/type) in `context.user_data`.
+        *   [x] Determine the first state based on missing information.
+    *   [x] Define states in `app/telegram_handlers/conversation_defs.py`: `COLLECT_TITLE`, `COLLECT_DESCRIPTION`, `COLLECT_PROPOSAL_TYPE`, `COLLECT_OPTIONS`, `ASK_CHANNEL` (if multi-channel), `ASK_DURATION`, `ASK_CONTEXT`.
+    *   [x] Implement handlers in `app/telegram_handlers/message_handlers.py` for new states:
+        *   [x] Handler for `COLLECT_TITLE` state:
+            *   [x] Get title from user, store in `context.user_data`.
+            *   [x] Transition to `COLLECT_DESCRIPTION`. Prompt user.
+        *   [x] Handler for `COLLECT_DESCRIPTION` state:
+            *   [x] Get description from user, store in `context.user_data`.
+            *   [x] Transition to `COLLECT_PROPOSAL_TYPE`. Prompt user.
+        *   [x] Handler for `COLLECT_PROPOSAL_TYPE` state (now in `callback_handlers.py`, handles inline and text):
+            *   [x] Get proposal type from user. Store in `context.user_data`.
+            *   [x] Transition to `COLLECT_OPTIONS` (if MC) or `ASK_DURATION` (if FF). Prompt user.
+        *   [x] Handler for `COLLECT_OPTIONS` state:
+            *   [x] Get options string from user. Parse options. Store in `context.user_data`.
+            *   [x] Transition to `ASK_DURATION`. Prompt user.
     *   [ ] Implement/Update handler for `ASK_CHANNEL` state (if multi-channel mode is active):
         *   [ ] Prompt user to select a channel.
         *   [ ] Store selected `target_channel_id` in `context.user_data`.
         *   [ ] Transition to `ASK_DURATION`. Prompt user.
-    *   [ ] Implement/Update handler for `ASK_DURATION` state:
-        *   [ ] Get user's natural language duration.
-        *   [ ] Call `LLMService.parse_natural_language_duration()` to get `deadline_date`.
-        *   [ ] Store `deadline_date` in `context.user_data`.
-        *   [ ] Transition to `ASK_CONTEXT`. Prompt user for initial context.
-    *   [ ] Implement/Update handler for `ASK_CONTEXT` state:
-        *   [ ] Get user's context input (text/URL/"no").
-        *   [ ] If context provided:
-            *   [ ] Call `ContextService.process_and_store_document(...)`, storing returned `document_id` in `context.user_data`.
-        *   [ ] Collate all proposal data from `context.user_data`.
-        *   [ ] Call `ProposalService.create_proposal(...)`.
-        *   [ ] If a context document was created, update its `proposal_id` field with the new proposal's ID via `DocumentRepository`.
-        *   [ ] Send confirmation DM (including "use `/add_proposal_context` for more" and the edit and cancel commands).
-        *   [ ] Post proposal to the `target_channel_id` (retrieved from context).
-        *   [ ] End conversation.
-    *   [ ] Ensure all necessary message handlers, command handlers (entry point), and callback query handlers (for channel selection if using inline keyboard) are correctly registered with the `ConversationHandler` and the main application dispatcher.
+    *   [x] Implement/Update handler for `ASK_DURATION` state:
+        *   [x] Get user's natural language duration.
+        *   [x] Call `LLMService.parse_natural_language_duration()` to get `deadline_date`.
+        *   [x] Store `deadline_date` in `context.user_data`.
+        *   [x] Transition to `ASK_CONTEXT`. Prompt user for initial context.
+    *   [x] Implement/Update handler for `ASK_CONTEXT` state:
+        *   [x] Get user's context input (text/URL/"no").
+        *   [x] If context provided:
+            *   [x] Call `ContextService.process_and_store_document(...)`, storing returned `document_id` in `context.user_data`.
+        *   [x] Collate all proposal data from `context.user_data`.
+        *   [x] Call `ProposalService.create_proposal(...)`.
+        *   [x] If a context document was created, update its `proposal_id` field with the new proposal's ID via `DocumentRepository`.
+        *   [x] Send confirmation DM (including "use `/add_proposal_context` for more" and the edit and cancel commands).
+        *   [x] Post proposal to the `target_channel_id` (retrieved from context).
+        *   [x] End conversation.
+    *   [x] Ensure all necessary message handlers, command handlers (entry point), and callback query handlers (for proposal type selection) are correctly registered with the `ConversationHandler` and the main application dispatcher.
     *   [ ] Manually test the full conversational flow for various inputs:
-        *   [ ] `/propose` (empty)
-        *   [ ] `/propose <Title only>`
-        *   [ ] `/propose <Title>; <Description>; <Options>`
-        *   [ ] `/propose <Title>; <Description>; FREEFORM`
-        *   [ ] Test with and without providing initial context.
-        *   [ ] Test channel selection if multi-channel mode is notionally active.
+        *   [x] `/propose` (empty)
+        *   [x] `/propose <Title only>`
+        *   [x] `/propose <Title>; <Description>; <Options>`
+        *   [x] `/propose <Title>; <Description>; FREEFORM`
+        *   [x] Test with and without providing initial context.
+        *   [x] Test cancellation at various stages.
+        *   [ ] Test channel selection if multi-channel mode is notionally active (Future task).
+    *   [ ] **Follow-up Task:** Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction.
+    *   [ ] **Follow-up Task:** Implement the `ASK_CHANNEL` state and related logic for multi-channel support (as per FR2.1.B, FR2.1.C, FR5.9).
 
 ## Phase 4: Voting and Submission Logic
 

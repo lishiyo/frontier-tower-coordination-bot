@@ -34,7 +34,7 @@ class ProposalRepository:
             # outcome and raw_results are nullable and set later
         )
         self.db_session.add(new_proposal)
-        await self.db_session.commit()
+        await self.db_session.flush()
         await self.db_session.refresh(new_proposal)
         return new_proposal
 
@@ -45,15 +45,12 @@ class ProposalRepository:
         return result.scalar_one_or_none()
 
     async def update_proposal_message_id(self, proposal_id: int, message_id: int) -> Optional[Proposal]:
-        stmt = (
-            update(Proposal)
-            .where(Proposal.id == proposal_id)
-            .values(channel_message_id=message_id)
-            .returning(Proposal)
-        )
-        result = await self.db_session.execute(stmt)
-        await self.db_session.commit()
-        return result.scalar_one_or_none()
+        proposal = await self.get_proposal_by_id(proposal_id)
+        if proposal:
+            proposal.channel_message_id = message_id
+            await self.db_session.flush()
+            await self.db_session.refresh(proposal)
+        return proposal
 
     async def find_expired_open_proposals(self) -> List[Proposal]:
         """Finds proposals that are currently open but past their deadline."""

@@ -52,9 +52,6 @@ class ConfigService:
         port = POSTGRES_PORT
         db_name = POSTGRES_DB
         
-        # print host
-        print(f"DEBUG: Host: {host}")
-        
         if not all([user, password, host, port, db_name]):
             missing_vars = []
             if not user: missing_vars.append("POSTGRES_USER")
@@ -66,9 +63,6 @@ class ConfigService:
 
         # Construct the URL for asyncpg
         constructed_url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db_name}"
-        
-        # Optional: print for debugging during development
-        print(f"DEBUG: Constructed Database URL: {constructed_url}") 
         
         return constructed_url
     
