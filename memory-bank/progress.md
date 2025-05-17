@@ -1,5 +1,19 @@
 # Progress Log
 
+## Sat May 17 16:13:24 PDT 2025
+
+**Completed:**
+- Task 3.6: (Utility) Implement Viewing of Stored Document Chunks.
+    - Added `get_document_chunks(sql_document_id)` method to `app/services/vector_db_service.py`.
+    - Created utility script `app/scripts/view_document_chunks.py` to view chunks using the new service method.
+- Phase 3 (Conversational Proposal Creation & Initial Context) is now fully complete.
+
+**Learnings & Fixes:**
+- ChromaDB's `collection.get()` method with a `where` filter is effective for retrieving specific documents or chunks based on their metadata, such as a `document_sql_id`.
+
+**Next Steps:**
+- Begin Phase 4: Voting and Submission Logic.
+    - Task 4.1: Define `Submission` SQLAlchemy model and repository.
 
 ## Sat May 17 13:28:25 PDT 2025
 

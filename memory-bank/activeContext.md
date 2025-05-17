@@ -1,36 +1,35 @@
-# Active Context - Sat May 17 13:28:25 PDT 2025
+# Active Context - Sat May 17 16:13:24 PDT 2025
 
 ## Current Work Focus
-- Testing newly implemented document viewing commands (`/view_doc`, `/view_docs`) as per Task 3.5 and updated `testing_instructions.md`.
-- Verifying command handler refactoring (Task 3.5.1).
-- Preparing for Task 3.6 (Viewing stored document chunks).
+- Transitioning to Phase 4: Voting and Submission Logic.
+- Starting with Task 4.1: Define `Submission` SQLAlchemy model and repository.
 
 ## What's Working
-- `NameError` in `context_service.py` is resolved.
-- Document viewing commands (`/view_doc`, `/view_docs`) are implemented (Task 3.5).
-- Command handlers have been refactored into separate files (Task 3.5.1), and `main.py` has been updated.
-- Testing instructions for document viewing have been added to `testing_instructions.md`.
-- Conversational proposal creation (Task 3.4) is mostly complete and awaiting final testing.
+- Phase 3 (Conversational Proposal Creation & Initial Context) is complete.
+- `VectorDBService.get_document_chunks` method is implemented and allows retrieval of specific document chunks from ChromaDB.
+- The utility script `app/scripts/view_document_chunks.py` is functional for viewing these stored chunks via the command line.
+- All previously completed features from Phase 1, 2, and earlier parts of Phase 3 remain operational.
 
 ## What's Broken
-- Full manual testing for Task 3.5 (document viewing) is pending.
-- Final manual testing for all paths/edge cases of Task 3.4 (conversational propose) might still be pending.
+- No known issues from the completion of Phase 3.
+- New features of Phase 4 are not yet implemented.
 
 ## Active Decisions and Considerations
-- Prioritizing testing of the new document commands and the refactored handler structure.
+- N/A at the start of Phase 4.
 
 ## Learnings and Project Insights
-- Modularizing command handlers improves code organization and maintainability.
-- Thorough testing instructions are crucial, especially after refactoring or adding new related features.
+- ChromaDB's metadata filtering (e.g., using `where` in `collection.get()`) is a powerful tool for precisely retrieving stored vector data and associated documents.
+- Utility scripts are helpful for debugging and verifying data in services like the VectorDB.
 
 ## Current Database/Model State
 - `users` table exists.
 - `proposals` table exists (includes `target_channel_id`).
 - `documents` table exists (includes `raw_content`, `id`, `title`, `content_hash`, `source_url`, `upload_date`, `vector_ids` (JSON), `proposal_id` (nullable FK)).
-- No new DB schema changes in this step beyond what was done for Task 3.5 (adding `raw_content` to documents).
+- No new DB schema changes were introduced in Task 3.6.
+- The next schema change will be the addition of the `submissions` table as part of Task 4.1.
 
 ## Next Steps
-- Complete manual testing for Task 3.5 (document viewing commands).
-- Complete any remaining manual testing for Task 3.4 (Conversational `/propose` flow).
-- Proceed with Task 3.6: (Utility) Implement Viewing of Stored Document Chunks (Optional - for Debugging).
-- Address Follow-up Task from 3.4: Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction for atomicity.
+- Begin Phase 4: Voting and Submission Logic.
+    - Task 4.1: Define `Submission` SQLAlchemy model in `app/persistence/models/submission_model.py`.
+    - Task 4.1: Generate Alembic migration for the `Submission` table.
+    - Task 4.1: Create `SubmissionRepository` in `app/persistence/repositories/submission_repository.py`.
