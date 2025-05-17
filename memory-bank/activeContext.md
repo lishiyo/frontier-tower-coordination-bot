@@ -1,37 +1,38 @@
-# Active Context - Fri May 16 22:41:10 PDT 2025
+# Active Context - Fri May 16 22:51:12 PDT 2025
 
 ## Current Work Focus
-- Completed Task 2.4: Basic `/propose` command.
-- Preparing for Task 2.5: Database migration to add `target_channel_id` to the `Proposal` model.
+- Completed Task 2.5: Add Multi-Channel Support to Proposal Model (database migration, model, repository, service, and command handler updates).
+- `/propose` command is functional with the new `target_channel_id` field (still in single-channel mode).
+- Preparing to start Phase 3: Conversational Proposal Creation & Initial Context.
 
 ## What's Working
-- Basic `/propose` command functionality (DM-only initiation, static duration, posts to single `TARGET_CHANNEL_ID`).
-- User registration (`/start` command).
-- Error handling for `switch_inline_query_current_chat` button in channel messages (button removed, relying on text instructions).
-- Design documents (`projectbrief.md`, `systemPatterns.md`, `tasks.md`) have been updated to incorporate future multi-channel proposal capabilities and current schema adjustments.
+- Task 2.5 implementation is complete and tested by the user for the `/propose` command flow.
+- The `proposals` table now includes `target_channel_id`.
+- Alembic migration for `target_channel_id` handles backfilling existing rows (if `TARGET_CHANNEL_ID` env var is set during migration) and sets the column to non-nullable.
+- Core services and repositories related to proposal creation are updated for `target_channel_id`.
+- `command_handlers.py` correctly passes `target_channel_id` for new proposals.
 
 ## What's Broken
-- The `proposals` table schema is missing the `target_channel_id` field, which is planned for multi-channel support. This will be addressed in Task 2.5.
+- No known issues related to the completed Task 2.5.
 
 ## Active Decisions and Considerations
-- Decided to implement `target_channel_id` in the schema now (Task 2.5) to prepare for future multi-channel support, while the current `/propose` implementation (Task 2.4) uses the single `TARGET_CHANNEL_ID` from config.
-- Removed the interactive "Submit Your Idea" button from channel messages for free-form proposals due to Telegram API limitations, opting for clear text-based instructions instead.
+- The system currently operates in a single-channel mode, using the `TARGET_CHANNEL_ID` from `ConfigService` as the `target_channel_id` for all proposals. Full multi-channel selection logic is deferred to a later task (Task 8.8).
 
 ## Learnings and Project Insights
-- `switch_inline_query_current_chat` buttons are unreliable when used in bot messages posted to channels. Direct text instructions are a more robust alternative for guiding users to DM the bot.
-- It's important to align task planning (`tasks.md`) with model evolution. We identified the need for a new migration task (2.5) after realizing the `target_channel_id` was introduced in design docs but not yet in the implemented `Proposal` model from Task 2.3.
+- Ensuring all layers of the application (handler, service, repository, model, migration) are updated consistently for schema changes is crucial to avoid runtime errors like `TypeError`.
+- Accessing environment variables within Alembic migration scripts for data backfills (like for `TARGET_CHANNEL_ID`) should be handled with awareness that the variable must be present in the migration execution environment.
 
 ## Current Database/Model State
 - The `users` table exists.
-- The `proposals` table exists but is missing the `target_channel_id` column. This column will be added in Task 2.5.
-- Schema for `proposals` table (target state after Task 2.5):
+- The `proposals` table now includes the `target_channel_id` (String, Not Null) column.
+- Schema for `proposals` table:
     - `id` (Integer, PK, Auto-increment, Index)
     - `proposer_telegram_id` (Integer, FK to `users.telegram_id`, Not Null, Index)
     - `title` (String, Not Null)
     - `description` (Text, Not Null)
     - `proposal_type` (String, Not Null)
     - `options` (JSON, Nullable)
-    - `target_channel_id` (String or Integer, Not Null) - NEW, will store the ID of the channel where the proposal is posted.
+    - `target_channel_id` (String, Not Null)
     - `channel_message_id` (Integer, Nullable)
     - `creation_date` (DateTime with timezone, Not Null, server_default='now()')
     - `deadline_date` (DateTime with timezone, Not Null)
@@ -40,7 +41,5 @@
     - `raw_results` (JSON, Nullable)
 
 ## Next Steps
-- Task 2.5: Add Multi-Channel Support to Proposal Model (Database Migration & Code Updates).
-    - Update `app/persistence/models/proposal_model.py`.
-    - Generate and apply Alembic migration.
-    - Update relevant repository and service methods.
+- Begin Phase 3: Conversational Proposal Creation & Initial Context.
+    - Task 3.1: LLM Service Setup: Create `app/services/llm_service.py` and implement initial functions.

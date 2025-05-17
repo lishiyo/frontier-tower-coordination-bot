@@ -1,5 +1,24 @@
 # Progress Log
 
+## Fri May 16 22:51:12 PDT 2025
+
+**Completed:**
+- Task 2.5: Add Multi-Channel Support to Proposal Model
+    - Updated `app/persistence/models/proposal_model.py` to include `target_channel_id`.
+    - Generated and edited Alembic migration `cb7185863232_add_target_channel_id_to_proposal.py` to add the new column, update existing rows using `TARGET_CHANNEL_ID` environment variable, and set the column to non-nullable.
+    - Updated `app/persistence/repositories/proposal_repository.py` (`add_proposal`) to handle the new field.
+    - Updated `app/core/proposal_service.py` (`create_proposal`) to pass `target_channel_id` to the repository.
+    - Updated `app/telegram_handlers/command_handlers.py` (`propose_command`) to fetch `TARGET_CHANNEL_ID` from `ConfigService` and pass it to `ProposalService.create_proposal`, and to use the `target_channel_id` from the returned proposal object when posting to the channel.
+    - User confirmed the `/propose` command is working after these changes.
+
+**Learnings & Fixes:**
+- Corrected a `TypeError` in `propose_command` by ensuring `target_channel_id` was passed to `ProposalService.create_proposal`.
+- Emphasized the importance of having the `TARGET_CHANNEL_ID` environment variable available when running Alembic migrations that depend on it for data backfills.
+
+**Next Steps:**
+- Begin Phase 3: Conversational Proposal Creation & Initial Context.
+    - Task 3.1: LLM Service Setup.
+
 ## Fri May 16 22:41:10 PDT 2025
 
 **Completed:**
