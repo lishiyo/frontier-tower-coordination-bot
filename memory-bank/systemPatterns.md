@@ -198,7 +198,7 @@ telegram_bot/
     *   If initial context was added and linked via `document_id` in `proposal_data`, ensures this link is correctly established (e.g., by updating the `Document` entry with the new `proposal_id` if it wasn't known before proposal creation).
 11. **`CommandHandlers.handle_context`:**
     *   Receives `proposal_id` from `ProposalService`.
-    *   Sends confirmation DM to proposer (e.g., "Proposal #`proposal_id` created... use `/add_proposal_context ...` for more later").
+    *   Sends confirmation DM to proposer (e.g., "Proposal #`proposal_id` created... use `/add_doc ...` for more later").
     *   Calls `TelegramUtils.format_proposal_message(...)` and posts it to the proposal's `target_channel_id` (retrieved from context or proposal object) via PTB's `bot.send_message()`.
     *   Updates the proposal in the DB with `channel_message_id` via `ProposalRepository.update_message_id(proposal_id, channel_msg_id)`.
     *   Ends `ConversationHandler`.

@@ -100,8 +100,8 @@ This document outlines the product requirements for `CoordinationBot`, which is 
             *   User responds. If context (text/URL) is provided, bot processes and stores it (see FR2.5 logic), associating it with the new proposal.
     *   **FR2.2 (Internal Parsing & Validation):** Bot internally parses and validates all collected/provided information (title, description, options, type, deadline, channel). Confirms deadline interpretation with user if ambiguous.
     *   **FR2.3 (Storage):** Store proposal details in the database, including `proposal_type` ("multiple_choice" or "free_form"), proposer, creation date, LLM-parsed `deadline_date`, and the **`target_channel_id`**. For multiple-choice, `options` are stored as a list of strings.
-    *   **FR2.4 (Confirmation DM):** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel '[Channel Name/ID]' shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`." (Channel name/ID included for clarity in multi-channel scenarios).
-    *   **FR2.5 (Adding Context - Proposer - Later or if initial offer declined):** `/add_proposal_context <proposal_id> <URL or paste text OR trigger chat>` (DM)
+    *   **FR2.4 (Confirmation DM):** Bot sends confirmation DM to proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel '[Channel Name/ID]' shortly. If you think of more context to add later, you can always DM me: `/add_doc <proposal_id> <URL or paste text>`." (Channel name/ID included for clarity in multi-channel scenarios).
+    *   **FR2.5 (Adding Context - Proposer - Later or if initial offer declined):** `/add_doc <proposal_id> <URL or paste text OR trigger chat>` (DM)
         *   Allows proposer to upload a document, paste text, or engage in a short chat with the bot to add context to their specific proposal *after* initial creation or if they initially declined to add context.
         *   This content is processed (chunked, embedded) and stored, linked to the `proposal_id` in the `Document` table, for use in RAG when users ask about this proposal. If text is from chat, `source_url` in `Document` table might indicate "proposer_chat_context". The full text content is also stored directly for later viewing.
 
@@ -154,8 +154,8 @@ This document outlines the product requirements for `CoordinationBot`, which is 
 
 **5.7. Contextual Information (RAG)**
     *   **FR7.1 (Admin/Proposer - Adding General/Specific Docs):**
-        *   Admin: `/add_doc <URL or paste text>` command (DM): Admin uploads general document content. (Future: could specify if a doc is for a specific channel or global).
-        *   Proposer: Can use `/add_proposal_context <proposal_id>` (see FR2.5) to add documents specific to their proposal.
+        *   Admin: `/add_global_doc <URL or paste text>` command (DM): Admin uploads general document content. (Future: could specify if a doc is for a specific channel or global).
+        *   Proposer: Can use `/add_doc <proposal_id>` (see FR2.5) to add documents specific to their proposal.
         *   Bot processes text (chunking, embedding) and stores in vector database & SQL `Document` table (linking to `proposal_id` if applicable). The full text content is also stored directly for later viewing.
     *   **FR7.2 (User):** `/ask <question>` or `/ask <proposal_id> <question>` command (DM): User asks a question.
         *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal. If multi-channel RAG becomes a feature, context searching might also be scoped by channel.
@@ -239,7 +239,7 @@ Here, submissions represent votes.
     *   `proposal_id` (Integer, Foreign Key to `Proposal.id`, Nullable): Links document to a specific proposal.
     *   `raw_content` (Text, Nullable): Stores the raw (or cleaned) text content of the document.
     *   **(Future)** `associated_channel_id` (String, Nullable): If a document is context for a specific channel rather than a proposal.
-    *   *(Raw content might be stored here or only in the vector DB's document store if it has one. Content can originate from direct uploads (URL/text by admin/proposer) or from conversational input by the proposer during proposal creation or via `/add_proposal_context`.)*
+    *   *(Raw content might be stored here or only in the vector DB's document store if it has one. Content can originate from direct uploads (URL/text by admin/proposer) or from conversational input by the proposer during proposal creation or via `/add_doc`.)*
 *   **(New) `AuthorizedChannel` Table (Conceptual for FR5.9 - could also be config-based):**
     *   `channel_id` (String, Primary Key): The Telegram channel ID.
     *   `channel_name` (String, Nullable): A human-readable name for the channel.
@@ -281,7 +281,7 @@ Here, submissions represent votes.
             *   If text/URL provided: Processes and stores this context (chunking, embedding, saving to `Document` table, linked to the `proposal_id`). The `Document.source_url` might be set to indicate "proposer_chat_on_creation" or similar.
         *   Determines `proposal_type`: `"multiple_choice"` if options are provided, `"free_form"` if "FREEFORM" keyword is used or if options part is empty/specific keyword.
         *   Stores the proposal in the `Proposal` table with `status="open"`, calculated `deadline_date`, and the determined `proposal_type`.
-        *   Sends a confirmation DM to the proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel shortly. If you think of more context to add later, you can always DM me: `/add_proposal_context <proposal_id> <URL or paste text>`."
+        *   Sends a confirmation DM to the proposer: "Understood. Your proposal ID is `[proposal_id]`. It will be posted to the channel shortly. If you think of more context to add later, you can always DM me: `/add_doc <proposal_id> <URL or paste text>`."
         *   **Posts to Channel:**
             *   **For `multiple_choice` proposals:**
                 *   Message: "📢 **New Proposal: [Title]**
@@ -380,8 +380,8 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
 
 7.  **Getting Info on a Policy (RAG - DM to Bot):**
     *   **Admin/Proposer Command to Add Context:**
-        *   Admin: `/add_doc <URL or paste text>` (for general documents)
-        *   Proposer: `/add_proposal_context <proposal_id> <URL or paste text OR trigger chat with bot>` (for proposal-specific documents, can be used after initial creation or if context wasn't added during the creation flow)
+        *   Admin: `/add_global_doc <URL or paste text>` (for general documents)
+        *   Proposer: `/add_doc <proposal_id> <URL or paste text OR trigger chat with bot>` (for proposal-specific documents, can be used after initial creation or if context wasn't added during the creation flow)
         *   *Context can also be added by the proposer conversationally during the initial proposal setup flow.* (As described in section III.3)
         *   Bot downloads/receives text.
         *   Generates embeddings for chunks of the text.
@@ -423,7 +423,7 @@ To see all submissions, DM me: `/view_submissions [proposal_id]`"
         *   Phase 1 (Multi-channel): Allow DM proposal creation with channel selection from a pre-configured list. Add `target_channel_id` to `Proposal` model.
         *   Phase 2 (Multi-channel): Implement in-channel `/propose` for authorized channels.
         *   Phase 3 (Multi-channel): Admin commands to manage authorized channels.
-    *   Focus on `/propose` (with conversational duration), channel posting, inline voting (MC), `/submit` (FF), `/cancel_proposal`, `/edit_proposal`, `/add_proposal_context`, deadline checking, and result announcement first.
+    *   Focus on `/propose` (with conversational duration), channel posting, inline voting (MC), `/submit` (FF), `/cancel_proposal`, `/edit_proposal`, `/add_proposal_doc`, deadline checking, and result announcement first.
     *   Use PostgreSQL (via Supabase) with Alembic for migrations.
     *   Manual document loading for RAG initially by admin; proposers can add context to their proposals.
 2.  **Error Handling & User Feedback:** Make the bot responsive. Inform users if their commands are malformed, if LLM parsing of duration is ambiguous, if something goes wrong, etc.

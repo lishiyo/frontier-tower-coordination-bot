@@ -233,7 +233,7 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 f"Proposal ID `{new_proposal.id}` created successfully\!\n",
                 f"Title: {title_escaped}\n",
                 f"It will be posted to the channel '{channel_id_escaped}' shortly\.\n\n",
-                f"You can add more context later using: `/add_proposal_context {new_proposal.id} <URL or paste text>`\n",
+                f"You can add more context later using: `/add_doc {new_proposal.id} <URL or paste text>`\n",
                 f"To edit \\(only if no votes\\): `/edit_proposal {new_proposal.id}`\n",
                 f"To cancel \\(required if votes\\): `/cancel_proposal {new_proposal.id}`"
             ]

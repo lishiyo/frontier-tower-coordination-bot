@@ -62,7 +62,7 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<proposal_id>`: The ID of the proposal to cancel.
     *   **Context:** DM with the bot (proposer only).
 
-*   `/add_proposal_context <proposal_id>`
+*   `/add_doc <proposal_id>`
     *   **Description:** Allows the original proposer to add supplementary context (text, URL, or via chat) to their specific proposal after its initial creation. This context is used by the RAG system for `/ask` queries.
     *   **Parameters:**
         *   `<proposal_id>`: The ID of the proposal to add context to.
@@ -101,10 +101,38 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<document_id>`: The ID of the document to view.
     *   **Context:** DM with the bot.
 
+*   `/edit_doc <document_id>`
+    *   **Description:** Allows the original proposer to edit the content of a specific context document they previously added to one of their proposals. (Bot might initiate a conversation to get new content).
+    *   **Parameters:**
+        *   `<document_id>`: The ID of the proposal-specific document to edit.
+    *   **Context:** DM with the bot (proposer of the associated proposal only).
+
+*   `/delete_doc <document_id>`
+    *   **Description:** Allows the original proposer to delete a specific context document they previously added to one of their proposals.
+    *   **Parameters:**
+        *   `<document_id>`: The ID of the proposal-specific document to delete.
+    *   **Context:** DM with the bot (proposer of the associated proposal only).
+
 ## Admin Commands (v0)
 
-*   `/add_doc <URL or paste text>`
-    *   **Description:** Allows an administrator to add general context documents (e.g., existing policies, guidelines) to the bot's knowledge base for the RAG system.
+*   `/add_global_doc <URL or paste text>`
+    *   **Description:** Allows an administrator to add general context documents (e.g., existing policies, guidelines) to the bot's global knowledge base for the RAG system.
     *   **Parameters:**
         *   `<URL or paste text>`: The URL of the document or the raw text content.
+    *   **Context:** DM with the bot (admin only).
+
+*   `/view_global_docs`
+    *   **Description:** Lists all global context documents (ID, title) added by administrators.
+    *   **Context:** DM with the bot (admin only).
+
+*   `/edit_global_doc <document_id>`
+    *   **Description:** Allows an administrator to edit the content of a specific global context document. (Bot might initiate a conversation to get new content).
+    *   **Parameters:**
+        *   `<document_id>`: The ID of the global document to edit.
+    *   **Context:** DM with the bot (admin only).
+
+*   `/delete_global_doc <document_id>`
+    *   **Description:** Allows an administrator to delete a specific global context document from the knowledge base.
+    *   **Parameters:**
+        *   `<document_id>`: The ID of the global document to delete.
     *   **Context:** DM with the bot (admin only).

@@ -190,7 +190,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Collate all proposal data from `context.user_data`.
         *   [x] Call `ProposalService.create_proposal(...)`.
         *   [x] If a context document was created, update its `proposal_id` field with the new proposal's ID via `DocumentRepository`.
-        *   [x] Send confirmation DM (including "use `/add_proposal_context` for more" and the edit and cancel commands).
+        *   [x] Send confirmation DM (including "use `/add_doc` for more" and the edit and cancel commands).
         *   [x] Post proposal to the `target_channel_id` (retrieved from context).
         *   [x] End conversation.
     *   [x] Ensure all necessary message handlers, command handlers (entry point), and callback query handlers (for proposal type selection) are correctly registered with the `ConversationHandler` and the main application dispatcher.
@@ -349,7 +349,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Format answer, citing sources/snippets.
     *   [ ] `ask_command` calls `ContextService.get_answer_for_question()` and DMs response.
 
-2.  **Task 6.2: Implement `/add_doc` Admin Command**
+2.  **Task 6.2: Implement `/add_global_doc` Admin Command**
     *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `add_doc_command` handler.
         *   [ ] Check if user is an admin (loaded from `ConfigService`).
         *   [ ] Parse URL or pasted text.
@@ -366,7 +366,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 **Goal:** Add commands for user history, proposal viewing/management, and privacy policy.
 
-**Dependencies:** Phase 2 (Proposals), Phase 4 (Submissions), Phase 3 (ContextService for `/add_proposal_context`)
+**Dependencies:** Phase 2 (Proposals), Phase 4 (Submissions), Phase 3 (ContextService for `/add_doc`)
 
 **Subtasks:**
 
@@ -402,9 +402,9 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Update channel message (e.g., "Proposal cancelled").
     *   [ ] Implement `cancel_proposal_command` in `command_handlers.py`.
 
-5.  **Task 7.5: Implement `/add_proposal_context` Command (Proposer Only)**
+5.  **Task 7.5: Implement `/add_doc` Command (Proposer Only)**
     *   [ ] In `ProposalRepository`, ensure `get_proposal_by_id` fetches `proposer_id`.
-    *   [ ] Implement `add_proposal_context_command` in `command_handlers.py`:
+    *   [ ] Implement `add_doc_command` in `command_handlers.py`:
         *   [ ] Parse `proposal_id`.
         *   [ ] Verify user is the proposer of `proposal_id`.
         *   [ ] If text/URL provided in command, call `ContextService.process_and_store_document(content, proposal_id=proposal_id, source_type="proposer_added_context")`.
@@ -452,7 +452,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] **`/view_docs <channel_id>`:**
         *   [ ] Ensure this command correctly lists proposals for *any* valid authorized `channel_id` (not just the old single `TARGET_CHANNEL_ID`). No significant change if `ProposalService.list_proposals_by_channel` already just takes a `channel_id`.
     *   [ ] **General Document Association (Future Consideration for RAG):**
-        *   [ ] Consider if general documents (added via `/add_doc`) should be associable with specific authorized channels (new `associated_channel_id` field in `Document` model).
+        *   [ ] Consider if general documents (added via `/add_global_doc`) should be associable with specific authorized channels (new `associated_channel_id` field in `Document` model).
         *   [ ] If so, `/view_docs <channel_id>` could also list general documents associated with that channel.
         *   [ ] RAG queries via `/ask` could then also be filtered/prioritized by documents relevant to the channel a user is in or asking about.
 

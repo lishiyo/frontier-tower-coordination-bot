@@ -90,7 +90,7 @@ Here's a structured approach to testing our `CoordinationBot`:
 **Phase 5: Information Retrieval (RAG)**
 
 *   **Add Documents:**
-    *   Use an admin command (`/add_doc <URL or text>`) to feed 2-3 sample policy documents into the bot's context.
+    *   Use an admin command (`/add_global_doc <URL or text>`) to feed 2-3 sample policy documents into the bot's context.
     *   Verify (Database/VectorDB): Documents are processed and stored/indexed.
 *   **Ask Questions:**
     *   DM test bot: `/ask What is our policy on snacks?` (assuming "snacks" is in one of your test docs).

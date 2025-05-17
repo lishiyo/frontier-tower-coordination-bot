@@ -149,6 +149,5 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await update.message.reply_text(f"No proposals found for channel/identifier '{channel_id_arg_str}', or it's not a recognized proposal ID or channel.")
 
 # TODO: Move other document-related commands here:
-# - add_proposal_context_command
 # - add_doc_command
 # - ask_command 
