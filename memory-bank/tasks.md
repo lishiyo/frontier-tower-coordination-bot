@@ -142,22 +142,22 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Implement `get_completion(prompt)` function using OpenAI API.
 
 2.  **Task 3.2: VectorDB Service Setup & Document Model**
-    *   [ ] Define `Document` SQLAlchemy model in `app/persistence/models/document_model.py` (id, title, content_hash, source_url, upload_date, vector_ids (JSON), proposal_id (nullable FK)).
-    *   [ ] Generate Alembic migration for `Document` table and apply.
-    *   [ ] Create `app/persistence/repositories/document_repository.py` with `add_document` method.
-    *   [ ] Create `app/services/vector_db_service.py`.
-        *   [ ] Initialize ChromaDB client.
-        *   [ ] Implement `store_embeddings(doc_id, text_chunks, embeddings)` function.
-        *   [ ] Implement `search_similar_chunks(query_embedding, proposal_id_filter, top_n)` function.
+    *   [x] Define `Document` SQLAlchemy model in `app/persistence/models/document_model.py` (id, title, content_hash, source_url, upload_date, vector_ids (JSON), proposal_id (nullable FK)).
+    *   [x] Generate Alembic migration for `Document` table and apply. (User confirmed applied)
+    *   [x] Create `app/persistence/repositories/document_repository.py` with `add_document` method.
+    *   [x] Create `app/services/vector_db_service.py`.
+        *   [x] Initialize ChromaDB client.
+        *   [x] Implement `store_embeddings(doc_id, text_chunks, embeddings)` function.
+        *   [x] Implement `search_similar_chunks(query_embedding, proposal_id_filter, top_n)` function.
 
 3.  **Task 3.3: Context Service Setup**
-    *   [ ] Create `app/core/context_service.py`.
-    *   [ ] Implement `process_and_store_document(content_text_or_url, source_type, title, proposal_id=None)`:
-        *   [ ] Fetch content if URL.
-        *   [ ] Chunk text (helper in `app/utils/text_processing.py` or within service).
-        *   [ ] Generate embeddings for chunks via `LLMService`.
-        *   [ ] Store document metadata in `DocumentRepository`.
-        *   [ ] Store embeddings in `VectorDBService`.
+    *   [x] Create `app/core/context_service.py`.
+    *   [x] Implement `process_and_store_document(content_text_or_url, source_type, title, proposal_id=None)`:
+        *   [x] Fetch content if URL (using httpx, basic implementation).
+        *   [x] Chunk text (helper in `app/utils/text_processing.py` - `simple_chunk_text` created).
+        *   [x] Generate embeddings for chunks via `LLMService`.
+        *   [x] Store document metadata in `DocumentRepository`.
+        *   [x] Store embeddings in `VectorDBService` (linking to SQL Document ID, and updating SQL doc with vector IDs).
 
 4.  **Task 3.4: ConversationHandler for `/propose`**
     *   [ ] Refactor `propose_command` in `app/telegram_handlers/command_handlers.py` to use `ConversationHandler`.
