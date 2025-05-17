@@ -86,17 +86,17 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Generate initial Alembic migration for the `User` table (`alembic revision -m "create_user_table"`) and apply it (`alembic upgrade head`).
 
 2.  **Task 2.2: Implicit User Registration**
-    *   [ ] Create `app/core/user_service.py`.
-        *   [ ] Implement `register_user_interaction(telegram_id, username, first_name)` that calls the repository.
-    *   [ ] Modify `start_command` (and other relevant future handlers) to call `UserService.register_user_interaction` on first contact.
+    *   [x] Create `app/core/user_service.py`.
+        *   [x] Implement `register_user_interaction(telegram_id, username, first_name)` that calls the repository.
+    *   [x] Modify `start_command` (and other relevant future handlers) to call `UserService.register_user_interaction` on first contact.
 
 3.  **Task 2.3: Proposal Model & Repository**
-    *   [ ] Define `Proposal` SQLAlchemy model in `app/persistence/models/proposal_model.py` (id, proposer_id, title, description, proposal_type, options (JSON), channel_message_id, creation_date, deadline_date, status, outcome, raw_results).
-    *   [ ] Create `app/persistence/repositories/proposal_repository.py`.
-        *   [ ] Implement `add_proposal(proposer_id, title, ...)` function.
-        *   [ ] Implement `get_proposal_by_id(proposal_id)` function.
-        *   [ ] Implement `update_proposal_message_id(proposal_id, message_id)`.
-    *   [ ] Generate Alembic migration for `Proposal` table and apply.
+    *   [x] Define `Proposal` SQLAlchemy model in `app/persistence/models/proposal_model.py` (id, proposer_id, title, description, proposal_type, options (JSON), channel_message_id, creation_date, deadline_date, status, outcome, raw_results).
+    *   [x] Create `app/persistence/repositories/proposal_repository.py`.
+        *   [x] Implement `add_proposal(proposer_id, title, ...)` function.
+        *   [x] Implement `get_proposal_by_id(proposal_id)` function.
+        *   [x] Implement `update_proposal_message_id(proposal_id, message_id)`.
+    *   [x] Generate Alembic migration for `Proposal` table and apply.
 
 4.  **Task 2.4: Basic `/propose` Command (Static Duration for now)**
     *   [ ] In `app/telegram_handlers/command_handlers.py`, implement initial `propose_command` handler.

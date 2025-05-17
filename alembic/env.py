@@ -9,7 +9,8 @@ from alembic import context
 
 # Import your application's models and database configuration
 from app.persistence.database import Base
-from app.persistence.models import user_model
+from app.persistence.models.user_model import User
+from app.persistence.models.proposal_model import Proposal
 from app.config import ConfigService
 
 # this is the Alembic Config object, which provides

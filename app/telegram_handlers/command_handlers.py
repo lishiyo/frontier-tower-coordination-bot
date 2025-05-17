@@ -3,12 +3,24 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
+from app.core.user_service import UserService
+from app.persistence.database import AsyncSessionLocal
+
 logger = logging.getLogger(__name__)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a welcome message when the /start command is issued."""
     if update.effective_user:
         user = update.effective_user
+
+        async with AsyncSessionLocal() as session:
+            user_service = UserService(session)
+            await user_service.register_user_interaction(
+                telegram_id=user.id,
+                username=user.username,
+                first_name=user.first_name
+            )
+
         welcome_message = (
             f"Hello {user.first_name}! Welcome to CoordinationBot.\n\n"
             f"I can help you create proposals, vote on them, and get information about policies.\n\n"
@@ -19,7 +31,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"Type /help to get started."
         )
         await update.message.reply_text(welcome_message)
-        logger.info(f"User {user.id} ({user.username}) started the bot.")
+        logger.info(f"User {user.id} ({user.username}) started the bot and was registered/updated.")
     else:
         await update.message.reply_text("Hello! Welcome to CoordinationBot. Type /help to see available commands.")
         logger.info("Received /start command from a user with no effective_user object.")

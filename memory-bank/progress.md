@@ -1,5 +1,30 @@
 # Progress Log
 
+## Fri May 16 21:25:44 PDT 2025
+
+**Completed:**
+- Task 2.2: Implicit User Registration
+    - Created `app/core/user_service.py` with `register_user_interaction` method.
+    - Modified `start_command` in `app/telegram_handlers/command_handlers.py` to call `UserService.register_user_interaction`.
+- Task 2.3: Proposal Model & Repository
+    - Defined `Proposal` SQLAlchemy model in `app/persistence/models/proposal_model.py`.
+    - Created `ProposalRepository` in `app/persistence/repositories/proposal_repository.py` with methods for adding, getting, and updating proposals.
+    - Addressed issues with Alembic autogeneration:
+        - Ensured models are imported in `app/persistence/models/__init__.py`.
+        - Explicitly imported model classes in `alembic/env.py`.
+        - Set `revision_environment = true` in `alembic.ini`.
+        - Manually populated the migration script `0cb97eaf1e36_create_proposal_table.py` when autogeneration still failed to produce a complete script despite `target_metadata` appearing correct.
+    - Applied the (manually populated) migration `0cb97eaf1e36_create_proposal_table.py` to create the `proposals` table.
+    - Removed debug print statement from `alembic/env.py`.
+
+**Learnings & Fixes:**
+- Alembic autogeneration can be sensitive. Even with correct `target_metadata` and model imports, it may fail to detect changes. Setting `revision_environment = true` in `alembic.ini` is crucial. If problems persist, manually creating or populating migration scripts is a viable workaround.
+- Ensured `app/persistence/models/__init__.py` imports all model classes.
+
+**Next Steps:**
+- Phase 2: User Management and Core Proposal Features (Static)
+    - Task 2.4: Basic `/propose` Command (Static Duration for now)
+
 ## Fri May 16 21:05:44 PDT 2025
 
 **Completed:**
