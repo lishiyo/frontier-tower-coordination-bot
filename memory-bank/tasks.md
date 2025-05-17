@@ -136,10 +136,10 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 3.1: LLM Service Setup**
-    *   [ ] Create `app/services/llm_service.py`.
-    *   [ ] Implement `parse_natural_language_duration(text)` function using OpenAI API.
-    *   [ ] Implement `generate_embedding(text)` function using OpenAI API.
-    *   [ ] Implement `get_completion(prompt)` function using OpenAI API.
+    *   [x] Create `app/services/llm_service.py`.
+    *   [ ] Implement `parse_natural_language_duration(text)` function using OpenAI API. (Placeholder added, full implementation pending)
+    *   [x] Implement `generate_embedding(text)` function using OpenAI API.
+    *   [x] Implement `get_completion(prompt)` function using OpenAI API.
 
 2.  **Task 3.2: VectorDB Service Setup & Document Model**
     *   [ ] Define `Document` SQLAlchemy model in `app/persistence/models/document_model.py` (id, title, content_hash, source_url, upload_date, vector_ids (JSON), proposal_id (nullable FK)).
