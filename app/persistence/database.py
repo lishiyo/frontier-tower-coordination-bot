@@ -10,6 +10,7 @@ engine = create_async_engine(
     ConfigService.get_database_url(),
     echo=False,  # Set to True for SQL query logging (development only)
     future=True,  # Use SQLAlchemy 2.0 style
+    pool_pre_ping=True, # Add pre-ping to check connection liveness
 )
 
 # Create async session maker
