@@ -1,6 +1,25 @@
 # Progress Log
 
 
+## Sat May 17 13:28:25 PDT 2025
+
+**Completed:**
+- Resolved `NameError: name 'Document' is not defined` in `app/core/context_service.py` by ensuring the `Document` model was correctly imported and available in the scope where type hints were being resolved.
+- Task 3.5: Implemented document storage with full content and basic viewing commands (`/view_doc`, `/view_docs`). This includes schema changes, updates to document ingestion, and implementation of the new commands.
+- Task 3.5.1: Refactored command handlers by moving them into separate files within `app/telegram_handlers/` (e.g., `document_command_handlers.py`, `proposal_command_handlers.py`) and updated `main.py` imports.
+- Added comprehensive testing instructions for document viewing commands (related to Task 3.5) to `memory-bank/testing_instructions.md`.
+
+**Learnings & Fixes:**
+- Python's name resolution for type hints, especially within class definitions, can be sensitive. Ensured imports are available before the class definition that uses them as type hints.
+- Confirmed the successful refactoring of command handlers into a more modular structure.
+
+**Next Steps:**
+- Manually test the document viewing commands (`/view_doc`, `/view_docs`) as per the new instructions in `testing_instructions.md`.
+- Complete any remaining manual testing for Task 3.4 (Conversational `/propose` flow).
+- Proceed with Task 3.6: (Utility) Implement Viewing of Stored Document Chunks (Optional - for Debugging).
+- Address Follow-up Task from 3.4: Refactor repository methods in `DocumentRepository` (`add_document` and `link_document_to_proposal`) to not commit, ensuring the `handle_ask_context` handler manages the entire transaction for atomicity.
+
+
 ## Sat May 17 01:24:52 PDT 2025
 
 **Completed:**

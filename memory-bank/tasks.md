@@ -230,11 +230,11 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] If `<proposal_id>` is provided, it should call `ContextService.list_documents_for_proposal()`.
         *   [x] DM the list of documents to the user.
     *   [x] **Command Registration:** Ensure all new `/view_docs` and `/view_doc` handlers are registered in `main.py`.
-    *   [ ] **Refactor Command Handlers (Task 3.5.1):**
-        *   [ ] Create new files in `app/telegram_handlers/` for different command categories (e.g., `document_commands.py`, `proposal_commands.py`, `submission_commands.py`).
-        *   [ ] Move relevant command handler functions from `command_handlers.py` to these new files.
-        *   [ ] Keep `command_handlers.py` for shared logic, core commands.
-        *   [ ] Update imports in `main.py` to reflect the new locations of command handlers and register them accordingly.
+    *   [x] **Refactor Command Handlers (Task 3.5.1):**
+        *   [x] Create new files in `app/telegram_handlers/` for different command categories (e.g., `document_commands.py`, `proposal_commands.py`, `submission_commands.py`).
+        *   [x] Move relevant command handler functions from `command_handlers.py` to these new files.
+        *   [x] Keep `command_handlers.py` for shared logic, core commands.
+        *   [x] Update imports in `main.py` to reflect the new locations of command handlers and register them accordingly.
     *   [ ] **Testing (Single Channel):**
         *   [ ] Test adding documents with context and ensure `raw_content` is stored.
         *   [ ] Test `/view_doc <document_id>` to see content.
