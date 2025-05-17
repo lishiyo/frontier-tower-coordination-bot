@@ -235,12 +235,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Move relevant command handler functions from `command_handlers.py` to these new files.
         *   [x] Keep `command_handlers.py` for shared logic, core commands.
         *   [x] Update imports in `main.py` to reflect the new locations of command handlers and register them accordingly.
-    *   [ ] **Testing (Single Channel):**
-        *   [ ] Test adding documents with context and ensure `raw_content` is stored.
-        *   [ ] Test `/view_doc <document_id>` to see content.
-        *   [ ] Test `/view_docs` (no args) shows the target channel.
-        *   [ ] Test `/view_docs <target_channel_id>` lists proposals.
-        *   [ ] Test `/view_docs <proposal_id>` lists documents for that proposal.
+    *   [x] **Testing (Single Channel):**
+        *   [x] Test adding documents with context and ensure `raw_content` is stored.
+        *   [x] Test `/view_doc <document_id>` to see content.
+        *   [x] Test `/view_docs` (no args) shows the target channel.
+        *   [x] Test `/view_docs <target_channel_id>` lists proposals.
+        *   [x] Test `/view_docs <proposal_id>` lists documents for that proposal.
 
 4.  **Task 3.6: (Utility) Implement Viewing of Stored Document Chunks (Optional - for Debugging)**
     *   [ ] In `VectorDBService`, add a method like `get_document_chunks(sql_document_id)` to retrieve all text chunks from ChromaDB associated with a given SQL document ID.
