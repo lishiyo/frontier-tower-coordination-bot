@@ -155,6 +155,41 @@ class VectorDBService:
             logger.error(f"Error searching for similar chunks: {e}", exc_info=True)
             return None
 
+    async def get_document_chunks(
+        self,
+        sql_document_id: int,
+        collection_name: str = DEFAULT_COLLECTION_NAME
+    ) -> Optional[List[str]]:
+        """
+        Retrieves all text chunks from ChromaDB associated with a given SQL document ID.
+        Returns a list of text chunks if successful, else None.
+        """
+        if not self.client:
+            logger.error("VectorDBService client not initialized. Cannot retrieve chunks.")
+            return None
+
+        try:
+            collection = self._get_or_create_collection(collection_name)
+            
+            # We stored document_sql_id as a string in metadata
+            where_filter = {"document_sql_id": str(sql_document_id)}
+            
+            results = collection.get(
+                where=where_filter,
+                include=['documents'] # We only need the text content of the chunks
+            )
+            
+            if results and results.get('documents'):
+                logger.info(f"Successfully retrieved {len(results['documents'])} chunks for SQL document ID {sql_document_id} from collection '{collection_name}'.")
+                return results['documents']
+            else:
+                logger.info(f"No chunks found for SQL document ID {sql_document_id} in collection '{collection_name}'.")
+                return [] # Return empty list if no documents found, consistent with List[str] hint
+
+        except Exception as e:
+            logger.error(f"Error retrieving chunks for SQL document ID {sql_document_id}: {e}", exc_info=True)
+            return None
+
 # Example Usage (for testing - ensure LLMService is available for embeddings)
 if __name__ == '__main__':
     import asyncio

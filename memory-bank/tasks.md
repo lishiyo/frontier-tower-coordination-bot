@@ -243,8 +243,8 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Test `/view_docs <proposal_id>` lists documents for that proposal.
 
 4.  **Task 3.6: (Utility) Implement Viewing of Stored Document Chunks (Optional - for Debugging)**
-    *   [ ] In `VectorDBService`, add a method like `get_document_chunks(sql_document_id)` to retrieve all text chunks from ChromaDB associated with a given SQL document ID.
-    *   [ ] (Optional) Create a simple admin command or utility script that uses this service method to allow viewing of stored chunks for debugging or verification purposes.
+    *   [x] In `VectorDBService`, add a method like `get_document_chunks(sql_document_id)` to retrieve all text chunks from ChromaDB associated with a given SQL document ID.
+    *   [x] (Optional) Create a simple admin command or utility script that uses this service method to allow viewing of stored chunks for debugging or verification purposes. (Created `app/scripts/view_document_chunks.py`)
 
 
 ## Phase 4: Voting and Submission Logic
