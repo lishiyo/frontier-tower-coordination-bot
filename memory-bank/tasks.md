@@ -362,16 +362,16 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Send confirmation to admin.
 
 2.  **Task 6.2: Implement `/ask` Command**
-    *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `ask_command` handler.
-        *   [ ] Parse `question` and optional `proposal_id`.
-    *   [ ] In `ContextService`, implement `get_answer_for_question(question_text, proposal_id_filter=None)`:
-        *   [ ] Generate embedding for `question_text` via `LLMService`.
-        *   [ ] Search for similar chunks in `VectorDBService`, passing `proposal_id_filter` if provided.
-        *   [ ] Retrieve full text of relevant chunks (e.g., from `DocumentRepository` or if `VectorDBService` stores it).
-        *   [ ] Construct prompt for LLM with context + question.
-        *   [ ] Get answer via `LLMService.get_completion()`.
-        *   [ ] Format answer, citing sources/snippets.
-    *   [ ] `ask_command` calls `ContextService.get_answer_for_question()` and DMs response.
+    *   [x] In `app/telegram_handlers/command_handlers.py`, implement `ask_command` handler.
+        *   [x] Parse `question` and optional `proposal_id`.
+    *   [x] In `ContextService`, implement `get_answer_for_question(question_text, proposal_id_filter=None)`:
+        *   [x] Generate embedding for `question_text` via `LLMService`.
+        *   [x] Search for similar chunks in `VectorDBService`, passing `proposal_id_filter` if provided.
+        *   [x] Retrieve full text of relevant chunks (e.g., from `DocumentRepository` or if `VectorDBService` stores it).
+        *   [x] Construct prompt for LLM with context + question.
+        *   [x] Get answer via `LLMService.get_completion()`.
+        *   [x] Format answer, citing sources/snippets.
+    *   [x] `ask_command` calls `ContextService.get_answer_for_question()` and DMs response.
 
 3.  **Task 6.3: Enhance URL Content Extraction**
     *   [ ] Research and select a robust HTML parsing/content extraction library or method (e.g., BeautifulSoup, trafilatura, crawl4ai, Firecrawl tools). crawl4ai preferred.

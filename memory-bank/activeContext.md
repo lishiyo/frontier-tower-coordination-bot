@@ -1,30 +1,36 @@
-# Active Context - Sat May 17 20:15:00 PDT 2025
+# Active Context - Sat May 17 21:02:08 PDT 2025
 
 ## Current Work Focus
-- Testing the `/ask` command functionality (Task 6.2).
+- Addressing pending follow-ups for Task 5.2 (timezone display and results message copy tweak).
+- Moving to Task 6.3: Enhance URL Content Extraction.
 
 ## What's Working
-- `/add_global_doc` command (Task 6.1) is now functional after refactoring service instantiation within `admin_command_handlers.py`.
+- `/add_global_doc` command (Task 6.1) is functional.
+- `/ask` command (Task 6.2) is now functional.
+    - RAG pipeline retrieves relevant document chunks.
+    - Source citation includes document titles and IDs.
+    - Fallback for missing titles in proposal context documents uses username (e.g., "proposal context by @username").
 - Phase 5 tasks related to deadline processing and LLM clustering for free-form proposals.
 - Newline rendering in summaries and large Telegram ID handling continue to work.
 
 ## What's Broken or Pending
-- `/ask` command (Task 6.2) needs testing and verification.
 - Timezone display (Task 5.2 To-do): User-facing times are still in UTC, need to be PST.
 - Copy Tweak (Task 5.2 To-do): Results message instruction "(DM the bot)" needs to be changed to "(DM @botname)".
 - The `PTBUserWarning` regarding `per_message=False` persists (known).
 
 ## Active Decisions and Considerations
-- Proceed with testing the `/ask` command to ensure RAG functionality is operational.
+- Determine the best library/approach for Task 6.3 (Enhance URL Content Extraction).
 
 ## Learnings and Project Insights
-- Refactoring `admin_command_handlers.py` to instantiate services (like `ContextService`) directly with a local `AsyncSessionLocal` context manager resolved `AttributeError` and `TypeError` issues related to the previous `application.services` bundle. This approach is more robust for services requiring database sessions.
-- Ensured `source_type` in `admin_command_handlers.py` for `add_global_doc` uses specific values (e.g., `admin_global_text`, `admin_global_url`) to align with `ContextService` expectations, resolving an `Invalid source_type` error.
-- The `/add_global_doc` command now correctly handles cases where document content is provided directly with the command or in a follow-up message.
+- Corrected key mismatch (`document_content` vs `text_content`) in `ContextService` for RAG.
+- Ensured `title` and `document_sql_id` are correctly retrieved from ChromaDB metadata for source citation in `/ask`.
+- Refined title generation for documents added during proposal creation in `message_handlers.py` to use `@username` for better identification and tappability.
+- Added functionality to `clear_supabase_data.py` to also clear ChromaDB vector embeddings.
 
 ## Current Database/Model State
-- No schema changes since the last update (BigInteger for Telegram IDs).
+- No schema changes since the last update.
+- ChromaDB vector store can be cleared along with SQL data using the script.
 
 ## Next Steps
-- Test the `/ask` command functionality (Task 6.2).
 - Address pending Task 5.2 follow-ups (timezone and copy tweak).
+- Begin Task 6.3: Enhance URL Content Extraction.
