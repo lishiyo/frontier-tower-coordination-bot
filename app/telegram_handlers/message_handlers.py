@@ -246,10 +246,11 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
             channel_message_text = telegram_utils.format_proposal_message(new_proposal, db_user) # Use db_user
             channel_reply_markup = None
 
-            if new_proposal.proposal_type == ProposalType.FREE_FORM:
-                # Use existing helper for free form button
-                channel_reply_markup = telegram_utils.get_free_form_submit_button(new_proposal.id)
-            elif new_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value:  # <-- Change here, use .value
+            if new_proposal.proposal_type == ProposalType.FREE_FORM.value:
+                # Use existing helper for free form button, now passing bot_username
+                bot_username = context.bot.username
+                channel_reply_markup = telegram_utils.get_free_form_submit_button(new_proposal.id, bot_username)
+            elif new_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value:
                 if new_proposal.options:
                     # Use the new helper for multiple choice options keyboard
                     channel_reply_markup = telegram_utils.create_proposal_options_keyboard(new_proposal.id, new_proposal.options)

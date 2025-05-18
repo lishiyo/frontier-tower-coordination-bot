@@ -295,7 +295,8 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Return success/failure.
     *   [x] `submit_command` calls `SubmissionService.record_free_form_submission(...)`.
     *   [x] Send DM confirmation to user.
-    *   [ ] Verify this is working manually.
+    *   [x] Verify this is working manually.
+    *   [x] **UI Enhancement:** Add an inline button ("💬 Submit Your Idea") to free-form proposal messages in the channel. This button should use `switch_inline_query_current_chat` to prefill `/submit <proposal_id> ` in the user's DM with the bot. (Verified as already implemented in Task 2.4/3.4 via `telegram_utils.get_free_form_submit_button`)
 
 ## Phase 5: Deadline Management & Results Announcement
 

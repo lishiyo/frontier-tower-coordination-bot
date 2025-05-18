@@ -58,13 +58,17 @@ def format_proposal_message(proposal: Proposal, proposer: User) -> str:
     
     return message_text
 
-def get_free_form_submit_button(proposal_id: int) -> InlineKeyboardMarkup:
-    """Returns an inline keyboard with a 'Submit Your Idea' button for free-form proposals."""
+def get_free_form_submit_button(proposal_id: int, bot_username: str) -> InlineKeyboardMarkup:
+    """Returns an inline keyboard with a 'Submit Your Idea' button that opens a DM to the bot."""
     button_text = "💬 Submit Your Idea"
-    # switch_inline_query_current_chat will prefill the user's input field with the query
-    # when they are in a DM with the bot.
-    query_to_prefill = f"/submit {proposal_id} " 
-    keyboard = [[InlineKeyboardButton(button_text, switch_inline_query_current_chat=query_to_prefill)]]
+    # Construct the deep-linking URL
+    # Example: https://t.me/YourBotUsername?start=submit_123
+    # Ensure bot_username does not have '@' if context.bot.username provides it like that.
+    # The URL typically uses the username without '@'.
+    cleaned_bot_username = bot_username.lstrip('@')
+    url = f"https://t.me/{cleaned_bot_username}?start=submit_{proposal_id}"
+    
+    keyboard = [[InlineKeyboardButton(button_text, url=url)]]
     return InlineKeyboardMarkup(keyboard)
 
 def create_proposal_options_keyboard(proposal_id: int, options: List[str]) -> InlineKeyboardMarkup:

@@ -2,8 +2,6 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.constants import ParseMode, ChatType
-from datetime import datetime, timedelta
-from typing import Optional, List, Pattern
 
 from app.core.user_service import UserService
 from app.persistence.database import AsyncSessionLocal
@@ -12,32 +10,59 @@ from app.core.proposal_service import ProposalService
 logger = logging.getLogger(__name__)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a welcome message when the /start command is issued."""
-    if update.effective_user:
-        user = update.effective_user
+    """Sends a welcome message when the /start command is issued, handles deep links."""
+    if not update.effective_user or not update.message:
+        logger.warning("start_command received update without effective_user or message.")
+        # Send a generic message if possible, though context might be limited
+        if update.message:
+            await update.message.reply_text("Hello! Welcome to CoordinationBot. Type /help to see available commands.")
+        return
 
-        async with AsyncSessionLocal() as session:
-            user_service = UserService(session)
-            await user_service.register_user_interaction(
-                telegram_id=user.id,
-                username=user.username,
-                first_name=user.first_name
-            )
+    user = update.effective_user
+    payload = None
+    if context.args and len(context.args) > 0:
+        payload = context.args[0]
+        logger.info(f"User {user.id} started bot with payload: {payload}")
 
-        welcome_message = (
-            f"Hello {user.first_name}! Welcome to CoordinationBot.\n\n"
-            f"I can help you create proposals, vote on them, and get information about policies.\n\n"
-            f"Here are some things you can do:\n"
-            f"  - Use /propose to create a new policy proposal or idea generation.\n"
-            f"  - Use /ask to get information about existing policies or proposals.\n"
-            f"  - Use /help to see all available commands.\n\n"
-            f"Type /help to get started."
+    async with AsyncSessionLocal() as session:
+        user_service = UserService(session)
+        await user_service.register_user_interaction(
+            telegram_id=user.id,
+            username=user.username,
+            first_name=user.first_name
         )
-        await update.message.reply_text(welcome_message)
-        logger.info(f"User {user.id} ({user.username}) started the bot and was registered/updated.")
-    else:
-        await update.message.reply_text("Hello! Welcome to CoordinationBot. Type /help to see available commands.")
-        logger.info("Received /start command from a user with no effective_user object.")
+
+    if payload and payload.startswith("submit_"):
+        try:
+            proposal_id_str = payload.split("submit_")[-1]
+            proposal_id = int(proposal_id_str)
+            
+            message_text = f"You\'re about to submit an idea for Proposal ID `{proposal_id}`\\.\\nClick the button below to prefill the command, then add your idea\\!"
+            
+            # This button WILL work because we are now in a DM with the bot.
+            query_to_prefill = f"submit {proposal_id} "
+            keyboard = [[InlineKeyboardButton("📝 Prefill Submission Command", switch_inline_query_current_chat=query_to_prefill)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(message_text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
+            logger.info(f"User {user.id} deep-linked to submit for proposal {proposal_id}. Sent prefill button.")
+            return # End here after handling deep link
+        except (ValueError, IndexError) as e:
+            logger.error(f"Error parsing submit payload '{payload}' for user {user.id}: {e}")
+            # Fall through to generic welcome if payload is malformed
+
+    # Generic welcome message if no valid payload
+    welcome_message = (
+        f"Hello {user.first_name}! Welcome to CoordinationBot.\n\n"
+        f"I can help you create proposals, vote on them, and get information about policies.\n\n"
+        f"Here are some things you can do:\n"
+        f"  - Use /propose to create a new policy proposal or idea generation.\n"
+        f"  - Use /ask to get information about existing policies or proposals.\n"
+        f"  - Use /help to see all available commands.\n\n"
+        f"Type /help to get started."
+    )
+    await update.message.reply_text(welcome_message)
+    logger.info(f"User {user.id} ({user.username}) started the bot (or payload not handled) and was registered/updated.")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a help message when the /help command is issued."""
