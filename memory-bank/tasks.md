@@ -325,7 +325,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
                 *   [x] Store outcome and raw_results (vote counts) in `Proposal` table via `ProposalRepository`.
             *   [x] **If "free_form":**
                 *   [x] Get submissions via `SubmissionRepository.get_submissions_for_proposal()`.
-                *   [ ] Call `LLMService.cluster_and_summarize_texts([sub.response_content for sub in submissions])` (needs implementation in `LLMService`). (Placeholder implemented)
+                *   [x] Call `LLMService.cluster_and_summarize_texts([sub.response_content for sub in submissions])` (needs implementation in `LLMService`). (Placeholder implemented)
                 *   [x] Store summary as `proposal.outcome` and full list of submissions in `proposal.raw_results` via `ProposalRepository`. (Placeholder summary stored)
             *   [x] Format results message (using `TelegramUtils` - basic formatting implemented directly).
             *   [x] Post results to the proposal's `target_channel_id` (using `channel_message_id` from `Proposal` to reply to or edit the original message).
@@ -391,13 +391,14 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 7.1: Implement `/my_votes` Command**
-    *   [ ] In `SubmissionRepository`, add `get_submissions_by_user(submitter_id)`.
-    *   [ ] In `ProposalRepository`, add `get_proposals_by_ids(list_of_proposal_ids)`.
-    *   [ ] In `SubmissionService`, implement `get_user_submission_history(submitter_id)`:
-        *   [ ] Get all user submissions.
-        *   [ ] For each submission, fetch proposal details.
-        *   [ ] Format a list of (proposal title, user's response, proposal status/outcome).
-    *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `my_votes_command` calling `SubmissionService.get_user_submission_history()` and DMs the result.
+    *   [x] In `SubmissionRepository`, add `get_submissions_by_user(submitter_id)`. (Verified exists)
+    *   [x] In `ProposalRepository`, add `get_proposals_by_ids(list_of_proposal_ids)`. (Verified exists)
+    *   [x] In `SubmissionService`, implement `get_user_submission_history(submitter_id)`:
+        *   [x] Get all user submissions.
+        *   [x] For each submission, fetch proposal details.
+        *   [x] Format a list of (proposal title, user's response, proposal status/outcome).
+    *   [x] In `app/telegram_handlers/command_handlers.py`, implement `my_votes_command` calling `SubmissionService.get_user_submission_history()` and DMs the result.
+    *   [x] Test this is working manually.
 
 2.  **Task 7.2: Implement `/proposals open` and `/proposals closed`**
     *   [ ] In `ProposalRepository`, add `get_proposals_by_status(status: str)`.
@@ -405,6 +406,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Fetch proposals from repository.
         *   [ ] Format list of (title, deadline/outcome).
     *   [ ] Implement `proposals_open_command` and `proposals_closed_command` in `command_handlers.py`, calling the service and DMing results.
+    *   [ ] Test this is working manually.
 
 3.  **Task 7.3: Implement `/edit_proposal` Command (Proposer Only)**
     *   [ ] In `SubmissionRepository`, add `count_submissions_for_proposal(proposal_id)`.
@@ -414,6 +416,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Update proposal fields in `ProposalRepository`.
         *   [ ] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
     *   [ ] Implement `edit_proposal_command` in `command_handlers.py` (likely needs a conversation to get new details).
+    *   [ ] Test this is working manually.
 
 4.  **Task 7.4: Implement `/cancel_proposal` Command (Proposer Only)**
     *   [ ] In `ProposalService`, implement `cancel_proposal_by_proposer(proposal_id, proposer_id)`:
@@ -421,6 +424,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Update status to "cancelled" via `ProposalRepository`.
         *   [ ] Update channel message (e.g., "Proposal cancelled").
     *   [ ] Implement `cancel_proposal_command` in `command_handlers.py`.
+    *   [ ] Test this is working manually.
 
 5.  **Task 7.5: Implement `/add_doc` Command (Proposer Only)**
     *   [ ] In `ProposalRepository`, ensure `get_proposal_by_id` fetches `proposer_id`.
@@ -430,6 +434,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] If text/URL provided in command, call `ContextService.process_and_store_document(content, proposal_id=proposal_id, source_type="proposer_added_context")`.
         *   [ ] (Optional) Could initiate a short conversation if no context provided in command.
     *   [ ] Send confirmation/error DM.
+    *   [ ] Test this is working manually.
 
 6.  **Task 7.6: Implement `/view_results` Command**
     *   [ ] In `ProposalService`, implement `get_all_results_for_proposal_view(proposal_id)`:
@@ -438,10 +443,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] For "free_form" results, fetch `proposal.raw_results` (which should contain the list of anonymized submissions).
         *   [ ] Format for display.
     *   [ ] Implement `view_results_command` in `submission_command_handlers.py`.
+    *   [ ] Test this is working manually.
 
 7.  **Task 7.7: Implement `/privacy` Command**
     *   [ ] Create a static privacy policy text.
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
+    *   [ ] Test this is working manually.
 
 8.  **Task 7.8: Implement Proposer Document Editing and Deletion**
     *   **Implement `/edit_doc <document_id>` Command (Proposer Only):**
@@ -458,6 +465,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] Updates `content_hash`.
         *   [ ] Call `ContextService.update_document_content()`.
         *   [ ] Send confirmation/error DM.
+        *   [ ] Test this is working manually.
     *   **Implement `/delete_doc <document_id>` Command (Proposer Only):**
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `delete_doc_command`.
         *   [ ] Handler parses `document_id`.
@@ -467,6 +475,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] Deletes document from `DocumentRepository`.
         *   [ ] Call `ContextService.delete_document()`.
         *   [ ] Send confirmation/error DM.
+        *   [ ] Test this is working manually.
 
 9.  **Task 7.9: Implement Admin Global Document Management (List, Edit, Delete)**
     *   **Implement `/view_global_docs` Command (Admin Only):**
@@ -475,6 +484,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] In `DocumentRepository`, add `get_global_documents()` (e.g., where `proposal_id` is NULL).
         *   [ ] In `ContextService`, add `list_global_documents()` that calls the repository method and formats a list (ID, title).
         *   [ ] DM the list to the admin.
+        *   [ ] Test this is working manually.
     *   **Implement `/edit_global_doc <document_id>` Command (Admin Only):**
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `edit_global_doc_command`.
         *   [ ] Verify user is an admin.
@@ -484,6 +494,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Initiate a conversation (or expect further message) for new content/title.
         *   [ ] Call `ContextService.update_document_content()` (from Task 7.8).
         *   [ ] Send confirmation/error DM.
+        *   [ ] Test this is working manually.
     *   **Implement `/delete_global_doc <document_id>` Command (Admin Only):**
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `delete_global_doc_command`.
         *   [ ] Verify user is an admin.
@@ -491,6 +502,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Verify document is a global document using `ContextService.is_global_document()`.
         *   [ ] Call `ContextService.delete_document()` (from Task 7.8).
         *   [ ] Send confirmation/error DM.
+        *   [ ] Test this is working manually.
 
 ## Phase 8: Multi-Channel Support Enhancements
 
