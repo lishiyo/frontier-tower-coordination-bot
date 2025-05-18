@@ -151,15 +151,23 @@ class ContextService:
         logger.info(f"Stored document metadata in SQL with ID: {sql_document.id} for title: '{title}'")
 
         # Now store in VectorDB using sql_document.id
-        chunk_metadatas = [
-            {
-                "document_sql_id": str(sql_document.id), 
-                "chunk_index": i, 
-                "original_source": final_source_url or source_type,
-                "title": title # Added document title to metadata
-            }
-            for i in range(len(text_chunks))
-        ]
+        # Prepare base metadata for each chunk
+        base_metadata_for_chunks = {
+            "document_sql_id": str(sql_document.id),
+            "original_source": final_source_url or source_type,
+            "title": title # The original title passed or derived
+        }
+        if proposal_id:
+            base_metadata_for_chunks["proposal_id"] = str(proposal_id) # Add proposal_id if available
+
+        chunk_metadatas = []
+        for i in range(len(text_chunks)):
+            meta = base_metadata_for_chunks.copy()
+            meta["chunk_index"] = i
+            # The chunk_text_preview is added by VectorDBService itself, no need to add it here.
+            # We are passing the original title to the vector store metadata.
+            # The dynamic title for proposals will be constructed during retrieval in get_answer_for_question.
+            chunk_metadatas.append(meta)
         
         chroma_vector_ids = await self.vector_db_service.store_embeddings(
             doc_id=sql_document.id,
@@ -252,30 +260,32 @@ class ContextService:
             source_details_for_prompt = []
 
             for chunk_info in similar_chunks_results:
-                # Metadata key is 'document_sql_id' (not 'sql_document_id')
                 text_chunk = chunk_info.get('document_content', '')
                 metadata = chunk_info.get('metadata', {})
                 
-                # Using the correct metadata key for document_sql_id
                 doc_id = metadata.get('document_sql_id')
-                
-                # Better fallback for missing titles - use preview or chunk text
                 chunk_preview = metadata.get('chunk_text_preview', '')
-                if metadata.get('title'):
-                    doc_title = metadata.get('title')
+                actual_title = metadata.get('title') # Title stored in ChromaDB metadata
+                linked_proposal_id = metadata.get('proposal_id') # Proposal ID stored in ChromaDB metadata
+
+                doc_title_display: str
+                if linked_proposal_id:
+                    # If linked to a proposal, prioritize this format
+                    preview_text = chunk_preview if chunk_preview else text_chunk # Use chunk_preview first, then text_chunk
+                    doc_title_display = f"Proposal {linked_proposal_id} context: {preview_text[:30]}..."
+                elif actual_title:
+                    doc_title_display = actual_title
                 elif chunk_preview:
-                    # Use first 30 chars of preview as a title
-                    doc_title = f"Preview: {chunk_preview[:30]}..." 
+                    doc_title_display = f"Preview: {chunk_preview[:30]}..."
                 else:
-                    # Last resort fallback
-                    doc_title = f"Document ID {doc_id}" if doc_id else "Unknown document"
+                    doc_title_display = f"Document ID {doc_id}" if doc_id else "Unknown document"
 
                 logger.info(f"Got chunk! Chunk info: {chunk_info} has text_chunk: {text_chunk}")
                 if text_chunk:
                     context_str += f"- {text_chunk}\\n"
-                    source_citation = f"'{doc_title}'"
-                    if doc_id:
-                        source_citation += f" (ID: {doc_id})"
+                    source_citation = f"'{doc_title_display}'"
+                    if doc_id: # Still useful to show the SQL document ID if available
+                        source_citation += f" (Doc ID: {doc_id})" # Clarified it's Doc ID
                     source_details_for_prompt.append(f"Content from {source_citation}")
                     sources_cited.add(source_citation)
 

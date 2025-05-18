@@ -138,7 +138,16 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 # Determine source_type (text or url)
                 # Basic check, can be improved
                 source_type = "user_url" if user_input_context.startswith(("http://", "https://")) else "user_text"
-                title = f"Initial context for proposal by {user.id}" 
+                
+                # Construct the title with tappable username if available
+                if user.username:
+                    user_display_name = f"@{user.username}"
+                elif user.first_name:
+                    user_display_name = user.first_name
+                else:
+                    user_display_name = str(user.id)
+                
+                title = f"proposal context by {user_display_name}"
                 
                 # process_and_store_document expects proposal_id to be optional for general docs
                 # For proposal creation, we don't have proposal_id yet.
