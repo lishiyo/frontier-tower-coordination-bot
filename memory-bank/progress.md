@@ -1,5 +1,29 @@
 # Progress Log
 
+## Sat May 17 18:09:20 PDT 2025
+
+**Completed:**
+- Task 4.3: Free-Form Submission (`/submit` Command) and Deep-Link Prefill Handling.
+    - Modified `query_to_prefill` in `app/telegram_handlers/command_handlers.py` (for `/start submit_...` payload) to generate `submit <id> ` (without leading `/`). This ensures `switch_inline_query_current_chat` correctly forms `@botname submit <id> ...`.
+    - Added `handle_prefilled_submit` function to `app/telegram_handlers/submission_command_handlers.py`. This new handler uses regex `^\s*@(\w+)\s+submit\s+(\d+)\s+(.*)$` to capture submissions made via the prefilled text, then validates the bot username and calls the original `submit_command`.
+    - Registered `handle_prefilled_submit` as a `MessageHandler` in `main.py` for private chats.
+    - Successfully debugged regex matching for `handle_prefilled_submit` after initial attempts failed despite seemingly correct patterns and input strings (verified with `repr()`). The working solution involved capturing the username with `(\w+)` and then comparing it, which proved more robust in this context.
+
+**Learnings & Fixes:**
+- `switch_inline_query_current_chat` prepends the bot's username (`@botname`) to the query. If the original query was `/command`, it becomes `@botname /command`.
+- Standard `CommandHandler` does not recognize `@botname /command`. It requires `/command` or `/command@botname`.
+- For commands initiated via `switch_inline_query_current_chat` (that were originally slash commands), the solution is:
+    1. Provide the `query` to `switch_inline_query_current_chat` *without* the leading slash (e.g., `"command args"`).
+    2. This results in the user's input field being prefilled with `@botname command args`.
+    3. Implement a `MessageHandler` with a regex to capture this specific format (e.g., `^\s*@BOT_USERNAME\s+command\s+(ARG1)\s+(.*)$`).
+    4. This handler then typically extracts arguments and calls the underlying logic of the original slash command handler.
+- When debugging regex that fails despite `repr()` showing clean strings, simplifying the pattern, using more general capture groups (like `\w+` instead of the escaped username directly in the pattern), and then validating the captured group can sometimes overcome very subtle matching issues.
+
+**Next Steps:**
+- Update `bot_commands.md` to reflect the effective `@botname submit <id> ...` alias.
+- Continue with any further testing or sub-tasks for Task 4.3.
+
+
 ## Sat May 17 17:31:03 PDT 2025
 
 **Completed:**

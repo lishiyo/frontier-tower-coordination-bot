@@ -26,6 +26,7 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<proposal_id>`: The ID of the free-form proposal.
         *   `<Your text submission>`: The user's textual input for the proposal.
     *   **Context:** DM with the bot.
+    *   **Note:** The "Submit Your Idea" button on channel messages for free-form proposals will guide the user to a DM where they can click a button to prefill their chat input with `@BotUsername submit <proposal_id> `, to which they then add their submission text. This format is handled by the bot.
 
 *   `/ask <question>` or `/ask <proposal_id> <question>`
     *   **Description:** Allows users to ask questions. If a `proposal_id` is provided, the question is specifically about that proposal, and related context is prioritized.
