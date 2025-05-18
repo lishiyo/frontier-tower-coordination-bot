@@ -135,6 +135,8 @@ class ProposalService:
                 raw_results_data = {"submissions": submission_texts} # Store all submissions
                 
                 if submission_texts:
+                    num_submissions = len(submission_texts)
+                    s_char = 's' if num_submissions != 1 else ''
                     try:
                         summary = await self.llm_service.cluster_and_summarize_texts(submission_texts)
                         if summary: # Check if summary is not None or empty
@@ -144,16 +146,16 @@ class ProposalService:
                             # We want actual newline characters in the string before MarkdownV2 escaping.
                             processed_summary = summary.replace("\\n", "\n").replace("\n", "\n") 
                             # The f-string itself should use a literal newline where desired for the initial part.
-                            outcome_text = f"Idea collection ended. Summary of themes:\n{processed_summary}"
-                            logger.info(f"Proposal {proposal.id} (FF) - Generated LLM summary for {len(submission_texts)} submissions. Processed summary for outcome: {repr(outcome_text)}")
+                            outcome_text = f"{num_submissions} submission{s_char} recorded. Summary of themes:\n{processed_summary}"
+                            logger.info(f"Proposal {proposal.id} (FF) - Generated LLM summary for {num_submissions} submissions. Processed summary for outcome: {repr(outcome_text)}")
                         else: # LLM service returned None or empty, or an error message string from the service itself
-                            outcome_text = "Idea collection ended. Could not generate a summary of submissions. Full list available via /view_results."
-                            logger.warning(f"Proposal {proposal.id} (FF) - LLM summary was None or empty. Fallback message used.")
+                            outcome_text = f"{num_submissions} submission{s_char} recorded. Could not generate a summary of submissions. Full list available via /view_results."
+                            logger.warning(f"Proposal {proposal.id} (FF) - LLM summary was None or empty for {num_submissions} submissions. Fallback message used.")
                     except Exception as e:
-                        logger.error(f"Error during LLM clustering for proposal {proposal.id}: {e}", exc_info=True)
-                        outcome_text = "Idea collection ended. Error processing submissions for summary. Full list available via /view_results."
+                        logger.error(f"Error during LLM clustering for proposal {proposal.id} ({num_submissions} submissions): {e}", exc_info=True)
+                        outcome_text = f"{num_submissions} submission{s_char} recorded. Error processing submissions for summary. Full list available via /view_results."
                 else:
-                    outcome_text = "Idea collection ended. No submissions received."
+                    outcome_text = "No submissions received." # Changed from "Idea collection ended. No submissions received." for conciseness
                 logger.info(f"Proposal {proposal.id} (FF) outcome: {outcome_text}")
             
             # Update proposal in DB
