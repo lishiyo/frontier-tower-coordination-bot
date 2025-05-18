@@ -337,11 +337,11 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] For the results message, instead of "(DM the bot)" use "(DM @botname)".
 
 3.  **Task 5.3: Implement LLM Clustering for Free-Form**
-    *   [ ] In `LLMService`, implement `cluster_and_summarize_texts(texts: list[str])`:
-        *   [ ] May involve embedding all texts.
-        *   [ ] Using an LLM prompt to group similar texts and provide a concise summary for each group/cluster.
-        *   [ ] Return the summary text.
-        *   [ ] Test this is working (should be displaying as results for free-form proposal results.)
+    *   [x] In `LLMService`, implement `cluster_and_summarize_texts(texts: list[str])`:
+        *   [x] May involve embedding all texts.
+        *   [x] Using an LLM prompt to group similar texts and provide a concise summary for each group/cluster.
+        *   [x] Return the summary text.
+        *   [x] Test this is working (should be displaying as results for free-form proposal results.)
 
 ## Phase 6: RAG for `/ask` Command & Admin Document Management
 

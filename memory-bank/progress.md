@@ -1,5 +1,20 @@
 # Progress Log
 
+## Sat May 17 19:25:21 PDT 2025
+
+**Completed:**
+- Fixed newline rendering bug in free-form proposal result summaries. The issue was with how newline characters from the LLM's summary were being incorporated into the final message string before MarkdownV2 escaping.
+    - Solution involved explicitly replacing any literal `\\n` or `\n` from the LLM's output with actual `\n` characters in `ProposalService` before constructing the `outcome_text`.
+
+**Learnings & Fixes:**
+- When incorporating multi-line text from an external source (like an LLM) into a formatted string that will undergo further escaping (e.g., for Markdown), ensure that newline characters are correctly represented as actual `\n` characters in the string prior to the final escaping step.
+
+**Next Steps:**
+- Address remaining to-dos for Task 5.2:
+    - Adjust user-facing timezone displays from UTC to PST.
+    - Tweak results message copy from "(DM the bot)" to "(DM @botname)".
+- Continue with Phase 6: RAG for `/ask` Command & Admin Document Management.
+
 ## Sat May 17 19:18:14 PDT 2025
 
 **Completed:**
