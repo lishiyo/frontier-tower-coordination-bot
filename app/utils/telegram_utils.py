@@ -2,11 +2,15 @@ import re # For escaping markdown
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from app.persistence.models.proposal_model import Proposal, ProposalType
 from app.persistence.models.user_model import User # For proposer info
-from datetime import datetime
+from datetime import datetime, timezone
+from dateutil import tz # Added for timezone conversion
 from telegram.ext import CallbackContext
 from typing import List, Dict, Any, Optional, Union
 
 MAX_MESSAGE_LENGTH = 4096 # Telegram's max message length
+
+# Define the target timezone (PST)
+PST = tz.gettz('America/Los_Angeles')
 
 def escape_markdown_v2(text: str) -> str:
     """Helper function to escape text for MarkdownV2."""
@@ -27,7 +31,10 @@ def format_proposal_message(proposal: Proposal, proposer: User) -> str:
     
     # Dates formatted by strftime with '-' or '.' should also be escaped if they are part of the text argument of send_message.
     # Here, deadline_str is interpolated into an f-string which is then sent.
-    deadline_str = escape_markdown_v2(proposal.deadline_date.strftime("%Y-%m-%d %H:%M UTC"))
+    # Convert deadline_date (assumed to be UTC) to PST for display
+    # deadline_pst = proposal.deadline_date.astimezone(PST) if proposal.deadline_date.tzinfo else proposal.deadline_date.replace(tzinfo=timezone.utc).astimezone(PST)
+    # deadline_str = escape_markdown_v2(deadline_pst.strftime("%Y-%m-%d %H:%M %Z")) # Display with timezone
+    deadline_str = escape_markdown_v2(format_datetime_for_display(proposal.deadline_date)) # Use the new helper
 
     message_text = f"📢 **New {'Proposal' if proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value else 'Idea Collection'}: {escaped_title}**\n\n"
     message_text += f"Proposed by: {proposer_name}\n\n"
@@ -57,6 +64,25 @@ def format_proposal_message(proposal: Proposal, proposer: User) -> str:
         message_text += f"Submissions end: {deadline_str}"
     
     return message_text
+
+def format_datetime_for_display(dt: datetime, target_tz_str: str = 'America/Los_Angeles') -> str:
+    """Formats a datetime object to a string for display in a target timezone."""
+    if not dt:
+        return "Not set"
+    
+    target_tz = tz.gettz(target_tz_str)
+    if not target_tz:
+        # Fallback or error if timezone string is invalid
+        return dt.strftime("%Y-%m-%d %H:%M UTC") # Default to UTC display
+
+    # Ensure the datetime is timezone-aware (assume UTC if naive)
+    if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+        dt_aware = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt_aware = dt
+    
+    dt_localized = dt_aware.astimezone(target_tz)
+    return dt_localized.strftime("%Y-%m-%d %H:%M %Z") # e.g., "2024-05-17 10:30 PST"
 
 def get_free_form_submit_button(proposal_id: int, bot_username: str) -> InlineKeyboardMarkup:
     """Returns an inline keyboard with a 'Submit Your Idea' button that opens a DM to the bot."""

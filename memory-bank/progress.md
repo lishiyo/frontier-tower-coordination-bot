@@ -1,5 +1,26 @@
 # Progress Log
 
+## Sat May 17 18:44:38 PDT 2025
+
+**Completed:**
+- Continued Task 5.2: Deadline Checking Job.
+    - Resolved `telegram.error.BadRequest: Can't parse entities` errors when posting results messages for both multiple-choice and free-form proposals.
+    - Fix involved ensuring all parts of the dynamically constructed results messages (including static text with parentheses and list item markers) were correctly escaped for MarkdownV2, or that text within inline code blocks was not unnecessarily escaped.
+        - Key fixes: Escaping parentheses in formatted percentage strings `\(100.0%\)`.
+        - Escaping parentheses in static instructional text `\(DM the bot\)`.
+        - Escaping the leading hyphen for list items `\- ` in the vote breakdown.
+
+**Learnings & Fixes:**
+- Telegram's MarkdownV2 parser requires meticulous escaping of all special characters: `_[]()~>#+-=|{}.!`. This applies to static parts of f-strings as well as dynamic content.
+- When MarkdownV2 parsing fails, the specific character flagged by the error (e.g., '-') might be the first point of failure in a complex string, even if that character is a valid Markdown element (like a list hyphen). The root cause could be an interaction with other improperly escaped entities or an overall parsing ambiguity.
+- Iterative debugging using `repr()` on the exact message string being sent to Telegram is invaluable for diagnosing these subtle escaping issues.
+
+**Next Steps:**
+- Address new to-dos for Task 5.2:
+    - Adjust user-facing timezone displays from UTC to PST.
+    - Tweak results message copy from "(DM the bot)" to "(DM @botname)".
+- Proceed to Task 5.3: Implement LLM Clustering for free-form proposal summaries.
+
 ## Sat May 17 18:21:49 PDT 2025
 
 **Completed:**

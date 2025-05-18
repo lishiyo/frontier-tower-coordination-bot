@@ -332,7 +332,9 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] In `SchedulingService`, define `check_proposal_deadlines_job` that calls `ProposalService.process_expired_proposals()`.
     *   [x] Add this job to the scheduler (e.g., to run every few minutes).
     *   [x] Ensure `ProposalService` has access to the bot application instance for sending messages.
-    *   [ ] Manually test.
+    *   [x] Manually test.
+    *   [ ] Make everything PST instead of UTC (e.g. "Voting ends", "Deadline set for" should be in UTC).
+    *   [ ] For the results message, instead of "(DM the bot)" use "(DM @botname)".
 
 3.  **Task 5.3: Implement LLM Clustering for Free-Form**
     *   [ ] In `LLMService`, implement `cluster_and_summarize_texts(texts: list[str])`:
@@ -349,7 +351,15 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 **Subtasks:**
 
-1.  **Task 6.1: Implement `/ask` Command**
+1.  **Task 6.1: Implement `/add_global_doc` Admin Command**
+    *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or appropriate admin command handler file), implement `add_global_doc_command` handler.
+        *   [ ] Check if user is an admin (loaded from `ConfigService`).
+        *   [ ] Parse URL or pasted text.
+        *   [ ] Prompt for a document title if not easily inferable.
+    *   [ ] `add_global_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_global_upload", title=user_provided_title, proposal_id=None)`.
+    *   [ ] Send confirmation to admin.
+
+2.  **Task 6.2: Implement `/ask` Command**
     *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `ask_command` handler.
         *   [ ] Parse `question` and optional `proposal_id`.
     *   [ ] In `ContextService`, implement `get_answer_for_question(question_text, proposal_id_filter=None)`:
@@ -360,14 +370,6 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Get answer via `LLMService.get_completion()`.
         *   [ ] Format answer, citing sources/snippets.
     *   [ ] `ask_command` calls `ContextService.get_answer_for_question()` and DMs response.
-
-2.  **Task 6.2: Implement `/add_global_doc` Admin Command**
-    *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or appropriate admin command handler file), implement `add_global_doc_command` handler.
-        *   [ ] Check if user is an admin (loaded from `ConfigService`).
-        *   [ ] Parse URL or pasted text.
-        *   [ ] Prompt for a document title if not easily inferable.
-    *   [ ] `add_global_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_global_upload", title=user_provided_title, proposal_id=None)`.
-    *   [ ] Send confirmation to admin.
 
 3.  **Task 6.3: Enhance URL Content Extraction**
     *   [ ] Research and select a robust HTML parsing/content extraction library or method (e.g., BeautifulSoup, trafilatura, crawl4ai, Firecrawl tools). crawl4ai preferred.

@@ -101,8 +101,10 @@ async def handle_ask_duration(update: Update, context: ContextTypes.DEFAULT_TYPE
     if deadline_date:
         context.user_data[USER_DATA_DEADLINE_DATE] = deadline_date
         logger.info(f"Parsed deadline for user {update.effective_user.id}: {deadline_date}")
+        # Use the new display formatter
+        display_deadline_str = telegram_utils.format_datetime_for_display(deadline_date)
         await update.message.reply_text(
-            f"Got it! Deadline set for: {deadline_date.strftime('%Y-%m-%d %H:%M:%S %Z')}. "
+            f"Got it! Deadline set for: {telegram_utils.escape_markdown_v2(display_deadline_str)}. "
             "Now, do you have any initial context or background information to add for this proposal? "
             "You can paste text, provide a URL, or just type 'no' for now.",
             reply_markup=ReplyKeyboardRemove()

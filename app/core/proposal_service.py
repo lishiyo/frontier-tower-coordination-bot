@@ -182,7 +182,8 @@ class ProposalService:
                                 results_message_text += f"\- {telegram_utils.escape_markdown_v2(option)}: {count} vote{'s' if count != 1 else ''} {escaped_percentage_str}\n"
                         
                         # Escape the final instructional line part that's not in a code block
-                        instructional_part = " (DM the bot)"
+                        bot_username_mention = f"@{self.bot_app.bot.username}" if self.bot_app and self.bot_app.bot and self.bot_app.bot.username else "the bot"
+                        instructional_part = f" (DM {bot_username_mention})"
                         escaped_instructional_part = telegram_utils.escape_markdown_v2(instructional_part)
                         results_message_text += f"\nView full details or all submissions with: `/view_results {updated_proposal.id}`{escaped_instructional_part}"
 
