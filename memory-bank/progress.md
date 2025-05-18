@@ -392,25 +392,21 @@
 - Task 1.3: Configure basic bot (main.py, app/config.py)
 - Task 1.4: Set up PostgreSQL database with Alembic
 
-## Sat May 17 21:02:08 PDT 2025
+## Sat May 17 22:10:15 PDT 2025
 
 **Completed:**
-- Task 6.2: Implement `/ask` Command.
-    - The `/ask` command is now fully functional, retrieving relevant context from stored documents (global and proposal-specific) using a RAG pipeline.
-    - Service instantiation for `ask_command` in `command_handlers.py` refactored to match the pattern used in `admin_command_handlers.py`, resolving `AttributeError`.
-    - Fixed MarkdownV2 parsing errors for `/ask` responses by correctly escaping special characters using `telegram_utils.escape_markdown_v2`.
-    - Resolved an issue where `/ask` reported "No text content found in similar chunks" by correcting the key used to access document content from ChromaDB results in `ContextService` (from `text_content` to `document_content`).
-    - Improved source citation in `/ask` responses:
-        - Ensured correct retrieval of `document_sql_id` and `title` from ChromaDB metadata.
-        - Updated title generation for documents added during proposal creation to use the format `"proposal context by @{username}"` for better identification and tappability.
-- Updated `app/scripts/clear_supabase_data.py` to also delete the ChromaDB vector collection (`general_context`), allowing for a full reset of both SQL and vector data.
+- Task 6.3: Enhance URL Content Extraction.
+    - Integrated `crawl4ai` into `ContextService._fetch_content_from_url`.
+    - Added `crawl4ai` to `requirements.txt`.
+    - Configured `AsyncWebCrawler` with `BrowserConfig(java_script_enabled=True, headless=True)` and `CrawlerRunConfig(markdown_generator=DefaultMarkdownGenerator(content_filter=PruningContentFilter(...)), wait_until="networkidle")`.
+    - This setup successfully fetches and processes dynamically loaded content from URLs, resolving issues where only minimal content (like a single newline) was previously extracted.
+- Updated `memory-bank/techContext.md` to include `crawl4ai` under a new "Web Content Extraction" section.
 
 **Learnings & Fixes:**
-- The RAG pipeline for `/ask` relies on consistent metadata keys between `VectorDBService` (storage) and `ContextService` (retrieval). A mismatch (`document_content` vs. `text_content`) was identified and fixed.
-- Proper escaping of Telegram MarkdownV2 is crucial for messages constructed from dynamic content, especially LLM outputs.
-- When adding documents via proposal flow, the `title` stored in ChromaDB metadata is key for identification. Updated this to be more descriptive (e.g., `"proposal context by @username"`).
-- Ensuring `proposal_id` is correctly passed and stored in ChromaDB metadata is vital for features that might rely on distinguishing proposal-specific context (though the current `/ask` title fallback for proposals uses other metadata like the user's name).
+- `crawl4ai`'s default behavior or simple configurations might not be sufficient for all websites, especially those heavily reliant on JavaScript for content rendering.
+- Iterative testing with different `crawl4ai` configurations (`headless` mode, `java_script_enabled`, `wait_for` with JS conditions, `wait_until="networkidle"`, and using `DefaultMarkdownGenerator` with `PruningContentFilter`) was necessary to find a robust solution.
+- The `wait_until="networkidle"` option in `CrawlerRunConfig` proved effective for ensuring dynamic content is loaded before extraction.
+- Discrepancies in behavior between a standalone test script and the integrated bot environment can occur, often related to browser automation initialization or JavaScript execution contexts.
 
 **Next Steps:**
-- Address pending follow-ups for Task 5.2 (timezone display and results message copy tweak).
-- Begin Task 6.3: Enhance URL Content Extraction.
+- Proceed to Phase 7 tasks, starting with Task 7.1: Implement `/my_votes` Command.

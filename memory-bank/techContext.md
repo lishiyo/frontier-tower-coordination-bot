@@ -24,6 +24,9 @@ See also [systemPatterns.md](./systemPatterns.md) for target architecture and co
     *   **LLM for Answering/Summarization:**
         *   **OpenAI API (GPT-4o or similar):** Easiest to integrate for powerful Q&A, summarization of free-form submissions, and for parsing natural language duration inputs for proposal deadlines.
 
+**Web Content Extraction:**
+    *   **`crawl4ai`:** Used for fetching and parsing content from URLs to extract cleaner text/markdown for RAG. Configured to wait for network idle to handle dynamically loading pages.
+
 **Scheduling (for deadlines):**
     *   **`APScheduler`:** A good Python library for scheduling tasks (like checking proposal deadlines).
 

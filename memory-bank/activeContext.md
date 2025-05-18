@@ -1,36 +1,33 @@
-# Active Context - Sat May 17 21:02:08 PDT 2025
+# Active Context - Sat May 17 22:10:15 PDT 2025
 
 ## Current Work Focus
-- Addressing pending follow-ups for Task 5.2 (timezone display and results message copy tweak).
-- Moving to Task 6.3: Enhance URL Content Extraction.
+- Completed Task 6.3 (Enhance URL Content Extraction).
+- Preparing to move to Phase 7 tasks, starting with Task 7.1: Implement `/my_votes` Command.
 
 ## What's Working
+- URL content extraction (Task 6.3) is now significantly improved using `crawl4ai` with appropriate configurations (`java_script_enabled=True`, `wait_until="networkidle"`, and `DefaultMarkdownGenerator` with `PruningContentFilter`). This resolves issues with fetching content from dynamic websites.
 - `/add_global_doc` command (Task 6.1) is functional.
-- `/ask` command (Task 6.2) is now functional.
-    - RAG pipeline retrieves relevant document chunks.
-    - Source citation includes document titles and IDs.
-    - Fallback for missing titles in proposal context documents uses username (e.g., "proposal context by @username").
-- Phase 5 tasks related to deadline processing and LLM clustering for free-form proposals.
-- Newline rendering in summaries and large Telegram ID handling continue to work.
+- `/ask` command (Task 6.2) is functional, with RAG pipeline and source citation.
+- Title generation for proposal context documents includes tappable usernames.
+- Core proposal lifecycle (creation, voting, deadline processing, results) is largely functional.
 
 ## What's Broken or Pending
-- Timezone display (Task 5.2 To-do): User-facing times are still in UTC, need to be PST.
+- Timezone display (Task 5.2 To-do): User-facing times (e.g., deadlines, result announcements) are still in UTC, need to be consistently displayed in PST.
 - Copy Tweak (Task 5.2 To-do): Results message instruction "(DM the bot)" needs to be changed to "(DM @botname)".
-- The `PTBUserWarning` regarding `per_message=False` persists (known).
+- The `PTBUserWarning` regarding `per_message=False` in `ConversationHandler` for `/propose` persists (known and accepted for now).
 
 ## Active Decisions and Considerations
-- Determine the best library/approach for Task 6.3 (Enhance URL Content Extraction).
+- None currently, focusing on moving to the next phase of tasks.
 
 ## Learnings and Project Insights
-- Corrected key mismatch (`document_content` vs `text_content`) in `ContextService` for RAG.
-- Ensured `title` and `document_sql_id` are correctly retrieved from ChromaDB metadata for source citation in `/ask`.
-- Refined title generation for documents added during proposal creation in `message_handlers.py` to use `@username` for better identification and tappability.
-- Added functionality to `clear_supabase_data.py` to also clear ChromaDB vector embeddings.
+- `crawl4ai` integration requires careful configuration for dynamic sites. `wait_until="networkidle"` is a key setting.
+- Debugging discrepancies between standalone script behavior and integrated application behavior is important, often pointing to environment or initialization differences.
+- Consistent metadata handling and escaping for Telegram messages remain important for robust functionality.
 
 ## Current Database/Model State
-- No schema changes since the last update.
-- ChromaDB vector store can be cleared along with SQL data using the script.
+- No schema changes since the last update (addition of `crawl4ai` is a library dependency, not a schema change).
+- ChromaDB vector store and SQL data can be cleared using `clear_supabase_data.py`.
 
 ## Next Steps
-- Address pending Task 5.2 follow-ups (timezone and copy tweak).
-- Begin Task 6.3: Enhance URL Content Extraction.
+- Address pending Task 5.2 follow-ups (timezone and copy tweak for results messages).
+- Begin Phase 7, Task 7.1: Implement `/my_votes` Command.
