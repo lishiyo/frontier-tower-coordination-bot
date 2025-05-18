@@ -1,5 +1,26 @@
 # Progress Log
 
+## Sun May 18 15:50:23 PDT 2025
+
+**Completed:**
+- Task 7.1: `/my_votes` command is now fully functional.
+    - Fixed newline rendering issues in `app/telegram_handlers/user_command_handlers.py` by switching from raw f-strings to regular f-strings and double-escaping MarkdownV2 special characters (e.g., `\\(` for `(`).
+    - Timestamps in `/my_votes` output are now correctly formatted to PST by utilizing `app.utils.telegram_utils.format_datetime_for_display` in `app/core/submission_service.py`.
+    - Resolved `SyntaxWarning: invalid escape sequence '\\-'` in `user_command_handlers.py` by using double backslashes for hyphens (`\\-\\-`) in the separator line within regular f-strings.
+- Updated `memory-bank/tasks.md` to mark all sub-tasks for Task 7.1 as complete.
+- Updated `memory-bank/bot_commands.md` with documentation for the `/my_votes` command.
+
+**Learnings & Fixes:**
+- Raw f-strings (`fr"..."`) prevent `\\n` from being processed as newlines. Regular f-strings (`f"..."`) should be used if `\\n` is intended for newlines, which then requires careful manual escaping of any MarkdownV2 special characters within the string itself.
+- Reaffirmed the utility of shared formatting functions like `format_datetime_for_display` for consistency.
+- Understanding the interplay between Python's string escaping and Telegram's MarkdownV2 escaping is crucial (e.g., needing `\\-\\-` in an f-string to produce `\\-` for MarkdownV2).
+
+**Next Steps:**
+- Address pending Task 5.2 follow-ups:
+    - Ensure all user-facing times (e.g., proposal deadlines, result announcements) are consistently displayed in PST.
+    - Tweak results message copy from "(DM the bot)" to "(DM @botname)".
+- Begin Phase 7, Task 7.2: Implement `/proposals open` and `/proposals closed`.
+
 ## Sat May 17 20:15:00 PDT 2025
 
 **Completed:**
