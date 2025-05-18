@@ -152,7 +152,12 @@ class ContextService:
 
         # Now store in VectorDB using sql_document.id
         chunk_metadatas = [
-            {"document_sql_id": str(sql_document.id), "chunk_index": i, "original_source": final_source_url or source_type}
+            {
+                "document_sql_id": str(sql_document.id), 
+                "chunk_index": i, 
+                "original_source": final_source_url or source_type,
+                "title": title # Added document title to metadata
+            }
             for i in range(len(text_chunks))
         ]
         
@@ -247,17 +252,32 @@ class ContextService:
             source_details_for_prompt = []
 
             for chunk_info in similar_chunks_results:
-                # Assuming chunk_info is a dict with 'text_content' and 'metadata'
-                # And metadata contains 'sql_document_id' and 'title' (document title)
-                text_chunk = chunk_info.get('text_content', '') # Prefer 'text_content' if available from vector DB
+                # Metadata key is 'document_sql_id' (not 'sql_document_id')
+                text_chunk = chunk_info.get('document_content', '')
                 metadata = chunk_info.get('metadata', {})
-                doc_id = metadata.get('sql_document_id')
-                doc_title = metadata.get('title', f"Document ID {doc_id}" if doc_id else "a relevant document")
+                
+                # Using the correct metadata key for document_sql_id
+                doc_id = metadata.get('document_sql_id')
+                
+                # Better fallback for missing titles - use preview or chunk text
+                chunk_preview = metadata.get('chunk_text_preview', '')
+                if metadata.get('title'):
+                    doc_title = metadata.get('title')
+                elif chunk_preview:
+                    # Use first 30 chars of preview as a title
+                    doc_title = f"Preview: {chunk_preview[:30]}..." 
+                else:
+                    # Last resort fallback
+                    doc_title = f"Document ID {doc_id}" if doc_id else "Unknown document"
 
+                logger.info(f"Got chunk! Chunk info: {chunk_info} has text_chunk: {text_chunk}")
                 if text_chunk:
                     context_str += f"- {text_chunk}\\n"
-                    source_details_for_prompt.append(f"Content from '{doc_title}' (ID: {doc_id})")
-                    sources_cited.add(f"'{doc_title}' (ID: {doc_id})")
+                    source_citation = f"'{doc_title}'"
+                    if doc_id:
+                        source_citation += f" (ID: {doc_id})"
+                    source_details_for_prompt.append(f"Content from {source_citation}")
+                    sources_cited.add(source_citation)
 
             if not context_str:
                  logger.info("No text content found in similar chunks.")
@@ -270,13 +290,13 @@ class ContextService:
                 f"Answer directly. If the context does not provide a sufficient answer, please state that you don't have enough information from the provided context."
             )
             
-            logger.debug(f"Prompt for /ask command:\\n{prompt}")
+            logger.debug(f"Prompt for /ask command:\n{prompt}")
 
             answer = await self.llm_service.get_completion(prompt)
 
             # Append source citation to the answer
             if sources_cited:
-                answer += f"\\n\\nSources: {', '.join(list(sources_cited))}."
+                answer += f"\n\nSources: {', '.join(list(sources_cited))}."
             
             return answer
 

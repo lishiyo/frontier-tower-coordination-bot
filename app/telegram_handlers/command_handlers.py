@@ -8,6 +8,10 @@ from app.core.user_service import UserService
 from app.persistence.database import AsyncSessionLocal
 from app.core.proposal_service import ProposalService
 from app.core.context_service import ContextService
+from app.services.llm_service import LLMService
+from app.services.vector_db_service import VectorDBService
+from app.config import ConfigService
+from app.utils.telegram_utils import escape_markdown_v2
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +126,65 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     context.user_data.clear()
     return ConversationHandler.END
+
+async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the /ask command, providing answers based on RAG."""
+    if not update.message or not update.effective_user:
+        logger.warning("ask_command received update without message or effective_user.")
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "Please provide a question. Usage: /ask <your question> or /ask <proposal_id> <your question>"
+        )
+        return
+
+    # Instantiate services directly
+    llm_service = LLMService()
+    vector_db_service = VectorDBService()
+
+    question_text: str
+    proposal_id_filter: Optional[int] = None
+
+    # Check if the first argument is a proposal_id (integer)
+    if len(context.args) > 1:
+        try:
+            potential_proposal_id = int(context.args[0])
+            # Further validation could be added here to check if it's a valid proposal_id format or exists
+            # For now, we assume if it's an int, it's a proposal_id
+            proposal_id_filter = potential_proposal_id
+            question_text = " ".join(context.args[1:])
+            logger.info(f"/ask command called with proposal_id_filter: {proposal_id_filter}, question: '{question_text}'")
+        except ValueError:
+            # First arg is not an int, so assume it's part of the question
+            question_text = " ".join(context.args)
+            logger.info(f"/ask command called with question: '{question_text}' (no proposal_id_filter)")
+    else:
+        question_text = " ".join(context.args)
+        logger.info(f"/ask command called with question: '{question_text}' (no proposal_id_filter)")
+
+    if not question_text.strip():
+        await update.message.reply_text("Your question seems to be empty. Please provide a question.")
+        return
+
+    await update.message.reply_chat_action(action='typing')
+
+    try:
+        async with AsyncSessionLocal() as session:
+            context_service = ContextService(
+                db_session=session,
+                llm_service=llm_service,
+                vector_db_service=vector_db_service
+            )
+            answer = await context_service.get_answer_for_question(
+                question_text=question_text, 
+                proposal_id_filter=proposal_id_filter
+            )
+            escaped_answer = escape_markdown_v2(answer)
+        # Ensure the message object exists before replying
+        if update.message:
+            await update.message.reply_text(escaped_answer, parse_mode='MarkdownV2')
+    except Exception as e:
+        logger.error(f"Error in ask_command: {e}", exc_info=True)
+        if update.message: # Ensure message object exists for error reply
+            await update.message.reply_text("Sorry, I couldn't process your request at the moment.")

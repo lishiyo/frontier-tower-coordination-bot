@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.persistence.database import AsyncSessionLocal # Engine is configured on import via ConfigService
 from app.persistence.models.document_model import Document
 from app.persistence.models.proposal_model import Proposal
-# from app.persistence.models.submission_model import Submission # For later
+from app.persistence.models.submission_model import Submission # Uncommented
 from app.config import ConfigService # Explicitly load to ensure .env is processed if needed
 
 # Setup logging
@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 async def clear_data_from_tables():
-    logger.info("Attempting to clear data from Supabase tables: documents, proposals.")
+    logger.info("Attempting to clear data from Supabase tables: documents, proposals, submissions.")
     
     # Ensure .env variables are loaded, which configures the DATABASE_URL used by the engine
     _ = ConfigService()
@@ -37,17 +37,17 @@ async def clear_data_from_tables():
             result_documents = await session.execute(stmt_documents)
             logger.info(f"Deleted {result_documents.rowcount} rows from 'documents' table.")
 
+            # Delete from Submission table (before Proposal due to FK constraint)
+            logger.info("Deleting all rows from 'submissions' table...")
+            stmt_submissions = delete(Submission)
+            result_submissions = await session.execute(stmt_submissions)
+            logger.info(f"Deleted {result_submissions.rowcount} rows from 'submissions' table.")
+
             # Delete from Proposal table
             logger.info("Deleting all rows from 'proposals' table...")
             stmt_proposals = delete(Proposal)
             result_proposals = await session.execute(stmt_proposals)
             logger.info(f"Deleted {result_proposals.rowcount} rows from 'proposals' table.")
-
-            # TODO: Add deletion for Submission table when implemented
-            # logger.info("Deleting all rows from 'submissions' table...")
-            # stmt_submissions = delete(Submission)
-            # result_submissions = await session.execute(stmt_submissions)
-            # logger.info(f"Deleted {result_submissions.rowcount} rows from 'submissions' table.")
             
             # The transaction will be committed here upon exiting the `async with session.begin():` block
         logger.info("Data clearing process completed successfully.")
@@ -56,8 +56,8 @@ async def main_script_runner():
     print("\n" + "="*60)
     print("WARNING: THIS SCRIPT WILL DELETE ALL DATA FROM THE FOLLOWING TABLES:")
     print("  - documents")
+    print("  - submissions")
     print("  - proposals")
-    # print("  - submissions (when uncommented)")
     print("This operation is irreversible.")
     print("="*60 + "\n")
     

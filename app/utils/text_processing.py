@@ -1,5 +1,6 @@
 import logging
 from typing import List
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +17,7 @@ def simple_chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> 
     Returns:
         A list of text chunks.
     """
-    if not text:
-        logger.warning("simple_chunk_text received empty or None text.")
+    if not text or not isinstance(text, str):
         return []
     
     if chunk_size <= 0:
@@ -31,22 +31,17 @@ def simple_chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> 
 
     chunks = []
     start = 0
-    text_len = len(text)
-
-    while start < text_len:
+    while start < len(text):
         end = start + chunk_size
-        chunks.append(text[start:end]) # Slicing handles if end > text_len
-        
-        if end >= text_len:
-            break # Reached the end of the text
-            
+        chunks.append(text[start:end])
+        if end >= len(text):
+            break
         start += (chunk_size - overlap)
-        
-        # This check was to prevent empty last chunk, but Python slicing handles out-of-bounds gracefully.
-        # if start >= text_len: 
-        #     break
-            
-    logger.debug(f"Chunked text of length {text_len} into {len(chunks)} chunks (size: {chunk_size}, overlap: {overlap}).")
+        # Ensure start doesn't go beyond text length in case of very small text or large overlap
+        if start >= len(text) and chunks:
+            # This condition might occur if overlap is too large relative to chunk_size and text length
+            # or if the last chunk was exactly up to len(text). Avoid adding an empty or negative slice.
+            break 
     return chunks
 
 # TODO: Consider adding more sophisticated chunking strategies, e.g.:
