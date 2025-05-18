@@ -2,10 +2,12 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.constants import ParseMode, ChatType
+from typing import Optional
 
 from app.core.user_service import UserService
 from app.persistence.database import AsyncSessionLocal
 from app.core.proposal_service import ProposalService
+from app.core.context_service import ContextService
 
 logger = logging.getLogger(__name__)
 

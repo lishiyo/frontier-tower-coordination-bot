@@ -8,7 +8,8 @@ from app.config import ConfigService
 
 # Import command handlers from their new locations
 from app.telegram_handlers.command_handlers import (
-    start_command, help_command # privacy_command # Commented out
+    start_command, help_command, # privacy_command, # Keep existing
+    ask_command # Added
 )
 from app.telegram_handlers.document_command_handlers import (
     view_document_content_command, view_docs_command
@@ -25,6 +26,8 @@ from app.telegram_handlers.callback_handlers import (
     handle_collect_proposal_type_callback, # Corrected name
     # handle_channel_selection_callback # Commented out - definition missing in callback_handlers.py
 )
+from app.telegram_handlers.admin_command_handlers import get_add_global_doc_conversation_handler # Added
+from app.telegram_handlers.error_handler import error_handler
 
 # Import scheduler functions
 from app.services.scheduling_service import start_scheduler_async, stop_scheduler
@@ -77,7 +80,7 @@ def main() -> None:
     # application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
     # application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
     # application.add_handler(CommandHandler("view_results", view_results_command)) # Task 7.6
-    # application.add_handler(CommandHandler("ask", ask_command)) # Task 6.1
+    application.add_handler(CommandHandler("ask", ask_command)) # Task 6.1
     # application.add_handler(CommandHandler("proposals", proposals_command)) # Task 7.2
     # application.add_handler(CommandHandler("cancel_proposal", cancel_proposal_command)) # Task 7.4
     # application.add_handler(CommandHandler("add_doc", add_doc_command)) # Task 7.5
@@ -85,6 +88,7 @@ def main() -> None:
 
     # Register ConversationHandlers
     application.add_handler(proposal_conv_handler)
+    application.add_handler(get_add_global_doc_conversation_handler()) # Added
 
     # Register MessageHandler for prefilled submits (must be before generic message handlers if any)
     # This specifically handles the "@botname submit <id> <text>" pattern in private chats
@@ -94,6 +98,8 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_collect_proposal_type_callback, pattern=f"^{PROPOSAL_TYPE_CALLBACK}")) # Corrected name
     # application.add_handler(CallbackQueryHandler(handle_channel_selection_callback, pattern=f"^{CHANNEL_SELECT_CALLBACK}")) # Commented out - definition missing
     application.add_handler(CallbackQueryHandler(handle_vote_callback, pattern=r"^vote_.*$")) # Task 4.2
+
+    application.add_error_handler(error_handler) # Added error handler
 
     logger.info("Bot command and callback handlers registered.")
 

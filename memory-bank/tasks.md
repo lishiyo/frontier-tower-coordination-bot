@@ -352,7 +352,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 6.1: Implement `/add_global_doc` Admin Command**
-    *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or appropriate admin command handler file), implement `add_global_doc_command` handler.
+    *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `add_global_doc_command` handler.
         *   [ ] Check if user is an admin (loaded from `ConfigService`).
         *   [ ] Parse URL or pasted text.
         *   [ ] Prompt for a document title if not easily inferable.

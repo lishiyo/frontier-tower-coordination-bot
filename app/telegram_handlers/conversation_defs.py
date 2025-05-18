@@ -11,6 +11,12 @@
     CONFIRM_PROPOSAL,       # Optional: A final confirmation step before submitting
 ) = range(9)
 
+# States for /edit_proposal (if needed, or manage via context + simple handlers)
+EDIT_PROPOSAL_NEW_TITLE, EDIT_PROPOSAL_NEW_DESCRIPTION, EDIT_PROPOSAL_NEW_OPTIONS = range(8, 11)
+
+# States for /add_global_doc
+ADD_GLOBAL_DOC_CONTENT, ADD_GLOBAL_DOC_TITLE = range(11, 13)
+
 # Callback data prefixes
 PROPOSAL_TYPE_CALLBACK = "proposal_type_"
 CHANNEL_SELECT_CALLBACK = "channel_select_"

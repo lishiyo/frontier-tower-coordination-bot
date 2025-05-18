@@ -200,4 +200,87 @@ class ContextService:
     async def list_documents_for_proposal(self, proposal_id: int) -> List[Document]:
         """Lists all documents associated with a given proposal_id."""
         return await self.document_repository.get_documents_by_proposal_id(proposal_id)
+
+    async def get_answer_for_question(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> str:
+        """
+        Answers a question using RAG by fetching relevant document chunks.
+        """
+        logger.info(f"Getting answer for question: '{question_text}', proposal_id_filter: {proposal_id_filter}")
+
+        try:
+            query_embedding = await self.llm_service.generate_embedding(question_text)
+            if not query_embedding:
+                logger.warning("Failed to generate embedding for question.")
+                return "I couldn't process your question at the moment. Please try again later."
+
+            # Assuming search_similar_chunks returns a list of dicts like:
+            # [{'text_chunk': str, 'sql_document_id': int, 'score': float, 'metadata': {'title': 'Doc Title'}}]
+            # Or that metadata contains enough to fetch the title.
+            # The VectorDBService.search_similar_chunks might need to be adjusted or its return type confirmed.
+            # For now, we'll assume it returns the chunk text and some document metadata.
+            
+            # The task mentions: search_similar_chunks(query_embedding, proposal_id_filter, top_n)
+            # Let's assume it returns a list of dicts, each having 'text' and 'metadata' (which includes 'sql_document_id' and 'title')
+            similar_chunks_results = await self.vector_db_service.search_similar_chunks(
+                query_embedding=query_embedding,
+                proposal_id_filter=proposal_id_filter,
+                top_n=top_n_chunks
+            )
+
+            if not similar_chunks_results:
+                logger.info("No similar document chunks found for the question.")
+                # Try a general search if proposal_id_filter was used and nothing found
+                if proposal_id_filter is not None:
+                    logger.info(f"Retrying search without proposal_id_filter for question: '{question_text}'")
+                    similar_chunks_results = await self.vector_db_service.search_similar_chunks(
+                        query_embedding=query_embedding,
+                        proposal_id_filter=None, # Search global docs too
+                        top_n=top_n_chunks
+                    )
+                    if not similar_chunks_results:
+                         return "I couldn't find any relevant information for your question."
+                else:
+                    return "I couldn't find any relevant information for your question."
+            
+            context_str = ""
+            sources_cited = set() # To avoid duplicate source citations
+            source_details_for_prompt = []
+
+            for chunk_info in similar_chunks_results:
+                # Assuming chunk_info is a dict with 'text_content' and 'metadata'
+                # And metadata contains 'sql_document_id' and 'title' (document title)
+                text_chunk = chunk_info.get('text_content', '') # Prefer 'text_content' if available from vector DB
+                metadata = chunk_info.get('metadata', {})
+                doc_id = metadata.get('sql_document_id')
+                doc_title = metadata.get('title', f"Document ID {doc_id}" if doc_id else "a relevant document")
+
+                if text_chunk:
+                    context_str += f"- {text_chunk}\\n"
+                    source_details_for_prompt.append(f"Content from '{doc_title}' (ID: {doc_id})")
+                    sources_cited.add(f"'{doc_title}' (ID: {doc_id})")
+
+            if not context_str:
+                 logger.info("No text content found in similar chunks.")
+                 return "I found some documents that might be related, but I couldn't extract specific text to answer your question."
+
+            prompt = (
+                f"You are a helpful assistant. Based on the following context, please answer the user's question.\\n"
+                f"Context from documents ({', '.join(sources_cited)}):\\n{context_str}\\n"
+                f"User's Question: {question_text}\\n\\n"
+                f"Answer directly. If the context does not provide a sufficient answer, please state that you don't have enough information from the provided context."
+            )
+            
+            logger.debug(f"Prompt for /ask command:\\n{prompt}")
+
+            answer = await self.llm_service.get_completion(prompt)
+
+            # Append source citation to the answer
+            if sources_cited:
+                answer += f"\\n\\nSources: {', '.join(list(sources_cited))}."
+            
+            return answer
+
+        except Exception as e:
+            logger.error(f"Error getting answer for question: {e}", exc_info=True)
+            return "Sorry, I encountered an error while trying to answer your question. Please try again later."
  
