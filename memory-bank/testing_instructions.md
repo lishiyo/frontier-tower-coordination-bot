@@ -214,3 +214,64 @@ These tests verify the functionality of document storage and viewing commands, p
 
 **Note:** This document will be expanded as more features are implemented.
 
+## 11. Testing Deadline Processing & Results Announcement (Task 5.1 & 5.2)
+
+These tests verify that the scheduler correctly identifies expired proposals, processes their results, and posts them to the channel. The scheduler job interval is currently set to 1 minute for easier testing.
+
+1.  **Preparation:**
+    *   Ensure the bot is running. You should see logs indicating the APScheduler has started and the `deadline_check_job` is added.
+    *   You will need at least two proposals: one multiple-choice and one free-form.
+
+2.  **Create a Multiple-Choice Proposal with a Short Deadline:**
+    *   Use the `/propose` command conversationally.
+    *   For the duration, specify a very short time, e.g., "for 2 minutes" or "until [current time + 2 minutes]".
+    *   Note the `Proposal ID` and the `Target Channel ID`.
+    *   Have one or more test users (or yourself from different accounts if possible) vote on the options before the 2-minute deadline.
+        *   Vote for different options to test tie-breaking and single winner scenarios.
+        *   Consider a case where no one votes, or votes are only for one option.
+
+3.  **Create a Free-Form Proposal with a Short Deadline:**
+    *   Use the `/propose` command conversationally.
+    *   Set the type to "Free Form".
+    *   For the duration, specify a very short time, e.g., "for 3 minutes" or "until [current time + 3 minutes]".
+    *   Note the `Proposal ID` and the `Target Channel ID`.
+    *   Have one or more test users submit different free-form responses using the `/submit <proposal_id> <text>` command (or via the deep-link button flow) before the 3-minute deadline.
+        *   Submit a few varied text responses.
+        *   Consider a case where no one submits.
+
+4.  **Observe Scheduler and Processing:**
+    *   Monitor the bot's console logs.
+    *   After the short deadlines pass, you should see logs from `SchedulingService` indicating `check_proposal_deadlines_job` is running.
+    *   Subsequently, you should see logs from `ProposalService.process_expired_proposals` detailing its actions for each expired proposal:
+        *   Fetching proposals.
+        *   Calculating/summarizing results.
+        *   Updating proposal status in the database.
+        *   Attempting to post results to the channel.
+
+5.  **Verify Results in Channel:**
+    *   Check the target channel(s) where the proposals were originally posted.
+    *   **For the Multiple-Choice Proposal:**
+        *   A new message should be posted (replying to the original proposal) announcing the results.
+        *   This message should state the winner(s) or if it was a tie, and include vote counts and percentages for each option.
+        *   Verify the vote counts match the votes you cast.
+    *   **For the Free-Form Proposal:**
+        *   A new message should be posted (replying to the original proposal) announcing the results.
+        *   This message should currently contain the placeholder summary (e.g., "Received X submission(s). Full list available via /view_results.").
+
+6.  **Verify Database Updates:**
+    *   (If you have database access) Check the `proposals` table for the processed proposals:
+        *   Verify their `status` is now `CLOSED`.
+        *   Verify the `outcome` field contains the summary text or winner information.
+        *   Verify the `raw_results` field contains the vote counts (for MC) or the list of submission texts (for FF).
+
+7.  **Test `/view_results <proposal_id>` for Closed Proposals:**
+    *   For the multiple-choice proposal: `/view_results <mc_proposal_id>`
+        *   Expected: Bot DMs you a breakdown of votes (similar to what was posted in the channel, but can be more detailed if designed so).
+    *   For the free-form proposal: `/view_results <ff_proposal_id>`
+        *   Expected: Bot DMs you the list of all anonymized free-form submissions that were part of `raw_results`.
+
+8.  **Edge Cases/Further Tests:**
+    *   Create a proposal and let it expire *without* any votes/submissions. Verify the outcome message is appropriate (e.g., "No votes cast.", "No submissions received.").
+    *   If possible, stop and restart the bot *before* a proposal's short deadline to ensure the scheduler picks it up correctly after restart.
+    *   Check log messages for any errors during processing or posting.
+

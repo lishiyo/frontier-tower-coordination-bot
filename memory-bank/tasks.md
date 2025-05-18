@@ -307,34 +307,39 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 5.1: Scheduling Service Setup**
-    *   [ ] Create `app/services/scheduling_service.py`.
-    *   [ ] Initialize `AsyncIOScheduler` from `APScheduler`.
-    *   [ ] Add function to start the scheduler (called from `main.py`).
+    *   [x] Create `app/services/scheduling_service.py`.
+    *   [x] Initialize `AsyncIOScheduler` from `APScheduler`.
+    *   [x] Add function to start the scheduler (called from `main.py`).
+    *   [x] Add function to stop the scheduler (called from `main.py` on exit).
+    *   [x] Update `main.py` to import and call scheduler start/stop functions.
 
 2.  **Task 5.2: Deadline Checking Job**
-    *   [ ] In `ProposalRepository`, add `find_expired_open_proposals()`.
-    *   [ ] In `ProposalService`, implement `process_expired_proposals()`:
-        *   [ ] Fetch expired open proposals using `ProposalRepository`.
-        *   [ ] For each proposal:
-            *   [ ] Update `proposal.status` to "closed" via `ProposalRepository`.
-            *   [ ] **If "multiple_choice":**
-                *   [ ] Get submissions via `SubmissionRepository.get_submissions_for_proposal()`.
-                *   [ ] Tally votes. Determine outcome (winner/tie).
-                *   [ ] Store outcome and raw_results (vote counts) in `Proposal` table via `ProposalRepository`.
-            *   [ ] **If "free_form":**
-                *   [ ] Get submissions via `SubmissionRepository.get_submissions_for_proposal()`.
-                *   [ ] Call `LLMService.cluster_and_summarize_texts([sub.response_content for sub in submissions])` (needs implementation in `LLMService`).
-                *   [ ] Store summary as `proposal.outcome` and full list of submissions in `proposal.raw_results` via `ProposalRepository`.
-            *   [ ] Format results message (using `TelegramUtils`).
-            *   [ ] Post results to the proposal's `target_channel_id` (using `channel_message_id` from `Proposal` to reply to or edit the original message).
-    *   [ ] In `SchedulingService`, define `check_proposal_deadlines_job` that calls `ProposalService.process_expired_proposals()`.
-    *   [ ] Add this job to the scheduler (e.g., to run every few minutes).
+    *   [x] In `ProposalRepository`, add `find_expired_open_proposals()`. (Verified exists)
+    *   [x] In `ProposalService`, implement `process_expired_proposals()`:
+        *   [x] Fetch expired open proposals using `ProposalRepository`.
+        *   [x] For each proposal:
+            *   [x] Update `proposal.status` to "closed" via `ProposalRepository` (combined with outcome update).
+            *   [x] **If "multiple_choice":**
+                *   [x] Get submissions via `SubmissionRepository.get_submissions_for_proposal()`.
+                *   [x] Tally votes. Determine outcome (winner/tie).
+                *   [x] Store outcome and raw_results (vote counts) in `Proposal` table via `ProposalRepository`.
+            *   [x] **If "free_form":**
+                *   [x] Get submissions via `SubmissionRepository.get_submissions_for_proposal()`.
+                *   [ ] Call `LLMService.cluster_and_summarize_texts([sub.response_content for sub in submissions])` (needs implementation in `LLMService`). (Placeholder implemented)
+                *   [x] Store summary as `proposal.outcome` and full list of submissions in `proposal.raw_results` via `ProposalRepository`. (Placeholder summary stored)
+            *   [x] Format results message (using `TelegramUtils` - basic formatting implemented directly).
+            *   [x] Post results to the proposal's `target_channel_id` (using `channel_message_id` from `Proposal` to reply to or edit the original message).
+    *   [x] In `SchedulingService`, define `check_proposal_deadlines_job` that calls `ProposalService.process_expired_proposals()`.
+    *   [x] Add this job to the scheduler (e.g., to run every few minutes).
+    *   [x] Ensure `ProposalService` has access to the bot application instance for sending messages.
+    *   [ ] Manually test.
 
 3.  **Task 5.3: Implement LLM Clustering for Free-Form**
     *   [ ] In `LLMService`, implement `cluster_and_summarize_texts(texts: list[str])`:
         *   [ ] May involve embedding all texts.
         *   [ ] Using an LLM prompt to group similar texts and provide a concise summary for each group/cluster.
         *   [ ] Return the summary text.
+        *   [ ] Test this is working (should be displaying as results for free-form proposal results.)
 
 ## Phase 6: RAG for `/ask` Command & Admin Document Management
 

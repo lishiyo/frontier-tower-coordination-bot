@@ -1,43 +1,40 @@
-# Active Context - Sat May 17 18:09:20 PDT 2025
+# Active Context - Sat May 17 18:21:49 PDT 2025
 
 ## Current Work Focus
-- Task 4.3: Free-Form Submission (`/submit` Command) is now working, including the prefilled version from the deep-link button.
-- Updating documentation based on the resolution of the `@botname submit ...` issue.
+- **Phase 5 Started:** Tasks 5.1 (Scheduler Setup) and 5.2 (Deadline Checking Job) largely completed.
+- Next is Task 5.3 (LLM Clustering for Free-Form Proposals).
+- Requires thorough manual testing of the newly implemented scheduler and deadline processing logic.
 
 ## What's Working
-- `/submit <proposal_id> <text>` command works as expected.
-- The "Submit Your Idea" button in channel messages (which deep-links to a DM) now correctly leads to a prefilled command `@botname submit <id> <text>` that is successfully parsed and handled.
-- `handle_prefilled_submit` in `app/telegram_handlers/submission_command_handlers.py` now correctly parses the `@botname submit <id> <text>` format.
-- `query_to_prefill` in `app/telegram_handlers/command_handlers.py` (for the deep-link start payload) now generates `submit <id> ` (without a leading `/`) which, when used with `switch_inline_query_current_chat`, correctly results in `@botname submit <id> `.
-- Multiple-choice proposals display voting buttons correctly.
-- Votes are successfully recorded in the `submissions` table.
-- **Prominent ephemeral alerts (`query.answer(text=..., show_alert=True)`) for vote confirmation are now working reliably** after refactoring `handle_vote_callback` in `app/telegram_handlers/callback_handlers.py` to call `query.answer()` only once at the end.
-- `/propose` command conversational flow is functional.
-- DM confirmation for proposal creation is sent (MarkdownV2 issues previously addressed).
+- **Scheduler:** `APScheduler` is integrated into the bot's lifecycle (`main.py`).
+- **Deadline Job:** `check_proposal_deadlines_job` is defined in `SchedulingService` and scheduled to run (currently every 1 minute for testing).
+- **Expired Proposal Processing (`ProposalService.process_expired_proposals`):
+    - Correctly fetches expired open proposals.
+    - Calculates outcomes for multiple-choice proposals by tallying votes.
+    - Stores a placeholder summary for free-form proposals (actual LLM clustering is Task 5.3).
+    - Updates proposal status to "CLOSED" and populates `outcome` and `raw_results` fields in the database.
+    - Posts a formatted results message to the proposal's target channel, replying to the original proposal message.
+- **Service Dependencies:** `ProposalService` constructor now accepts `bot_app` (Telegram `Application` instance), allowing it to send messages. This is passed correctly from `SchedulingService`.
+- Previous features (proposal creation, voting, `/submit` command, prefilled submit handling via `@botname submit...`) are stable.
 
-## What's Broken
-- The `PTBUserWarning` regarding `per_message=False` in `ConversationHandler` still appears on startup. This is a known and currently accepted warning, as changing it to `True` broke `/propose` command detection due to the mix of handler types (CommandHandlers and CallbackQueryHandlers).
+## What's Broken or Pending
+- **LLM Clustering (Task 5.3):** The actual LLM-based summarization for free-form proposals is not yet implemented in `LLMService`; `ProposalService` uses a placeholder.
+- The `PTBUserWarning` regarding `per_message=False` in `ConversationHandler` persists (known and accepted).
 
 ## Active Decisions and Considerations
-- Confirmed that using a prominent ephemeral alert (`show_alert=True`) is the preferred method for user-specific vote confirmation, rather than attempting to edit the public channel message in a user-specific way.
-- The current solution for handling `@botname submit...` (a separate regex handler) is effective.
+- The scheduler interval for `check_proposal_deadlines_job` is 1 minute for easier testing. This will need to be increased for a production environment (e.g., 5-15 minutes).
+- The results message posted by `ProposalService` is currently formatted directly within the service. A dedicated helper in `telegram_utils.py` could be added later if more complex formatting is needed.
 
 ## Learnings and Project Insights
-- `switch_inline_query_current_chat` prepends `@botname` (the bot's username) to the provided query. If the query is intended to be a command like `/submit`, this results in `@botname /submit...`.
-- Standard `CommandHandler` in `python-telegram-bot` does not recognize `@botname /command...` as a command. It expects `/command` or `/command@botname`.
-- To handle commands prefilled by `switch_inline_query_current_chat` that originally started with `/`, the prefill query should omit the leading `/` (e.g., `submit <id>`), resulting in `@botname submit <id>`. A separate `MessageHandler` with a regex is then needed to parse this specific format.
-- Debugging regex issues can benefit from logging `repr(text_to_match)` and `repr(pattern)` to uncover hidden characters or discrepancies. When `repr()` shows clean strings but matching still fails, iteratively testing parts of the regex or using more general capturing groups initially can help isolate the problematic part of the pattern or text.
-- The timing and singularity of `query.answer()` calls are critical for `show_alert=True` to function correctly in `python-telegram-bot`.
-- Thoroughly testing callback handler behavior, especially UI elements like alerts, is important.
+- For services (like `ProposalService`) that need to perform actions outside typical Telegram handler flows (e.g., sending messages from a scheduled job), they must be provided with the Telegram `Application` or `Bot` instance.
+- Scheduled jobs requiring database access should manage their own `AsyncSessionLocal` to ensure proper session scoping and lifecycle.
+- Careful consideration of timezones is important for deadline calculations. Using `UTC` for the scheduler and `func.now()` (which is timezone-aware in PostgreSQL) for database comparisons is a robust approach.
 
 ## Current Database/Model State
-- `users` table exists.
-- `proposals` table exists (includes `target_channel_id`, `channel_message_id`).
-- `documents` table exists (includes `raw_content`, `vector_ids`, `proposal_id` FK).
-- `submissions` table exists (for recording votes and free-form submissions).
-- No schema changes were made in the latest fix; focus was on application logic in callback handlers.
+- No database schema changes were introduced in Tasks 5.1 or 5.2.
+- The `proposals` table will now be actively managed by the scheduler: `status` will change to `CLOSED`, and `outcome` and `raw_results` will be populated for expired proposals.
 
 ## Next Steps
-- Update `progress.md` and `bot_commands.md`.
-- Consider if any other commands use `switch_inline_query_current_chat` and might need similar adjustments.
-- Continue with any remaining sub-tasks for Task 4.3 or move to the next task.
+- Manually test the deadline processing and results posting functionality (details to be added to `testing_instructions.md`).
+- Implement Task 5.3: `LLMService.cluster_and_summarize_texts`.
+- Update `progress.md` with today's advancements.

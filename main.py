@@ -26,6 +26,9 @@ from app.telegram_handlers.callback_handlers import (
     # handle_channel_selection_callback # Commented out - definition missing in callback_handlers.py
 )
 
+# Import scheduler functions
+from app.services.scheduling_service import start_scheduler_async, stop_scheduler
+
 # For PROPOSAL_TYPE_CALLBACK and CHANNEL_SELECT_CALLBACK patterns
 from app.telegram_handlers.conversation_defs import PROPOSAL_TYPE_CALLBACK, CHANNEL_SELECT_CALLBACK
 
@@ -37,6 +40,11 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+async def post_init_actions(application: Application):
+    """Actions to run after the application is initialized but before polling starts."""
+    await start_scheduler_async(application)
+    logger.info("Post-initialization actions (like starting scheduler) completed.")
 
 def main() -> None:
     """Start the bot.""" 
@@ -50,6 +58,9 @@ def main() -> None:
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(config_service.get_bot_token()).build()
 
+    # Assign the async post_init_actions function
+    application.post_init = post_init_actions
+
     # Register command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -62,7 +73,7 @@ def main() -> None:
     # application.add_handler(CommandHandler("view_global_docs", view_global_docs_command)) # Task 7.9
     # application.add_handler(CommandHandler("edit_global_doc", edit_global_doc_command)) # Task 7.9
     # application.add_handler(CommandHandler("delete_global_doc", delete_global_doc_command)) # Task 7.9
-    application.add_handler(CommandHandler("submit", submit_command)) # Task 4.3, added block=False
+    application.add_handler(CommandHandler("submit", submit_command, block=False)) # Task 4.3, added block=False
     # application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
     # application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
     # application.add_handler(CommandHandler("view_results", view_results_command)) # Task 7.6
@@ -88,6 +99,7 @@ def main() -> None:
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting bot polling...")
+    # start_scheduler(application) # REMOVED: Scheduler now started via post_init
     application.run_polling()
     logger.info("Bot polling stopped.")
 
@@ -96,7 +108,15 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user (KeyboardInterrupt).")
+        stop_scheduler() # Stop the scheduler
     except ValueError as e: # Catch config errors from ConfigService
         logger.error(f"Configuration error: {e}")
+        stop_scheduler() # Stop the scheduler
     except Exception as e:
         logger.critical(f"Critical error in main execution: {e}", exc_info=True) 
+        stop_scheduler() # Stop the scheduler
+    finally:
+        # Ensure scheduler is stopped if it was running and an error occurred before the specific except blocks
+        # This is a bit redundant if stop_scheduler() is in all excepts, but good for belt-and-suspenders
+        # However, direct call to stop_scheduler() in excepts is cleaner.
+        pass # stop_scheduler() already called in specific handlers 

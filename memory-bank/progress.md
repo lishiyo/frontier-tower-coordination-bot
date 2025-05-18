@@ -1,5 +1,36 @@
 # Progress Log
 
+## Sat May 17 18:21:49 PDT 2025
+
+**Completed:**
+- **Task 5.1: Scheduling Service Setup**
+    - Created `app/services/scheduling_service.py`.
+    - Initialized `AsyncIOScheduler`.
+    - Added `start_scheduler` and `stop_scheduler` functions.
+    - Integrated scheduler start/stop into `main.py` lifecycle, passing the `Application` instance to `start_scheduler`.
+- **Task 5.2: Deadline Checking Job**
+    - Verified existence of `ProposalRepository.find_expired_open_proposals()`.
+    - Implemented `ProposalService.process_expired_proposals()`:
+        - Fetches expired proposals.
+        - Calculates results for multiple-choice proposals (vote tally).
+        - Implements placeholder summarization for free-form proposals.
+        - Updates proposal status to "CLOSED" and stores outcome/raw_results.
+        - Posts results messages to the proposal's target channel, replying to the original proposal message.
+    - Modified `ProposalService.__init__` to accept and store `bot_app` (Application instance) for message sending capabilities.
+    - Ensured `ProposalService` instantiation in `app/telegram_handlers/message_handlers.py` (manual edit by user) passes `context.application` as `bot_app`.
+    - Defined `check_proposal_deadlines_job` in `SchedulingService` to call `ProposalService.process_expired_proposals()`.
+    - Added `check_proposal_deadlines_job` to the scheduler to run at 1-minute intervals (for testing).
+
+**Learnings & Fixes:**
+- Services needing to send Telegram messages outside of direct handler flows (e.g., from a scheduler) require access to the `Application` or `Bot` instance.
+- Scheduled jobs should manage their own database sessions (e.g., using `AsyncSessionLocal`).
+- The `ProposalService` now correctly handles the processing of expired proposals and posts results.
+
+**Next Steps:**
+- Manually test the scheduler and deadline processing logic thoroughly.
+- Add testing instructions for Phase 5 to `memory-bank/testing_instructions.md`.
+- Implement Task 5.3: `LLMService.cluster_and_summarize_texts` for free-form proposal summaries.
+
 ## Sat May 17 18:09:20 PDT 2025
 
 **Completed:**

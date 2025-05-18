@@ -164,7 +164,7 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # All data collected, proceed to create proposal
     try:
         async with AsyncSessionLocal() as session:
-            proposal_service = ProposalService(session)
+            proposal_service = ProposalService(session, bot_app=context.application)
             user_repo = UserRepository(session) # For fetching full user object for channel message
 
             # Retrieve all data from context.user_data
@@ -278,4 +278,4 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("A critical error occurred while finalizing your proposal. Please try again later or contact an admin.", reply_markup=ReplyKeyboardRemove())
     finally:
         context.user_data.clear()
-        return ConversationHandler.END 
+        return ConversationHandler.END
