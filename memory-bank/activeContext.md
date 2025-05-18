@@ -1,34 +1,30 @@
-# Active Context - Sat May 17 19:25:21 PDT 2025
+# Active Context - Sat May 17 20:15:00 PDT 2025
 
 ## Current Work Focus
-- Addressing remaining to-do items for Task 5.2:
-    - Adjusting user-facing timezone displays in messages from UTC to PST.
-    - Updating results message copy from "(DM the bot)" to "(DM @botname)".
+- Testing the `/ask` command functionality (Task 6.2).
 
 ## What's Working
-- **Newline Rendering in Summaries:** Free-form proposal result summaries now correctly render newlines in Telegram messages.
-- **Task 5.3 (LLM Clustering for Free-Form Proposals):** Implemented and integrated.
-- **Large Telegram ID Handling:** Proposal creation, user registration, and voting are functioning correctly with large Telegram User IDs.
-- Scheduler and deadline processing (Tasks 5.1 & 5.2) continue to function.
+- `/add_global_doc` command (Task 6.1) is now functional after refactoring service instantiation within `admin_command_handlers.py`.
+- Phase 5 tasks related to deadline processing and LLM clustering for free-form proposals.
+- Newline rendering in summaries and large Telegram ID handling continue to work.
 
 ## What's Broken or Pending
-- **Timezone Display (Task 5.2 To-do):** User-facing times (e.g., "Voting ends", "Deadline set for") are still in UTC. Needs to be PST.
-- **Copy Tweak (Task 5.2 To-do):** The results message instruction "(DM the bot)" needs to be changed to "(DM @botname)".
+- `/ask` command (Task 6.2) needs testing and verification.
+- Timezone display (Task 5.2 To-do): User-facing times are still in UTC, need to be PST.
+- Copy Tweak (Task 5.2 To-do): Results message instruction "(DM the bot)" needs to be changed to "(DM @botname)".
 - The `PTBUserWarning` regarding `per_message=False` persists (known).
 
 ## Active Decisions and Considerations
-- Prioritize fixing the timezone and copy tweak next as they are small follow-ups to Task 5.2.
+- Proceed with testing the `/ask` command to ensure RAG functionality is operational.
 
 ## Learnings and Project Insights
-- Newline handling in strings that will be escaped for protocols like MarkdownV2 requires ensuring the `\n` character is an actual newline and not a literal backslash followed by 'n' before the escaping function is called.
+- Refactoring `admin_command_handlers.py` to instantiate services (like `ContextService`) directly with a local `AsyncSessionLocal` context manager resolved `AttributeError` and `TypeError` issues related to the previous `application.services` bundle. This approach is more robust for services requiring database sessions.
+- Ensured `source_type` in `admin_command_handlers.py` for `add_global_doc` uses specific values (e.g., `admin_global_text`, `admin_global_url`) to align with `ContextService` expectations, resolving an `Invalid source_type` error.
+- The `/add_global_doc` command now correctly handles cases where document content is provided directly with the command or in a follow-up message.
 
 ## Current Database/Model State
-- `users.telegram_id` is `BigInteger`.
-- `submissions.submitter_id` is `BigInteger`.
-- `proposals.proposer_telegram_id` is `BigInteger`.
-- No schema changes anticipated for the immediate next tasks.
+- No schema changes since the last update (BigInteger for Telegram IDs).
 
 ## Next Steps
-- Implement the timezone display adjustment (PST for user-facing times).
-- Implement the copy tweak for the results message ("(DM @botname)").
-- Proceed to Phase 6 tasks (RAG for `/ask`, admin document management).
+- Test the `/ask` command functionality (Task 6.2).
+- Address pending Task 5.2 follow-ups (timezone and copy tweak).

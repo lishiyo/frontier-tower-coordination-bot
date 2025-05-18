@@ -1,5 +1,26 @@
 # Progress Log
 
+## Sat May 17 20:15:00 PDT 2025
+
+**Completed:**
+- Successfully refactored `app/telegram_handlers/admin_command_handlers.py` for the `/add_global_doc` command (Task 6.1).
+    - Services (`ConfigService`, `LLMService`, `VectorDBService`, `ContextService`) are now instantiated directly within the command handlers.
+    - `ContextService` uses a local `AsyncSessionLocal` context manager for database sessions within the handler scope.
+    - This resolved previous `AttributeError` (related to `context.application.services`) and `TypeError` (related to service `__init__` signatures) issues that arose from the `main_services.py` / `SimpleNamespace` approach for service bundling.
+- Corrected `source_type` logic in `admin_command_handlers.py` to pass specific values like `admin_global_text` or `admin_global_url` to `ContextService`, fixing an `Invalid source_type` error.
+- Enhanced the `/add_global_doc` command to correctly handle document content provided directly in the command arguments (e.g., `/add_global_doc <content>`) in addition to the conversational flow.
+- Task 6.1 (`/add_global_doc`) is now fully functional.
+
+**Learnings & Fixes:**
+- The approach of instantiating services directly within handlers (especially those requiring specific session contexts like `ContextService`) is more robust for this project than relying on a global service bundle attached to the `application` object, particularly when dealing with `AsyncSessionLocal`.
+- Careful alignment of `source_type` string conventions between calling handlers and service methods is crucial to prevent validation errors.
+- Simplified the service access pattern in `admin_command_handlers.py`, removing the need for `main_services.py` and the `application.services` attribute for these handlers.
+
+**Next Steps:**
+- Test the `/ask` command functionality (Task 6.2) to ensure the RAG pipeline is working as expected.
+- Address pending follow-ups for Task 5.2 (timezone display and results message copy tweak).
+
+
 ## Sat May 17 19:25:21 PDT 2025
 
 **Completed:**

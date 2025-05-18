@@ -352,12 +352,14 @@ This document breaks down the implementation of CoordinationBot into manageable 
 **Subtasks:**
 
 1.  **Task 6.1: Implement `/add_global_doc` Admin Command**
-    *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `add_global_doc_command` handler.
-        *   [ ] Check if user is an admin (loaded from `ConfigService`).
-        *   [ ] Parse URL or pasted text.
-        *   [ ] Prompt for a document title if not easily inferable.
-    *   [ ] `add_global_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_global_upload", title=user_provided_title, proposal_id=None)`.
-    *   [ ] Send confirmation to admin.
+    *   [x] In `app/telegram_handlers/admin_command_handlers.py`, implement `add_global_doc_command` handler.
+        *   [x] Check if user is an admin (loaded from `ConfigService`).
+        *   [x] Parse URL or pasted text.
+        *   [x] Prompt for a document title if not easily inferable.
+        *   [x] Handle content provided directly with the command or in a follow-up message.
+    *   [x] `add_global_doc_command` calls `ContextService.process_and_store_document(content, source_type="admin_global_text/url", title=user_provided_title, proposal_id=None)`.
+        *   [x] Ensure `admin_command_handlers.py` instantiates services like `ContextService` internally with a proper session, rather than relying on a global `application.services` for session-dependent services.
+    *   [x] Send confirmation to admin.
 
 2.  **Task 6.2: Implement `/ask` Command**
     *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `ask_command` handler.
