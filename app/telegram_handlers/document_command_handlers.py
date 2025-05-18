@@ -91,7 +91,7 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             target_channel_id = cfg_service.get_target_channel_id()
             if target_channel_id:
                 # Attempt to get channel name if possible (future enhancement)
-                await update.message.reply_text(f"Proposals are currently managed in channel: {target_channel_id}")
+                await update.message.reply_text(f"Proposals are currently managed in channel: {target_channel_id}. Use `/view_docs <channel_id>` to list all proposals for the channel.")
             else:
                 await update.message.reply_text("The bot is not currently configured with a default target proposal channel.")
             return
@@ -110,6 +110,9 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     doc_lines = [f"Documents for Proposal ID {potential_id}:"]
                     for doc in documents:
                         doc_lines.append(f"  - ID: {doc.id}, Title: {doc.title or 'N/A'}")
+                        
+                    # add a line about using `/view_doc <document_id>` to see the doc in detail
+                    doc_lines.append(f"\nUse `/view_doc <document_id>` to see the doc in detail.")
                     await update.message.reply_text("\n".join(doc_lines))
                     return
                 else:
@@ -144,9 +147,13 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             for prop in proposals_list:
                 status_display = prop.status.value if hasattr(prop.status, 'value') else str(prop.status)
                 proposal_lines.append(f"  - ID: {prop.id}, Title: {prop.title}, Status: {status_display}")
+            
+            # Add a line about using `view_docs <proposal_id>` to view the documents for a proposal
+            proposal_lines.append(f"\nUse `/view_docs <proposal_id>` to view the documents for a proposal.")
+            
             await update.message.reply_text("\n".join(proposal_lines))
         else:
-            await update.message.reply_text(f"No proposals found for channel/identifier '{channel_id_arg_str}', or it's not a recognized proposal ID or channel.")
+            await update.message.reply_text(f"No proposals found for channel/identifier '{channel_id_arg_str}', or it's not a recognized proposal ID or channel. Use `/view_docs` to list all channel ids.")
 
 # TODO: Move other document-related commands here:
 # - add_doc_command
