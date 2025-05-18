@@ -1,8 +1,12 @@
 import re # For escaping markdown
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from app.persistence.models.proposal_model import Proposal, ProposalType
 from app.persistence.models.user_model import User # For proposer info
 from datetime import datetime
+from telegram.ext import CallbackContext
+from typing import List, Dict, Any, Optional, Union
+
+MAX_MESSAGE_LENGTH = 4096 # Telegram's max message length
 
 def escape_markdown_v2(text: str) -> str:
     """Helper function to escape text for MarkdownV2."""
@@ -36,11 +40,8 @@ def format_proposal_message(proposal: Proposal, proposer: User) -> str:
                 # Escape each option text
                 escaped_option_text = escape_markdown_v2(option_text)
                 message_text += f"{i+1}️⃣ {escaped_option_text}\n"
-        # Inline keyboard for voting will be added in a later task (4.2)
-        # For now, just indicate voting happens on the message.
+        # Inline keyboard for voting will be added by the caller using reply_markup.
         message_text += f"\nVoting ends: {deadline_str}\n"
-        static_vote_below_text = "👇 Vote Below (Buttons will appear once voting is enabled)"
-        message_text += escape_markdown_v2(static_vote_below_text)
 
     elif proposal.proposal_type == ProposalType.FREE_FORM.value:
         # Note: The command `/submit {proposal.id} Your idea here` is wrapped in backticks, so it's pre-formatted code.
@@ -64,4 +65,29 @@ def get_free_form_submit_button(proposal_id: int) -> InlineKeyboardMarkup:
     # when they are in a DM with the bot.
     query_to_prefill = f"/submit {proposal_id} " 
     keyboard = [[InlineKeyboardButton(button_text, switch_inline_query_current_chat=query_to_prefill)]]
-    return InlineKeyboardMarkup(keyboard) 
+    return InlineKeyboardMarkup(keyboard)
+
+def create_proposal_options_keyboard(proposal_id: int, options: List[str]) -> InlineKeyboardMarkup:
+    """
+    Creates an inline keyboard with buttons for each proposal option.
+    Callback data format: vote_[proposal_id]_[option_index]
+    """
+    keyboard = []
+    for index, option_text in enumerate(options):
+        callback_data = f"vote_{proposal_id}_{index}"
+        # Ensure option_text for button isn't too long for Telegram (64 bytes for button text)
+        # A simple truncation, could be smarter if needed.
+        button_text = option_text[:60] # Max 64 bytes, play safe with characters
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+    return InlineKeyboardMarkup(keyboard)
+
+async def send_message_in_chunks(context: CallbackContext, chat_id: int, text: str, **kwargs) -> None:
+    """Sends a message, splitting it into chunks if it exceeds Telegram's max length."""
+    if not text:
+        return
+    
+    max_len = MAX_MESSAGE_LENGTH
+
+    for i in range(0, len(text), max_len):
+        chunk = text[i:i + max_len]
+        await context.bot.send_message(chat_id=chat_id, text=chunk, **kwargs) 

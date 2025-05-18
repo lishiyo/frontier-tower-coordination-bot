@@ -54,7 +54,11 @@ class SubmissionService:
             # We assume user details (username, first_name) are not strictly needed here for submission,
             # but if they were, the callback_query.from_user object would be passed here.
             # For now, just ensuring the user is in our DB is enough via their ID.
-            voter = await self.user_service.get_user_by_telegram_id(submitter_telegram_id)
+            voter = await self.user_service.register_user_interaction(
+                telegram_id=submitter_telegram_id,
+                username=None,  # We don't have these details here
+                first_name=None  # We don't have these details here
+            )
             if not voter: # Should ideally be registered from some prior interaction like /start
                 # If we want to auto-register on vote, we'd need more user details.
                 # For now, we assume they must have interacted before if they are voting.

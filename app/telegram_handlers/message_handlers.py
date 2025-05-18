@@ -227,15 +227,16 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Send confirmation DM
             # Ensure all parts of the message that might contain special MarkdownV2 characters are escaped.
             title_escaped = telegram_utils.escape_markdown_v2(new_proposal.title)
-            channel_id_escaped = telegram_utils.escape_markdown_v2(str(new_proposal.target_channel_id)) # Ensure channel_id is string
+            # Ensure channel_id is string before escaping, as it might be an int from config
+            channel_id_escaped = telegram_utils.escape_markdown_v2(str(new_proposal.target_channel_id))
             
             confirmation_dm_parts = [
-                f"Proposal ID `{new_proposal.id}` created successfully\!\n",
+                f"Proposal ID `{new_proposal.id}` created successfully\\!\n",
                 f"Title: {title_escaped}\n",
-                f"It will be posted to the channel '{channel_id_escaped}' shortly\.\n\n",
+                f"It will be posted to the channel '{channel_id_escaped}' shortly\\.\n\n",
                 f"You can add more context later using: `/add_doc {new_proposal.id} <URL or paste text>`\n",
                 f"To edit \\(only if no votes\\): `/edit_proposal {new_proposal.id}`\n",
-                f"To cancel \\(required if votes\\): `/cancel_proposal {new_proposal.id}`"
+                f"To cancel: `/cancel_proposal {new_proposal.id}`" # Clarified cancel command
             ]
             confirmation_dm = "".join(confirmation_dm_parts)
 
@@ -246,16 +247,19 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
             channel_reply_markup = None
 
             if new_proposal.proposal_type == ProposalType.FREE_FORM:
-                keyboard = [[InlineKeyboardButton("💬 Submit Your Idea", switch_inline_query_current_chat=f"/submit {new_proposal.id} ")]]
-                channel_reply_markup = InlineKeyboardMarkup(keyboard)
-            elif new_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE:
+                # Use existing helper for free form button
+                channel_reply_markup = telegram_utils.get_free_form_submit_button(new_proposal.id)
+            elif new_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value:  # <-- Change here, use .value
                 if new_proposal.options:
-                    keyboard = [
-                        [InlineKeyboardButton(opt, callback_data=f"vote_{new_proposal.id}_{i}")] 
-                        for i, opt in enumerate(new_proposal.options)
-                    ]
-                    channel_reply_markup = InlineKeyboardMarkup(keyboard)
+                    # Use the new helper for multiple choice options keyboard
+                    channel_reply_markup = telegram_utils.create_proposal_options_keyboard(new_proposal.id, new_proposal.options)
+                else:
+                    logger.warning(f"User {user.id}: Multiple choice proposal {new_proposal.id} has no options. Cannot create voting keyboard.")
+            else:
+                logger.warning(f"User {user.id}: Unknown proposal type {new_proposal.proposal_type} for proposal {new_proposal.id}")
             
+            logger.info(f"User {user.id}: Final channel_reply_markup: {channel_reply_markup is not None}")
+
             sent_channel_message = await context.bot.send_message(
                 chat_id=new_proposal.target_channel_id,
                 text=channel_message_text,

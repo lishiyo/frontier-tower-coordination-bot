@@ -127,7 +127,7 @@ proposal_conv_handler = ConversationHandler(
         ASK_CONTEXT: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_ask_context)],
     },
     fallbacks=[CommandHandler("cancel", cancel_conversation)],
-    # per_message=True, # Consider if needed for specific scenarios
+    # Using default per_message=False to make sure command entry points work properly
     # name="proposal_creation_conversation", # Optional: for debugging or specific handler management
     # persistent=False, # Set to True if you want to use persistence across restarts
 )
