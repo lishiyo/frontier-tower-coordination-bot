@@ -138,4 +138,14 @@ class ProposalRepository:
         # Ensure channel_id is treated as a string if it comes in as a number from Telegram API
         stmt = select(Proposal).where(Proposal.target_channel_id == str(channel_id)).order_by(Proposal.creation_date.desc())
         result = await self.db_session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_proposals_by_proposer_id(self, proposer_telegram_id: int) -> List[Proposal]:
+        """Fetches proposals by their proposer_telegram_id, ordered by creation_date descending."""
+        stmt = (
+            select(Proposal)
+            .where(Proposal.proposer_telegram_id == proposer_telegram_id)
+            .order_by(Proposal.creation_date.desc())
+        )
+        result = await self.db_session.execute(stmt)
         return list(result.scalars().all()) 

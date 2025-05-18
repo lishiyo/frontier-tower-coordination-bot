@@ -401,20 +401,20 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Test this is working manually.
 
 2.  **Task 7.2: Implement `/my_proposals` command**
-    *   [ ] In `app/persistence/repositories/proposal_repository.py`, add `get_proposals_by_proposer_id(proposer_telegram_id: int)`:
-        *   [ ] This method should retrieve all proposals where the `proposer_telegram_id` matches the given ID.
-    *   [ ] In `app/core/proposal_service.py`, add `list_proposals_by_proposer(user_id: int)`:
-        *   [ ] This service method will call `ProposalRepository.get_proposals_by_proposer_id()`.
-        *   [ ] It should format the results into a list suitable for display (e.g., list of dictionaries with proposal ID, title, status, deadline/outcome, target_channel_id).
-        *   [ ] Timestamps like `deadline_date` or `creation_date` should be formatted for display using `app.utils.telegram_utils.format_datetime_for_display`.
-    *   [ ] In `app/telegram_handlers/user_command_handlers.py` (or `proposal_command_handlers.py`), implement `my_proposals_command`:
-        *   [ ] This command handler will call `ProposalService.list_proposals_by_proposer()`.
-        *   [ ] It will format and send the list of proposals to the user via DM.
-        *   [ ] Ensure proper MarkdownV2 escaping for the message.
-        *   [ ] Handle potential message length limits if the list is very long (e.g., basic pagination or a note to the user).
-        *   [ ] If no proposals are found, it should inform the user (e.g., "You haven't created any proposals yet.").
-    *   [ ] Add `/my_proposals` command to `main.py` command registration.
-    *   [ ] Ensure `/my_proposals` is documented in `memory-bank/bot_commands.md`.
+    *   [x] In `app/persistence/repositories/proposal_repository.py`, add `get_proposals_by_proposer_id(proposer_telegram_id: int)`:
+        *   [x] This method should retrieve all proposals where the `proposer_telegram_id` matches the given ID.
+    *   [x] In `app/core/proposal_service.py`, add `list_proposals_by_proposer(user_id: int)`:
+        *   [x] This service method will call `ProposalRepository.get_proposals_by_proposer_id()`.
+        *   [x] It should format the results into a list suitable for display (e.g., list of dictionaries with proposal ID, title, status, deadline/outcome, target_channel_id).
+        *   [x] Timestamps like `deadline_date` or `creation_date` should be formatted for display using `app.utils.telegram_utils.format_datetime_for_display`.
+    *   [x] In `app/telegram_handlers/user_command_handlers.py` (or `proposal_command_handlers.py`), implement `my_proposals_command`:
+        *   [x] This command handler will call `ProposalService.list_proposals_by_proposer()`.
+        *   [x] It will format and send the list of proposals to the user via DM.
+        *   [x] Ensure proper MarkdownV2 escaping for the message.
+        *   [x] Handle potential message length limits if the list is very long (e.g., basic pagination or a note to the user).
+        *   [x] If no proposals are found, it should inform the user (e.g., "You haven't created any proposals yet.").
+    *   [x] Add `/my_proposals` command to `main.py` command registration.
+    *   [x] Ensure `/my_proposals` is documented in `memory-bank/bot_commands.md`.
     *   [ ] Write unit tests for the new repository and service methods, and the command handler.
     *   [ ] Test this is working manually.
 

@@ -23,6 +23,8 @@ from app.telegram_handlers.message_handlers import (
 )
 from app.telegram_handlers.callback_handlers import handle_collect_proposal_type_callback
 from app.telegram_handlers.command_handlers import cancel_conversation # Assuming cancel_conversation remains in core command_handlers
+from app.core.proposal_service import ProposalService
+from app.utils import telegram_utils
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +133,62 @@ proposal_conv_handler = ConversationHandler(
     # name="proposal_creation_conversation", # Optional: for debugging or specific handler management
     # persistent=False, # Set to True if you want to use persistence across restarts
 )
+
+async def my_proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays a list of proposals created by the user."""
+    if not update.effective_user:
+        await update.message.reply_text("I can't identify you to fetch your proposals.")
+        return
+
+    user_id = update.effective_user.id
+    message_text = ""
+
+    async with AsyncSessionLocal() as session:
+        # Register interaction first (ensures user exists)
+        user_service = UserService(session)
+        await user_service.register_user_interaction(
+            telegram_id=user_id,
+            username=update.effective_user.username,
+            first_name=update.effective_user.first_name
+        )
+        # No need to commit here if register_user_interaction doesn't commit and
+        # list_proposals_by_proposer is read-only.
+        # However, register_user_interaction *does* commit internally in its current form.
+
+        proposal_service = ProposalService(session)
+        proposals = await proposal_service.list_proposals_by_proposer(user_id)
+
+    if not proposals:
+        message_text = "You haven't created any proposals yet."
+    else:
+        message_parts = ["*Your Proposals:*" + "\n"]
+        for prop in proposals:
+            title = telegram_utils.escape_markdown_v2(prop['title'])
+            status = telegram_utils.escape_markdown_v2(prop['status'])
+            deadline = telegram_utils.escape_markdown_v2(prop['deadline_date'])
+            created = telegram_utils.escape_markdown_v2(prop['creation_date'])
+            outcome = telegram_utils.escape_markdown_v2(prop['outcome'] if prop['outcome'] else "N/A")
+            channel_id_escaped = telegram_utils.escape_markdown_v2(str(prop['target_channel_id']))
+            
+            part = (
+                f"\- *Title:* {title} \(ID: `{prop['id']}`\)\n"
+                f"  Status: {status}\n"
+                f"  Type: {telegram_utils.escape_markdown_v2(prop['proposal_type'])}\n"
+                f"  Channel: `{channel_id_escaped}`\n"
+                f"  Created: {created}\n"
+                f"  Deadline: {deadline}\n"
+                f"  Outcome: {outcome}\n"
+            )
+            message_parts.append(part)
+        
+        message_text = "\n".join(message_parts)
+
+    await telegram_utils.send_message_in_chunks(
+        context, 
+        chat_id=update.effective_chat.id, 
+        text=message_text, 
+        parse_mode='MarkdownV2'
+    )
 
 # TODO: Move other proposal-related command handlers here:
 # - Handler for /proposals open/closed

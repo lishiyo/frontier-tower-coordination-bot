@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,7 +76,24 @@ class ProposalService:
     async def list_proposals_by_channel(self, channel_id: str) -> List[Proposal]:
         """Lists proposals for a given channel_id."""
         # Ensure channel_id is a string, as it's stored that way and might come as int from Telegram
-        return await self.proposal_repository.get_proposals_by_channel_id(str(channel_id)) 
+        return await self.proposal_repository.get_proposals_by_channel_id(str(channel_id))
+
+    async def list_proposals_by_proposer(self, user_telegram_id: int) -> List[Dict[str, Any]]:
+        """Lists proposals created by a specific user, formatted for display."""
+        proposals = await self.proposal_repository.get_proposals_by_proposer_id(user_telegram_id)
+        formatted_proposals = []
+        for proposal in proposals:
+            formatted_proposals.append({
+                "id": proposal.id,
+                "title": proposal.title,
+                "status": proposal.status,
+                "deadline_date": telegram_utils.format_datetime_for_display(proposal.deadline_date),
+                "creation_date": telegram_utils.format_datetime_for_display(proposal.creation_date),
+                "outcome": proposal.outcome,
+                "target_channel_id": proposal.target_channel_id,
+                "proposal_type": proposal.proposal_type
+            })
+        return formatted_proposals
 
     async def process_expired_proposals(self) -> List[Proposal]:
         """
