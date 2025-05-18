@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.persistence.database import Base
@@ -18,7 +18,7 @@ class Proposal(Base):
     __tablename__ = "proposals"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    proposer_telegram_id = Column(Integer, ForeignKey(User.telegram_id), nullable=False, index=True)
+    proposer_telegram_id = Column(BigInteger, ForeignKey(User.telegram_id), nullable=False, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     proposal_type = Column(String, nullable=False) # Using String to store enum values
