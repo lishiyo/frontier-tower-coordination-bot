@@ -374,7 +374,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] `ask_command` calls `ContextService.get_answer_for_question()` and DMs response.
 
 3.  **Task 6.3: Enhance URL Content Extraction**
-    *   [ ] Research and select a robust HTML parsing/content extraction library or method (e.g., BeautifulSoup, trafilatura, crawl4ai, Firecrawl tools). crawl4ai preferred.
+    *   [ ] Research and select a robust HTML parsing/content extraction library or method (e.g., BeautifulSoup, trafilatura, crawl4ai, Firecrawl). crawl4ai preferred.
     *   [ ] Implement the chosen solution within `ContextService._fetch_content_from_url` to replace the basic `response.text`.
     *   [ ] Ensure the new implementation extracts clean, main content from web pages, stripping HTML tags, scripts, and other noise.
     *   [ ] Test with various URLs to confirm improved context quality for RAG.

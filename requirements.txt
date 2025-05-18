@@ -8,5 +8,6 @@ pylint
 pytest
 openai
 chromadb
-APScheduler 
+APScheduler==3.11.0
+crawl4ai
 pytest-asyncio

@@ -1,7 +1,9 @@
 import logging
 import hashlib
 from typing import Optional, List, Dict, Any, Tuple
-import httpx # For fetching content from URLs
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, BrowserConfig # For fetching and parsing URLs
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.content_filter_strategy import PruningContentFilter
 
 from app.services.llm_service import LLMService
 from app.services.vector_db_service import VectorDBService
@@ -27,24 +29,45 @@ class ContextService:
         self.document_repository = DocumentRepository(db_session)
 
     async def _fetch_content_from_url(self, url: str) -> Optional[str]:
-        """Fetches text content from a URL."""
+        """Fetches text content from a URL using Crawl4AI."""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=10.0) # 10 second timeout
-                response.raise_for_status() # Raise an exception for HTTP 4xx/5xx errors
-                # For simplicity, assuming text content. Could add content-type checks.
-                # Basic HTML stripping might be needed for web pages, or use a library like BeautifulSoup.
-                # For now, returning raw text content.
-                # TODO: Add better HTML parsing or content extraction (e.g. using a library like `trafilatura` or `beautifulsoup4`)
-                return response.text
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error fetching URL {url}: {e.response.status_code} - {e.response.text}")
-            return None
-        except httpx.RequestError as e:
-            logger.error(f"Request error fetching URL {url}: {e}")
-            return None
+            # Configure Crawl4AI for a simple run
+            browser_config = BrowserConfig(
+                headless=True,
+                java_script_enabled=True # Explicitly enable JavaScript
+            )
+            # Using a markdown generator with a pruning filter as per crawl4ai docs for potentially better content extraction
+            md_generator = DefaultMarkdownGenerator(
+                content_filter=PruningContentFilter(threshold=0.4, threshold_type="fixed") # Default values from docs
+            )
+            run_config = CrawlerRunConfig(
+                cache_mode=CacheMode.BYPASS,  # To get fresh content
+                markdown_generator=md_generator,
+                wait_until="networkidle"  # Wait for network activity to cease
+            )
+            async with AsyncWebCrawler(config=browser_config) as crawler:
+                result = await crawler.arun(url=url, config=run_config)
+            
+            if result.success and result.markdown:
+                # Try fit_markdown first, then raw_markdown as a fallback
+                content_to_return = result.markdown.fit_markdown
+                source_of_content = "fit_markdown"
+                if not content_to_return or len(content_to_return) <= 1: # Check if fit_markdown is empty or just a newline
+                    logger.info(f"fit_markdown for {url} was empty or minimal. Falling back to raw_markdown.")
+                    content_to_return = result.markdown.raw_markdown
+                    source_of_content = "raw_markdown"
+
+                logger.info(f"Successfully fetched and processed URL {url} with Crawl4AI using {source_of_content}. Markdown length: {len(content_to_return)}")
+                logger.info(f"Crawl4AI {source_of_content} content (first 100 chars): '{content_to_return[:100]}'")
+                return content_to_return
+            elif not result.success:
+                logger.error(f"Crawl4AI failed to fetch URL {url}. Error: {result.error_message}")
+                return None
+            else: # result.success but no markdown (should be rare for valid HTML pages)
+                logger.warning(f"Crawl4AI fetched URL {url} successfully, but no markdown content was generated.")
+                return None
         except Exception as e:
-            logger.error(f"Unexpected error fetching URL {url}: {e}", exc_info=True)
+            logger.error(f"Unexpected error fetching URL {url} with Crawl4AI: {e}", exc_info=True)
             return None
 
     async def process_and_store_document(
