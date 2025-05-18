@@ -1,4 +1,5 @@
 from typing import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -23,6 +24,21 @@ AsyncSessionLocal = async_sessionmaker(
 
 # Create a base class for declarative models
 Base = declarative_base()
+
+@asynccontextmanager
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provide a transactional scope around a series of operations."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+async def init_db():
+    async with engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all) # Uncomment to drop tables on startup (for dev)
+        await conn.run_sync(Base.metadata.create_all)
 
 # Dependency for FastAPI (if needed later)
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

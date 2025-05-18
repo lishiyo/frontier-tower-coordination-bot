@@ -5,7 +5,7 @@ from telegram.constants import ParseMode, ChatType
 from typing import Optional
 
 from app.core.user_service import UserService
-from app.persistence.database import AsyncSessionLocal
+from app.persistence.database import AsyncSessionLocal, get_session
 from app.core.proposal_service import ProposalService
 from app.core.context_service import ContextService
 from app.services.llm_service import LLMService
@@ -14,6 +14,12 @@ from app.config import ConfigService
 from app.utils.telegram_utils import escape_markdown_v2
 
 logger = logging.getLogger(__name__)
+
+# Initialize services for handlers that don't have their own session management
+# This might need refinement based on how sessions are handled per request/handler
+# For now, assuming a simplified approach or that services handle sessions internally if needed for single calls
+config_service = ConfigService()
+# Note: Consider dependency injection or a context-based service provider for more complex scenarios
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a welcome message when the /start command is issued, handles deep links."""
@@ -188,3 +194,7 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         logger.error(f"Error in ask_command: {e}", exc_info=True)
         if update.message: # Ensure message object exists for error reply
             await update.message.reply_text("Sorry, I couldn't process your request at the moment.")
+
+async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles unknown commands."""
+    await update.message.reply_text("Sorry, I didn't understand that command. Type /help to see available commands.")

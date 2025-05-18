@@ -7,14 +7,17 @@ from app.persistence.models.proposal_model import Proposal, ProposalType, Propos
 from app.persistence.repositories.proposal_repository import ProposalRepository
 from app.persistence.repositories.submission_repository import SubmissionRepository
 from app.core.user_service import UserService # To ensure voter exists
+from app.persistence.repositories.user_repository import UserRepository
+from app.utils.telegram_utils import format_datetime_for_display 
 
 logger = logging.getLogger(__name__)
 
 class SubmissionService:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.proposal_repository = ProposalRepository(db_session)
         self.submission_repository = SubmissionRepository(db_session)
+        self.user_repository = UserRepository(db_session)
+        self.proposal_repository = ProposalRepository(db_session)
         self.user_service = UserService(db_session)
 
     async def record_vote(
@@ -146,4 +149,46 @@ class SubmissionService:
 
         except Exception as e:
             logger.error(f"Unexpected error in record_free_form_submission for proposal {proposal_id}, user {submitter_telegram_id}: {e}", exc_info=True)
-            return False, "An unexpected error occurred. Please try again later." 
+            return False, "An unexpected error occurred. Please try again later."
+
+    async def get_user_submission_history(self, submitter_id: int) -> list[dict]:
+        """
+        Retrieves a user's submission history, including proposal details.
+        """
+        logger.info(f"Fetching submission history for user {submitter_id}")
+        submissions = await self.submission_repository.get_submissions_by_user(submitter_id)
+        if not submissions:
+            logger.info(f"No submissions found for user {submitter_id}")
+            return []
+
+        proposal_ids = list(set(sub.proposal_id for sub in submissions))
+        proposals_list = await self.proposal_repository.get_proposals_by_ids(proposal_ids)
+        
+        proposals_map = {prop.id: prop for prop in proposals_list}
+
+        history = []
+        for sub in submissions:
+            proposal = proposals_map.get(sub.proposal_id)
+            if proposal:
+                timestamp_str = "N/A"
+                if sub.timestamp:
+                    # Use the utility function for formatting
+                    timestamp_str = format_datetime_for_display(sub.timestamp) # Target TZ defaults to PST in the util
+                
+                history.append({
+                    "proposal_id": proposal.id,
+                    "proposal_title": proposal.title,
+                    "user_response": sub.response_content,
+                    "proposal_status": proposal.status,
+                    "proposal_outcome": proposal.outcome or "N/A",
+                    "submission_timestamp": timestamp_str
+                })
+            else:
+                logger.warning(f"Proposal ID {sub.proposal_id} not found for submission ID {sub.id} by user {submitter_id}")
+        
+        logger.info(f"Returning {len(history)} items for user {submitter_id} submission history.")
+        return history
+
+    async def get_all_results_for_proposal_view(self, proposal_id: int) -> Optional[dict]:
+        # Implementation of get_all_results_for_proposal_view method
+        pass 

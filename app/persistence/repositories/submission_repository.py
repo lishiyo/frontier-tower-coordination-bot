@@ -3,6 +3,7 @@ from typing import List, Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert # For INSERT ... ON CONFLICT DO UPDATE
+from datetime import datetime
 
 from app.persistence.models.submission_model import Submission
 
@@ -64,4 +65,14 @@ class SubmissionRepository:
             return list(submissions)
         except Exception as e:
             logger.error(f"Error retrieving submissions for proposal {proposal_id}: {e}", exc_info=True)
-            return [] 
+            return []
+
+    async def get_submissions_by_user(self, submitter_id: int) -> List[Submission]:
+        stmt = select(Submission).where(Submission.submitter_id == submitter_id).order_by(Submission.timestamp.desc())
+        result = await self.db_session.execute(stmt)
+        return result.scalars().all()
+
+    async def count_submissions_for_proposal(self, proposal_id: int) -> int:
+        stmt = select(Submission).where(Submission.proposal_id == proposal_id)
+        result = await self.db_session.execute(stmt)
+        return len(result.scalars().all()) 

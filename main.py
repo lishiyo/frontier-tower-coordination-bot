@@ -8,9 +8,9 @@ from app.config import ConfigService
 
 # Import command handlers from their new locations
 from app.telegram_handlers.command_handlers import (
-    start_command, help_command, # privacy_command, # Keep existing
-    ask_command # Added
+    start_command, help_command, unknown_command, ask_command
 )
+from app.telegram_handlers.user_command_handlers import my_votes_command
 from app.telegram_handlers.document_command_handlers import (
     view_document_content_command, view_docs_command
     # edit_doc_command, delete_doc_command, view_global_docs_command, edit_global_doc_command, delete_global_doc_command, add_global_doc_command, add_doc_command, edit_proposal_command # Commented out
@@ -77,7 +77,7 @@ def main() -> None:
     # application.add_handler(CommandHandler("edit_global_doc", edit_global_doc_command)) # Task 7.9
     # application.add_handler(CommandHandler("delete_global_doc", delete_global_doc_command)) # Task 7.9
     application.add_handler(CommandHandler("submit", submit_command, block=False)) # Task 4.3, added block=False
-    # application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
+    application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
     # application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
     # application.add_handler(CommandHandler("view_results", view_results_command)) # Task 7.6
     application.add_handler(CommandHandler("ask", ask_command)) # Task 6.1
@@ -96,7 +96,6 @@ def main() -> None:
 
     # Register CallbackQueryHandlers
     application.add_handler(CallbackQueryHandler(handle_collect_proposal_type_callback, pattern=f"^{PROPOSAL_TYPE_CALLBACK}")) # Corrected name
-    # application.add_handler(CallbackQueryHandler(handle_channel_selection_callback, pattern=f"^{CHANNEL_SELECT_CALLBACK}")) # Commented out - definition missing
     application.add_handler(CallbackQueryHandler(handle_vote_callback, pattern=r"^vote_.*$")) # Task 4.2
 
     application.add_error_handler(error_handler) # Added error handler
@@ -105,7 +104,6 @@ def main() -> None:
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting bot polling...")
-    # start_scheduler(application) # REMOVED: Scheduler now started via post_init
     application.run_polling()
     logger.info("Bot polling stopped.")
 
