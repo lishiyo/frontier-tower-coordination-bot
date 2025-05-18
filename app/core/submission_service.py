@@ -90,4 +90,60 @@ class SubmissionService:
 
         except Exception as e:
             logger.error(f"Unexpected error in record_vote for proposal {proposal_id}, user {submitter_telegram_id}: {e}", exc_info=True)
+            return False, "An unexpected error occurred. Please try again later."
+
+    async def record_free_form_submission(
+        self,
+        proposal_id: int,
+        submitter_telegram_id: int, # submitter's telegram_id
+        text_submission: str
+    ) -> Tuple[bool, str]: # Returns (success_status, message_to_user)
+        """
+        Records a free-form submission for a proposal.
+        Validates the proposal, then adds/updates the submission.
+        """
+        try:
+            # 1. Fetch the proposal
+            proposal = await self.proposal_repository.get_proposal_by_id(proposal_id)
+            if not proposal:
+                logger.warning(f"Attempt to submit to non-existent proposal ID: {proposal_id}")
+                return False, "Error: Proposal not found."
+
+            # 2. Validate proposal status and type
+            if proposal.status != ProposalStatus.OPEN.value:
+                logger.warning(f"Attempt to submit to proposal {proposal_id} which is not open (status: {proposal.status}).")
+                return False, f"Sorry, submissions for proposal '{proposal.title}' are closed."
+            
+            if proposal.proposal_type != ProposalType.FREE_FORM.value:
+                logger.warning(f"Attempt to submit to proposal {proposal_id} which is not free_form (type: {proposal.proposal_type}).")
+                return False, "Error: This proposal does not accept free-form submissions."
+
+            # 3. Ensure submitter exists
+            # Assuming user details (username, first_name) are not strictly needed here for submission.
+            # The command handler for /submit should pass the user's telegram_id.
+            submitter = await self.user_service.register_user_interaction(
+                telegram_id=submitter_telegram_id,
+                username=None,  # We don't have these details here from just the ID and text
+                first_name=None  # We don't have these details here
+            )
+            if not submitter:
+                logger.warning(f"User {submitter_telegram_id} attempted to submit but is not registered. This should ideally not happen.")
+                return False, "Error: Submitter registration not found. Please /start the bot first."
+
+            # 4. Add or update the submission
+            submission = await self.submission_repository.add_or_update_submission(
+                proposal_id=proposal_id,
+                submitter_id=submitter_telegram_id,
+                response_content=text_submission
+            )
+
+            if submission:
+                logger.info(f"Successfully recorded free-form submission for user {submitter_telegram_id} on proposal {proposal_id}.")
+                return True, "Your submission has been recorded!"
+            else:
+                logger.error(f"Failed to record free-form submission for user {submitter_telegram_id} on proposal {proposal_id} in repository.")
+                return False, "An error occurred while saving your submission. Please try again."
+
+        except Exception as e:
+            logger.error(f"Unexpected error in record_free_form_submission for proposal {proposal_id}, user {submitter_telegram_id}: {e}", exc_info=True)
             return False, "An unexpected error occurred. Please try again later." 

@@ -285,16 +285,17 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] The original proposal message in the channel (with voting buttons) will remain unchanged for other users to vote.
 
 3.  **Task 4.3: Free-Form Submission (`/submit` Command)**
-    *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `submit_command` handler.
-        *   [ ] Parse `proposal_id` and `<text_submission>`.
-        *   [ ] Get `user_id` (submitter_id).
-    *   [ ] In `app/core/submission_service.py`, implement `record_free_form_submission(proposal_id, submitter_id, text_submission)`:
-        *   [ ] Call `ProposalRepository.get_proposal_by_id()`. Check if open & "free_form".
-        *   [ ] Call `UserRepository` to ensure submitter exists.
-        *   [ ] Call `SubmissionRepository.add_or_update_submission(...)`.
-        *   [ ] Return success/failure.
-    *   [ ] `submit_command` calls `SubmissionService.record_free_form_submission(...)`.
-    *   [ ] Send DM confirmation to user.
+    *   [x] In `app/telegram_handlers/command_handlers.py`, implement `submit_command` handler. (Moved to `submission_command_handlers.py`)
+        *   [x] Parse `proposal_id` and `<text_submission>`.
+        *   [x] Get `user_id` (submitter_id).
+    *   [x] In `app/core/submission_service.py`, implement `record_free_form_submission(proposal_id, submitter_id, text_submission)`:
+        *   [x] Call `ProposalRepository.get_proposal_by_id()`. Check if open & "free_form".
+        *   [x] Call `UserRepository` to ensure submitter exists.
+        *   [x] Call `SubmissionRepository.add_or_update_submission(...)`.
+        *   [x] Return success/failure.
+    *   [x] `submit_command` calls `SubmissionService.record_free_form_submission(...)`.
+    *   [x] Send DM confirmation to user.
+    *   [ ] Verify this is working manually.
 
 ## Phase 5: Deadline Management & Results Announcement
 

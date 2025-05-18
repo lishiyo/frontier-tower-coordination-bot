@@ -17,9 +17,9 @@ from app.telegram_handlers.document_command_handlers import (
 from app.telegram_handlers.proposal_command_handlers import (
     proposal_conv_handler, # get_proposal_creation_conv_handler, cancel_proposal_command, proposals_command # Commented out, proposal_conv_handler is covered by get_proposal_creation_conv_handler
 )
-# from app.telegram_handlers.submission_command_handlers import (
-#     submit_command, my_votes_command, view_results_command, ask_command # Commented out
-# )
+from app.telegram_handlers.submission_command_handlers import (
+    submit_command #, my_votes_command, view_results_command, ask_command # Commented out
+)
 from app.telegram_handlers.callback_handlers import (
     handle_vote_callback, 
     handle_collect_proposal_type_callback, # Corrected name
@@ -62,7 +62,7 @@ def main() -> None:
     # application.add_handler(CommandHandler("view_global_docs", view_global_docs_command)) # Task 7.9
     # application.add_handler(CommandHandler("edit_global_doc", edit_global_doc_command)) # Task 7.9
     # application.add_handler(CommandHandler("delete_global_doc", delete_global_doc_command)) # Task 7.9
-    # application.add_handler(CommandHandler("submit", submit_command)) # Task 4.3
+    application.add_handler(CommandHandler("submit", submit_command)) # Task 4.3
     # application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
     # application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
     # application.add_handler(CommandHandler("view_results", view_results_command)) # Task 7.6
