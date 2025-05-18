@@ -203,7 +203,62 @@ telegram_bot/
     *   Updates the proposal in the DB with `channel_message_id` via `ProposalRepository.update_message_id(proposal_id, channel_msg_id)`.
     *   Ends `ConversationHandler`.
 
-### B. User Asks a Question (`/ask`)
+*Note*: Users can also edit and delete proposals. They can edit a proposal that has not been voted on yet. If the proposal has been voted on already, they have to delete it and make a new proposal.
+
+### B. User Votes and Submissions
+
+This section covers how users cast votes on multiple-choice proposals, submit free-form responses, and view the results of proposals.
+
+**1. Casting a Vote (Multiple-Choice Proposal):**
+
+1.  **User (Telegram):** Clicks an inline keyboard button on a multiple-choice proposal message in the `target_channel_id`.
+2.  **`main.py`/PTB `Application`:** Receives `CallbackQuery` and routes to `CallbackHandlers.handle_vote_callback`.
+3.  **`CallbackHandlers.handle_vote_callback`:**
+    *   Parses `proposal_id` and `option_index` from `callback_data`.
+    *   Retrieves `user_id` from the `update`.
+    *   Calls `SubmissionService.record_vote(proposal_id, user_id, option_index)`.
+4.  **`SubmissionService.record_vote`:**
+    *   Calls `ProposalRepository.get_proposal_by_id(proposal_id)` to verify the proposal is open and of "multiple_choice" type.
+    *   Retrieves the actual option string from `proposal.options` using `option_index`.
+    *   Calls `UserRepository.register_user_interaction(...)` to ensure the user exists.
+    *   Calls `SubmissionRepository.add_or_update_submission(proposal_id, user_id, response_content=selected_option_string)`.
+    *   Returns success/failure status.
+5.  **`CallbackHandlers.handle_vote_callback`:**
+    *   Sends an ephemeral confirmation to the user via `query.answer(...)`.
+
+**2. Submitting a Response (Free-Form Proposal):**
+
+1.  **User (Telegram):** Sends `/submit <proposal_id> <Their text submission>` via DM, often guided by a "Submit Your Idea" button that pre-fills `@BotUsername submit <proposal_id> ` in their DM.
+2.  **`main.py`/PTB `Application`:** Routes to `SubmissionCommandHandlers.submit_command` (or `handle_prefilled_submit` which then calls `submit_command`).
+3.  **`SubmissionCommandHandlers.submit_command`:**
+    *   Parses `proposal_id` and `<text_submission>`.
+    *   Retrieves `user_id` from the `update`.
+    *   Calls `SubmissionService.record_free_form_submission(proposal_id, user_id, text_submission)`.
+4.  **`SubmissionService.record_free_form_submission`:**
+    *   Calls `ProposalRepository.get_proposal_by_id(proposal_id)` to verify the proposal is open and of "free_form" type.
+    *   Calls `UserRepository.register_user_interaction(...)` to ensure the user exists.
+    *   Calls `SubmissionRepository.add_or_update_submission(proposal_id, user_id, response_content=text_submission)`.
+    *   Returns success/failure status.
+5.  **`SubmissionCommandHandlers.submit_command`:**
+    *   Sends a DM confirmation to the user.
+
+**3. Viewing Proposal Results (`/view_results <proposal_id>`):**
+
+1.  **User (Telegram):** Sends `/view_results <proposal_id>` via DM. (If no `proposal_id`, bot prompts on how to find one).
+2.  **`main.py`/PTB `Application`:** Routes to `SubmissionCommandHandlers.view_results_command`.
+3.  **`SubmissionCommandHandlers.view_results_command`:**
+    *   Parses `proposal_id`. If missing, sends guidance and exits.
+    *   Calls `ProposalService.get_all_results_for_proposal_view(proposal_id)`.
+4.  **`ProposalService.get_all_results_for_proposal_view`:**
+    *   Calls `ProposalRepository.get_proposal_by_id(proposal_id)` to fetch the proposal. Ensures it's "closed".
+    *   If "multiple_choice": Retrieves vote counts from `proposal.raw_results` (or could re-tally from `SubmissionRepository` if `raw_results` isn't guaranteed to be the sole source of truth for this view).
+    *   If "free_form": Retrieves the list of anonymized submissions from `proposal.raw_results`.
+    *   Formats the data for display (e.g., vote percentages, list of submissions).
+5.  **`SubmissionCommandHandlers.view_results_command`:**
+    *   Receives formatted results.
+    *   Sends the results to the user via DM, potentially handling message splitting for long lists.
+
+### C. User Asks a Question (`/ask`)
 
 1.  **User (Telegram):** Sends `/ask <question>` or `/ask <proposal_id> <question>`.
 2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.handle_ask_question`.
@@ -221,7 +276,7 @@ telegram_bot/
     *   Receives formatted answer from `ContextService`.
     *   Sends the answer back to the user via DM.
 
-### C. Scheduled Job: Closing Expired Proposals
+### D. Scheduled Job: Closing Expired Proposals
 
 1.  **`SchedulingService` (`APScheduler`):** Triggers the `check_due_proposals` job periodically.
 2.  **`SchedulingService.check_due_proposals_job`:**
@@ -241,7 +296,7 @@ telegram_bot/
         *   Calls `TelegramUtils.format_results_message(...)` and posts results to the proposal's `target_channel_id` (retrieving the channel ID from the proposal record).
         *   (Optional v0/Core v1) Prepares and sends notifications to proposer/voters.
 
-### D. Viewing Document Context
+### E. Viewing Document Context
 
 1.  **User (Telegram):** Sends `/view_docs` (or `/view_docs <channel_id>` or `/view_docs <proposal_id>`).
 2.  **`main.py`/PTB `Application`:** Routes to a new command handler, e.g., `CommandHandlers.handle_view_documents_router`.
@@ -263,7 +318,9 @@ telegram_bot/
     *   Receives the raw text content.
     *   Formats it if necessary (e.g., handling long messages for Telegram) and DMs it to the user.
 
-### E. Intelligent Help (`/help <question>`)
+*Note*: Users can also edit and delete their own documents.
+
+### F. Intelligent Help (`/help <question>`)
 
 1.  **User (Telegram):** Sends `/help how do I see my votes?`.
 2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.handle_help_command`.
@@ -282,6 +339,126 @@ telegram_bot/
 6.  **`CommandHandlers.handle_help_command`:**
     *   Receives the formatted explanation from `ContextService`.
     *   Sends the explanation back to the user via DM.
+
+### G. User History Commands
+
+This section outlines data flows for commands that allow users to view their own activity and creations.
+
+**1. Viewing Own Votes/Submissions (`/my_votes`):**
+
+1.  **User (Telegram):** Sends `/my_votes` via DM.
+2.  **`main.py`/PTB `Application`:** Routes to `UserCommandHandlers.my_votes_command`.
+3.  **`UserCommandHandlers.my_votes_command`:**
+    *   Retrieves `user_id` from the `update`.
+    *   Calls `SubmissionService.get_user_submission_history(user_id)`.
+4.  **`SubmissionService.get_user_submission_history`:**
+    *   Calls `SubmissionRepository.get_submissions_by_user(user_id)` to get all user's submissions.
+    *   For each submission, extracts `proposal_id`.
+    *   Collects all unique `proposal_id`s and calls `ProposalRepository.get_proposals_by_ids(list_of_proposal_ids)` to fetch details for all relevant proposals in a batch.
+    *   Combines submission data with proposal details (title, status, outcome).
+    *   Calls `TelegramUtils.format_datetime_for_display` for timestamps.
+    *   Returns a list of formatted history items.
+5.  **`UserCommandHandlers.my_votes_command`:**
+    *   Receives the formatted history.
+    *   Escapes necessary characters for MarkdownV2.
+    *   Sends the history to the user via DM, handling message splitting if necessary.
+
+**2. Viewing Own Proposals (`/my_proposals` - Task 7.2):**
+
+1.  **User (Telegram):** Sends `/my_proposals` via DM.
+2.  **`main.py`/PTB `Application`:** Routes to `ProposalCommandHandlers.my_proposals_command` (or similar).
+3.  **`ProposalCommandHandlers.my_proposals_command`:**
+    *   Retrieves `user_id` (proposer_id) from the `update`.
+    *   Calls `ProposalService.list_proposals_by_proposer(proposer_id)`.
+4.  **`ProposalService.list_proposals_by_proposer`:**
+    *   Calls `ProposalRepository.get_proposals_by_proposer_id(proposer_id)`.
+    *   Formats the list of proposals (ID, title, status, target_channel_id) for display.
+5.  **`ProposalCommandHandlers.my_proposals_command`:**
+    *   Receives the formatted list.
+    *   Sends the list to the user via DM.
+
+**3. Viewing Own Documents (`/my_docs` - Task 7.6):**
+
+1.  **User (Telegram):** Sends `/my_docs` via DM.
+2.  **`main.py`/PTB `Application`:** Routes to `DocumentCommandHandlers.my_docs_command` (or `UserCommandHandlers`).
+3.  **`DocumentCommandHandlers.my_docs_command`:**
+    *   Retrieves `user_id` from `update`.
+    *   Calls `ContextService.list_documents_by_proposer(user_id)`.
+4.  **`ContextService.list_documents_by_proposer`:**
+    *   Calls `DocumentRepository.get_documents_by_proposer_id(user_id)`.
+        *   This repository method will need to join `documents` with `proposals` on `proposal_id` and filter by `proposals.proposer_telegram_id`.
+    *   Formats the list of documents (ID, title, associated proposal ID/title) for display.
+5.  **`DocumentCommandHandlers.my_docs_command`:**
+    *   Receives the formatted list.
+    *   Sends the list to the user via DM.
+
+### H. Admin-only Commands
+
+This section describes flows for commands restricted to administrators.
+
+**1. Adding a Global Document (`/add_global_doc`):**
+
+1.  **Admin User (Telegram):** Sends `/add_global_doc <URL or paste text>` or initiates conversation.
+2.  **`main.py`/PTB `Application`:** Routes to `AdminCommandHandlers.add_global_doc_command`.
+3.  **`AdminCommandHandlers.add_global_doc_command`:**
+    *   Verifies user is an admin using `ConfigService`.
+    *   Parses URL or text. May enter a conversation to get title/content if not fully provided.
+    *   Calls `ContextService.process_and_store_document(content, source_type="admin_global_text/url", title=user_provided_title, proposal_id=None)`.
+4.  **`ContextService.process_and_store_document`:** (As described in Proposal Creation, but `proposal_id` is `None`).
+    *   Fetches content if URL.
+    *   Chunks text.
+    *   Generates embeddings via `LLMService`.
+    *   Stores document metadata (title, content_hash, source_url, raw_content) in `DocumentRepository`.
+    *   Stores embeddings in `VectorDBService`, linking to the SQL `Document.id`.
+5.  **`AdminCommandHandlers.add_global_doc_command`:**
+    *   Sends confirmation/error DM to admin.
+
+**2. Viewing Global Documents (`/view_global_docs` - Task 7.8):**
+
+1.  **Admin User (Telegram):** Sends `/view_global_docs`.
+2.  **`main.py`/PTB `Application`:** Routes to `AdminCommandHandlers.view_global_docs_command`.
+3.  **`AdminCommandHandlers.view_global_docs_command`:**
+    *   Verifies user is an admin.
+    *   Calls `ContextService.list_global_documents()`.
+4.  **`ContextService.list_global_documents`:**
+    *   Calls `DocumentRepository.get_global_documents()` (e.g., filters for `proposal_id IS NULL`).
+    *   Formats list of documents (ID, title).
+5.  **`AdminCommandHandlers.view_global_docs_command`:**
+    *   Sends formatted list to admin via DM.
+
+**3. Editing a Global Document (`/edit_global_doc <document_id>` - Task 7.8):**
+
+1.  **Admin User (Telegram):** Sends `/edit_global_doc <document_id>` (or `/edit_global_doc` to get prompt).
+2.  **`main.py`/PTB `Application`:** Routes to `AdminCommandHandlers.edit_global_doc_command`.
+3.  **`AdminCommandHandlers.edit_global_doc_command`:**
+    *   Verifies user is an admin.
+    *   Parses `document_id`. If missing, sends guidance and exits.
+    *   Calls `ContextService.is_global_document(document_id)` to verify.
+    *   Initiates conversation or expects follow-up for new content/title.
+    *   Calls `ContextService.update_document_content(document_id, new_content, new_title)`.
+4.  **`ContextService.update_document_content`:**
+    *   Calls `DocumentRepository.update_document(document_id, raw_content=new_content, title=new_title, content_hash=new_hash)`.
+    *   Re-chunks `new_content`, generates new embeddings via `LLMService`.
+    *   Updates/replaces embeddings in `VectorDBService` associated with `document_id`.
+5.  **`AdminCommandHandlers.edit_global_doc_command`:**
+    *   Sends confirmation/error DM.
+
+**4. Deleting a Global Document (`/delete_global_doc <document_id>` - Task 7.8):**
+
+1.  **Admin User (Telegram):** Sends `/delete_global_doc <document_id>` (or `/delete_global_doc` to get prompt).
+2.  **`main.py`/PTB `Application`:** Routes to `AdminCommandHandlers.delete_global_doc_command`.
+3.  **`AdminCommandHandlers.delete_global_doc_command`:**
+    *   Verifies user is an admin.
+    *   Parses `document_id`. If missing, sends guidance and exits.
+    *   Calls `ContextService.is_global_document(document_id)` to verify.
+    *   Calls `ContextService.delete_document(document_id)`.
+4.  **`ContextService.delete_document`:**
+    *   Calls `VectorDBService.delete_embeddings_for_document(document_id)`.
+    *   Calls `DocumentRepository.delete_document(document_id)`.
+5.  **`AdminCommandHandlers.delete_global_doc_command`:**
+    *   Sends confirmation/error DM.
+
+-------
 
 ## V. Key Design Patterns & Python Best Practices
 

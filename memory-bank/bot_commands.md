@@ -41,14 +41,14 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Description:** Lists all closed proposals with their titles and final outcomes.
     *   **Context:** DM with the bot.
 
-*   `/edit_proposal <proposal_id>`
-    *   **Description:** Allows the original proposer to edit the title, description, or options of their proposal, but only if no votes or submissions have been cast yet.
+*   `/edit_proposal` or `/edit_proposal <proposal_id>`
+    *   **Description:** Allows the original proposer to edit the title, description, or options of their proposal, but only if no votes or submissions have been cast yet. If the user just says `/edit_proposal`, the bot should ask "which proposal? Use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`.
     *   **Parameters:**
         *   `<proposal_id>`: The ID of the proposal to edit.
     *   **Context:** DM with the bot (proposer only).
 
-*   `/cancel_proposal <proposal_id>`
-    *   **Description:** Allows the original proposer to cancel their active proposal before its deadline.
+*   `/cancel_proposal` or `/cancel_proposal <proposal_id>`
+    *   **Description:** Allows the original proposer to cancel their active proposal before its deadline. If the user just says `/cancel_proposal`, the bot should ask "which proposal? Use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`.
     *   **Parameters:**
         *   `<proposal_id>`: The ID of the proposal to cancel.
     *   **Context:** DM with the bot (proposer only).
@@ -63,8 +63,8 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Context:** DM with the bot.
     *   **Note:** The "Submit Your Idea" button on channel messages for free-form proposals will guide the user to a DM where they can click a button to prefill their chat input with `@BotUsername submit <proposal_id> `, to which they then add their submission text. This format is handled by the bot.
 
-*   `/view_results <proposal_id>`
-    *   **Description:** Allows any user to view all anonymized free-form text submissions or breakdown of votes (e.g. "30% A, 70% B") for a specific closed proposal.
+*   `/view_results` or `/view_results <proposal_id>`
+    *   **Description:** Allows any user to view all anonymized free-form text submissions or breakdown of votes (e.g. "30% A, 70% B") for a specific closed proposal. If the user just says `/view_results`, the bot should ask "for which proposal? use `/proposals open` for open proposals, `/proposals closed` for closed proposals, or `/my_proposals` for your proposals. Then use "/view_results <proposal_id>`.
     *   **Parameters:**
         *   `<proposal_id>`: The ID of the closed proposal.
     *   **Context:** DM with the bot.
@@ -79,10 +79,14 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Description:** Shows the user a list of proposals they have proposed, across all channels.
     *   **Context:** DM with the bot.
 
+*   `/my_docs`
+    *   **Description:** Shows the user the list of their docs, which they can manage (edit, delete).
+    *   **Context:** DM with the bot.
+
 ### Documents
 
-*   `/add_doc <proposal_id>`
-    *   **Description:** Allows the original proposer to add supplementary context (text, URL, or via chat) to their specific proposal after its initial creation. This context is used by the RAG system for `/ask` queries.
+*   `/add_doc` or `/add_doc <proposal_id>`
+    *   **Description:** Allows the original proposer to add supplementary context (text, URL, or via chat) to their specific proposal after its initial creation. This context is used by the RAG system for `/ask` queries. If the user just says `/add_doc`, the bot should say "which proposal? use `/my_proposals` to list all then `/add_doc <proposal_id>`".
     *   **Parameters:**
         *   `<proposal_id>`: The ID of the proposal to add context to.
         *   (Context can be provided as text/URL directly, or the bot might initiate a short chat).
@@ -110,14 +114,14 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<document_id>`: The ID of the document to view.
     *   **Context:** DM with the bot.
 
-*   `/edit_doc <document_id>`
-    *   **Description:** Allows the original proposer to edit the content of a specific context document they previously added to one of their proposals. (Bot might initiate a conversation to get new content).
+*   `edit_doc` or `/edit_doc <document_id>`
+    *   **Description:** Allows the original proposer to edit the content of a specific context document they previously added to one of their proposals. (Bot might initiate a conversation to get new content). If the user just says `/edit_doc`, the bot should say "which doc? use `/my_docs` to list all then use `/edit_doc <document_id>`".
     *   **Parameters:**
         *   `<document_id>`: The ID of the proposal-specific document to edit.
     *   **Context:** DM with the bot (proposer of the associated proposal only).
 
 *   `/delete_doc <document_id>`
-    *   **Description:** Allows the original proposer to delete a specific context document they previously added to one of their proposals.
+    *   **Description:** Allows the original proposer to delete a specific context document they previously added to one of their proposals. If the user just says `/delete_doc`, the bot should say "which doc? use `/my_docs` to list all then use `/delete_doc <document_id>`".
     *   **Parameters:**
         *   `<document_id>`: The ID of the proposal-specific document to delete.
     *   **Context:** DM with the bot (proposer of the associated proposal only).
@@ -134,14 +138,14 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Description:** Lists all global context documents (ID, title) added by administrators.
     *   **Context:** DM with the bot (admin only).
 
-*   `/edit_global_doc <document_id>`
-    *   **Description:** Allows an administrator to edit the content of a specific global context document. (Bot might initiate a conversation to get new content).
+*   `/edit_global_doc` or `/edit_global_doc <document_id>`
+    *   **Description:** Allows an administrator to edit the content of a specific global context document. (Bot might initiate a conversation to get new content). If the admin just says `/edit_global_doc`, the bot should ask "which doc? use `/my_docs` to list all then use `/edit_global_doc <document_id>`".
     *   **Parameters:**
         *   `<document_id>`: The ID of the global document to edit.
     *   **Context:** DM with the bot (admin only).
 
-*   `/delete_global_doc <document_id>`
-    *   **Description:** Allows an administrator to delete a specific global context document from the knowledge base.
+*   `/delete_global_doc` or `/delete_global_doc <document_id>`
+    *   **Description:** Allows an administrator to delete a specific global context document from the knowledge base. If the admin just says `/delete_global_doc`, the bot should ask "which doc? use `/my_docs` to list all then use `/delete_global_doc <document_id>`".
     *   **Parameters:**
         *   `<document_id>`: The ID of the global document to delete.
     *   **Context:** DM with the bot (admin only).
