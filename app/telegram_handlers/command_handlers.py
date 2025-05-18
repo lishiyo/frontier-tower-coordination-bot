@@ -37,7 +37,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             proposal_id_str = payload.split("submit_")[-1]
             proposal_id = int(proposal_id_str)
             
-            message_text = f"You\'re about to submit an idea for Proposal ID `{proposal_id}`\\.\\nClick the button below to prefill the command, then add your idea\\!"
+            message_text = f"You\'re about to submit an idea for Proposal ID `{proposal_id}`\\.\nClick the button below to prefill the command, then add your idea\\!"
             
             # This button WILL work because we are now in a DM with the bot.
             query_to_prefill = f"submit {proposal_id} "

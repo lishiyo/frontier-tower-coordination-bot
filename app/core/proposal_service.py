@@ -135,17 +135,23 @@ class ProposalService:
                 raw_results_data = {"submissions": submission_texts} # Store all submissions
                 
                 if submission_texts:
-                    # Placeholder for LLMService.cluster_and_summarize_texts (Task 5.3)
                     try:
-                        # summary = await self.llm_service.cluster_and_summarize_texts(submission_texts)
-                        # For now, a simple summary:
-                        summary = f"Received {len(submission_texts)} submission(s). Full list available via /view_results."
-                        # outcome_text = f"Idea collection ended. Summary: {summary}" # Or just use the summary
-                        outcome_text = summary # Keep it shorter for channel message
-                        logger.info(f"Proposal {proposal.id} (FF) - Generated placeholder summary for {len(submission_texts)} submissions.")
+                        summary = await self.llm_service.cluster_and_summarize_texts(submission_texts)
+                        if summary: # Check if summary is not None or empty
+                            # Ensure newlines from LLM (which might be literal \n or \\n) are actual \n characters
+                            # The LLM is prompted to provide newlines for formatting.
+                            # If the LLM itself sends '\n' (literal backslash + n), it might become '\\n' after f-string or escaping.
+                            # We want actual newline characters in the string before MarkdownV2 escaping.
+                            processed_summary = summary.replace("\\n", "\n").replace("\n", "\n") 
+                            # The f-string itself should use a literal newline where desired for the initial part.
+                            outcome_text = f"Idea collection ended. Summary of themes:\n{processed_summary}"
+                            logger.info(f"Proposal {proposal.id} (FF) - Generated LLM summary for {len(submission_texts)} submissions. Processed summary for outcome: {repr(outcome_text)}")
+                        else: # LLM service returned None or empty, or an error message string from the service itself
+                            outcome_text = "Idea collection ended. Could not generate a summary of submissions. Full list available via /view_results."
+                            logger.warning(f"Proposal {proposal.id} (FF) - LLM summary was None or empty. Fallback message used.")
                     except Exception as e:
-                        logger.error(f"Error during placeholder summary for proposal {proposal.id}: {e}")
-                        outcome_text = "Idea collection ended. Error processing submissions for summary."
+                        logger.error(f"Error during LLM clustering for proposal {proposal.id}: {e}", exc_info=True)
+                        outcome_text = "Idea collection ended. Error processing submissions for summary. Full list available via /view_results."
                 else:
                     outcome_text = "Idea collection ended. No submissions received."
                 logger.info(f"Proposal {proposal.id} (FF) outcome: {outcome_text}")
@@ -179,7 +185,7 @@ class ProposalService:
                                 # Escape the percentage part separately
                                 percentage_str = f"({percentage:.1f}%)"
                                 escaped_percentage_str = telegram_utils.escape_markdown_v2(percentage_str)
-                                results_message_text += f"\- {telegram_utils.escape_markdown_v2(option)}: {count} vote{'s' if count != 1 else ''} {escaped_percentage_str}\n"
+                                results_message_text += f"\\- {telegram_utils.escape_markdown_v2(option)}: {count} vote{'s' if count != 1 else ''} {escaped_percentage_str}\n"
                         
                         # Escape the final instructional line part that's not in a code block
                         bot_username_mention = f"@{self.bot_app.bot.username}" if self.bot_app and self.bot_app.bot and self.bot_app.bot.username else "the bot"

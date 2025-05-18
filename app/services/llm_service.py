@@ -121,6 +121,56 @@ class LLMService:
             logger.error(f"Error getting completion for prompt '{prompt[:50]}...': {e}", exc_info=True)
             return None
 
+    async def cluster_and_summarize_texts(self, texts: List[str], model: str = "gpt-4o") -> Optional[str]:
+        """
+        Clusters a list of texts and generates a concise summary for each cluster using an LLM.
+        Aims to identify 3-5 main themes or clusters.
+        Returns a single string containing the summarized clusters, or None if an error occurs or no texts are provided.
+        """
+        if not self.client:
+            logger.error("LLMService client not initialized. Cannot cluster and summarize texts.")
+            return None
+
+        if not texts:
+            logger.warning("No texts provided to cluster_and_summarize_texts. Returning None.")
+            return None
+
+        # Construct the prompt for the LLM
+        # Combine all texts into a single string, clearly demarcated
+        numbered_texts = "\n".join([f"{i+1}. {text}" for i, text in enumerate(texts)])
+        
+        prompt = (
+            f"You are a text analysis assistant specializing in summarizing and clustering free-form text submissions. "
+            f"Below are several text submissions. Your task is to identify the main themes or clusters of ideas present in these submissions. "
+            f"Aim to identify between 1 to 5 main clusters, but adjust based on the diversity of the content. "
+            f"For each cluster, provide a CONCISE title or heading for the theme, followed by a BRIEF summary (1-2 sentences) of the ideas within that cluster. "
+            f"If there are very few submissions or they are all very similar, it's acceptable to identify fewer clusters.\n\n"
+            f"Here are the submissions:\n"
+            f"{numbered_texts}\n\n"
+            f"Please format your output clearly, with each cluster's title and summary. "
+            f"For example:\n"
+            f"Theme 1: [Cluster Title 1]\n"
+            f"Summary: [Brief summary of ideas in cluster 1]\n\n"
+            f"Theme 2: [Cluster Title 2]\n"
+            f"Summary: [Brief summary of ideas in cluster 2]\n"
+            f"..."
+        )
+
+        logger.info(f"Attempting to cluster and summarize {len(texts)} texts.")
+
+        try:
+            summary_text = await self.get_completion(prompt, model=model)
+
+            if not summary_text:
+                logger.warning("LLM returned no summary for clustering.")
+                return "No summary could be generated from the submissions." # Return a placeholder
+
+            logger.info(f"Successfully generated cluster summary for {len(texts)} texts.")
+            return summary_text
+        except Exception as e:
+            logger.error(f"Unexpected error during text clustering and summarization for {len(texts)} texts: {e}", exc_info=True)
+            return "An error occurred while generating the summary." # Return a placeholder
+
 # Example usage (for testing purposes, would not be here in production)
 if __name__ == '__main__':
     import asyncio

@@ -63,12 +63,7 @@ async def handle_prefilled_submit(update: Update, context: ContextTypes.DEFAULT_
     Handles messages that match the prefilled submit format: @botname submit <proposal_id> <text>
     This is triggered after a user clicks a switch_inline_query_current_chat button.
     """
-    logger.info(
-        f"Attempting handle_prefilled_submit. Effective user: {update.effective_user.id if update.effective_user else 'None'}. "
-        f"Message text: '{update.message.text if update.message else 'None'}'. "
-        f"Bot username from context: '{context.bot.username if context.bot else 'None'}'"
-    )
-
+    
     if not update.message or not update.message.text or not update.effective_user:
         logger.warning("handle_prefilled_submit received an empty message or no user.")
         return

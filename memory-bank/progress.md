@@ -1,5 +1,25 @@
 # Progress Log
 
+## Sat May 17 19:18:14 PDT 2025
+
+**Completed:**
+- Task 5.3: Implement LLM Clustering for Free-Form Proposals.
+    - Added `cluster_and_summarize_texts` method to `LLMService`.
+    - Integrated this method into `ProposalService.process_expired_proposals` to generate summaries for free-form proposal results.
+- Resolved critical database errors related to `telegram_id` size:
+    - Changed `User.telegram_id` from `Integer` to `BigInteger`.
+    - Changed `Submission.submitter_id` (ForeignKey to `User.telegram_id`) from `Integer` to `BigInteger`.
+    - Changed `Proposal.proposer_telegram_id` (ForeignKey to `User.telegram_id`) from `Integer` to `BigInteger`.
+    - Successfully created and applied three Alembic migrations to reflect these schema changes in the database (`f1ac7397b643`, `2de06a4f92b0`, `f558c5a9a4d6`).
+
+**Learnings & Fixes:**
+- When dealing with external identifiers like Telegram User IDs, it's crucial to use a sufficiently large data type (e.g., `BigInteger`) in all tables where these IDs are stored or referenced (including foreign keys).
+- Alembic autogeneration might not always capture all necessary changes for `alter_column` operations, requiring manual verification and population of migration scripts.
+
+**Next Steps:**
+- Address newline display bug in free-form proposal result summaries (currently showing raw `\n` instead of rendering a newline).
+- Continue with Phase 6: RAG for `/ask` Command & Admin Document Management.
+
 ## Sat May 17 18:44:38 PDT 2025
 
 **Completed:**
