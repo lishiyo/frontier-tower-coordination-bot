@@ -1,5 +1,27 @@
 # Progress Log
 
+## Sat May 17 17:31:03 PDT 2025
+
+**Completed:**
+- Task 4.2 (Partial): Addressed issues with ephemeral vote confirmation alerts.
+    - Refactored `handle_vote_callback` in `app/telegram_handlers/callback_handlers.py` to call `query.answer()` only once at the end of the function.
+    - Ensured `show_alert=True` is used for vote confirmation, making the pop-up alert reliably display after a user votes.
+- Previously addressed in this session:
+    - Fixed vote buttons not appearing for multiple-choice proposals due to enum vs enum.value comparison error in `app/telegram_handlers/message_handlers.py`.
+    - Resolved `AttributeError: 'UserService' object has no attribute 'get_user_by_telegram_id'` in `app/core/submission_service.py` by using `register_user_interaction`.
+    - Corrected MarkdownV2 parsing errors for DM confirmations in `app/telegram_handlers/message_handlers.py` (e.g., escaping special characters or simplifying message).
+    - Investigated and reverted `per_message=True` in `ConversationHandler` for `/propose` as it caused command detection issues. The `per_message=False` warning is noted but accepted.
+
+**Learnings & Fixes:**
+- Calling `query.answer()` multiple times or prematurely within a callback handler can prevent `show_alert=True` from working correctly. It should typically be called once at the end.
+- The `PTBUserWarning` regarding `per_message=False` in `ConversationHandler` is benign for handlers that mix `CommandHandler` entry points with `CallbackQueryHandler` states if not all handlers are `CallbackQueryHandler`. Reverting to `per_message=False` fixed command detection.
+
+**Next Steps:**
+- Continue with Task 4.2:
+    - Thoroughly test the vote confirmation alert under various conditions.
+    - Mark Task 4.2 sub-items as complete in `tasks.md` based on successful testing.
+- Proceed to Task 4.3: Free-Form Submission (`/submit` Command).
+
 ## Sat May 17 16:13:24 PDT 2025
 
 **Completed:**

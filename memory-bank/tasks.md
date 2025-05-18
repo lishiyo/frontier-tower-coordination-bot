@@ -278,7 +278,11 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [x] Return success/failure.
     *   [x] `handle_vote_callback` calls `SubmissionService.record_vote(...)`.
     *   [x] Send ephemeral confirmation to user (`answer_callback_query`).
-    *   [ ] Test this is working manually.
+    *   [x] Test this is working manually.
+    *   [x] **UI Update:** After a successful vote:
+        *   [x] Modify `handle_vote_callback` in `app/telegram_handlers/callback_handlers.py`.
+        *   [x] Instead of a default ephemeral message, use `query.answer(text=f"Your vote for '{VOTED_OPTION}' has been recorded!", show_alert=True)` for a more prominent, user-specific pop-up confirmation.
+        *   [x] The original proposal message in the channel (with voting buttons) will remain unchanged for other users to vote.
 
 3.  **Task 4.3: Free-Form Submission (`/submit` Command)**
     *   [ ] In `app/telegram_handlers/command_handlers.py`, implement `submit_command` handler.

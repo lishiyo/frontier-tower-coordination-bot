@@ -93,18 +93,17 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     """
     Handles callback queries for voting on multiple-choice proposals.
     Callback data format: vote_[proposal_id]_[option_index]
+    Ensures query.answer() is called only once.
     """
     query = update.callback_query
-    # It's good practice to answer the callback query immediately to provide quick feedback to the user.
-    # However, if the operation is very fast, it might be okay to answer after the operation.
-    # For potentially longer operations (DB access), answer first.
-    await query.answer() 
+    response_message_text = "An unexpected error occurred."
+    success_for_alert = False # Determines if the final alert is for success or error
 
     callback_data = query.data
     if not callback_data or not callback_data.startswith("vote_"):
         logger.warning(f"handle_vote_callback received invalid data: {callback_data}")
-        # await query.edit_message_text(text="Error: Invalid vote data.") # Editing message not ideal for ephemeral error
-        await query.answer(text="Error: Invalid vote data received.", show_alert=True)
+        response_message_text = "Error: Invalid vote data received."
+        await query.answer(text=response_message_text, show_alert=True)
         return
 
     try:
@@ -122,41 +121,29 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.info(f"Vote received: User {user_telegram_id} selected option {option_index} for proposal {proposal_id}.")
 
         async with AsyncSessionLocal() as session:
-            # Ensure user is registered before attempting to vote
-            # This helps prevent foreign key constraint errors if a user somehow bypasses /start
             user_service = UserService(session)
             await user_service.register_user_interaction(
                 telegram_id=user_telegram_id,
                 username=user_username,
                 first_name=user_first_name
             )
-            # The commit for user registration will be handled by SubmissionService or at the end if needed,
-            # for now, SubmissionRepository has its own commit after upsert.
-            # Let's assume SubmissionService/Repository will handle its own transaction for the vote.
-            # If user_service.register_user_interaction needs a separate commit, it should also be handled.
-            # For now, let's assume the user registration commit is handled if necessary by user_service 
-            # or that SubmissionService will do a commit that covers this if they share a session and no prior commit happened.
-            # Actually, submission_repository.add_or_update_submission has its own commit. 
-            # To be safe, user_service.register_user_interaction should also ensure its commit if it modifies data.
-            # Let's assume UserService does its own commit as well or its underlying repo does.
-            await session.commit() # Commit user registration if any changes were made
+            await session.commit()
 
             submission_service = SubmissionService(session)
-            success, message = await submission_service.record_vote(
+            success_for_alert, response_message_text = await submission_service.record_vote(
                 proposal_id=proposal_id,
                 submitter_telegram_id=user_telegram_id,
                 option_index=option_index
             )
-            # The commit for the vote itself is handled within submission_service.record_vote -> submission_repository.add_or_update_submission
-
-            if success:
-                await query.answer(text=message, show_alert=False) # Ephemeral confirmation
-            else:
-                await query.answer(text=message, show_alert=True) # Ephemeral error, with alert
 
     except ValueError as ve:
         logger.error(f"Error parsing vote callback data '{callback_data}': {ve}", exc_info=True)
-        await query.answer(text="Error: Could not process your vote due to invalid data format.", show_alert=True)
+        response_message_text = "Error: Could not process your vote due to invalid data format."
     except Exception as e:
         logger.error(f"Error processing vote callback for data '{callback_data}': {e}", exc_info=True)
-        await query.answer(text="An unexpected error occurred while processing your vote. Please try again.", show_alert=True) 
+        response_message_text = "An unexpected error occurred while processing your vote. Please try again."
+    
+    # Single call to query.answer() at the end
+    # For success, submission_service.record_vote already provides a good message.
+    # For errors caught here, response_message_text is set accordingly.
+    await query.answer(text=response_message_text, show_alert=True) 
