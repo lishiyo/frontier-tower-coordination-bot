@@ -333,8 +333,8 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Add this job to the scheduler (e.g., to run every few minutes).
     *   [x] Ensure `ProposalService` has access to the bot application instance for sending messages.
     *   [x] Manually test.
-    *   [ ] Make everything PST instead of UTC (e.g. "Voting ends", "Deadline set for" should be in UTC).
-    *   [ ] For the results message, instead of "(DM the bot)" use "(DM @botname)".
+    *   [x] Make everything PST instead of UTC (e.g. "Voting ends", "Deadline set for" should be in UTC).
+    *   [x] For the results message, instead of "(DM the bot)" use "(DM @botname)".
 
 3.  **Task 5.3: Implement LLM Clustering for Free-Form**
     *   [ ] In `LLMService`, implement `cluster_and_summarize_texts(texts: list[str])`:
