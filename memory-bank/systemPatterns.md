@@ -203,7 +203,9 @@ telegram_bot/
     *   Updates the proposal in the DB with `channel_message_id` via `ProposalRepository.update_message_id(proposal_id, channel_msg_id)`.
     *   Ends `ConversationHandler`.
 
-*Note*: Users can also edit and delete proposals. They can edit a proposal that has not been voted on yet. If the proposal has been voted on already, they have to delete it and make a new proposal.
+*Notes*: 
+- Users can also edit and delete proposals. They can edit a proposal that has not been voted on yet. If the proposal has been voted on already, they have to delete it and make a new proposal.
+- Users can view proposals via `/my_proposals`, `/proposals open`, and `/proposals closed`.
 
 ### B. User Votes and Submissions
 

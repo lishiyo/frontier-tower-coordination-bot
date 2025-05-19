@@ -419,13 +419,13 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Write unit tests for the new repository and service methods, and the command handler.
     *   [x] Test this is working manually.
 
-3.  **Task 7.3: Implement `/proposals open` and `/proposals closed`**
+3.  **Task 7.3: Implement `/proposals`, `/proposals open` and `/proposals closed`**
     *   [ ] If the user just types `/proposals`, the bot should ask "open or closed?" If the user says "open", use `/proposals open` and if closed, use `/proposals closed`.
     *   [ ] In `ProposalRepository`, add `get_proposals_by_status(status: str)`.
     *   [ ] In `ProposalService`, implement `list_proposals_by_status(status: str)`:
         *   [ ] Fetch proposals from repository.
         *   [ ] Format list of (title, deadline/outcome).
-    *   [ ] Implement `proposals_open_command` and `proposals_closed_command` in `command_handlers.py`, calling the service and DMing results.
+    *   [ ] Implement `proposals_open_command` and `proposals_closed_command` in `proposal_command_handlers.py`, calling the service and DMing results.
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
@@ -437,7 +437,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Check `SubmissionRepository.count_submissions_for_proposal()`. If > 0, reject edit.
         *   [ ] Update proposal fields in `ProposalRepository`.
         *   [ ] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
-    *   [ ] Implement `edit_proposal_command` in `command_handlers.py` (likely needs a conversation to get new details).
+    *   [ ] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details).
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
@@ -447,7 +447,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Fetch proposal. Verify `proposer_id` matches and status is "open".
         *   [ ] Update status to "cancelled" via `ProposalRepository`.
         *   [ ] Update channel message (e.g., "Proposal cancelled").
-    *   [ ] Implement `cancel_proposal_command` in `command_handlers.py`.
+    *   [ ] Implement `cancel_proposal_command` in `proposal_command_handlers.py`.
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
@@ -458,19 +458,19 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] In `app/core/context_service.py`, add `list_documents_by_proposer(user_id: int)`:
         *   [ ] This service method will call `DocumentRepository.get_documents_by_proposer_id()`.
         *   [ ] It should format the results into a list of dictionaries, each containing `document_id`, `document_title`, and optionally the `proposal_id` and `proposal_title` it's associated with.
-    *   [ ] In `app/telegram_handlers/user_command_handlers.py` (or `document_command_handlers.py`), implement `my_docs_command`:
+    *   [ ] In `app/telegram_handlers/user_command_handlers.py`, implement `my_docs_command`:
         *   [ ] This command handler will call `ContextService.list_documents_by_proposer()`.
         *   [ ] It will format and send the list of documents to the user via DM.
         *   [ ] If no documents are found, it should inform the user (e.g., "You haven't added any documents to your proposals yet.").
     *   [ ] Add `/my_docs` command to `main.py` command registration.
-    *   [ ] Ensure `/my_docs` is documented in `memory-bank/bot_commands.md`.
+    *   [x] Ensure `/my_docs` is documented in `memory-bank/bot_commands.md`.
     *   [ ] Write unit tests for the new repository and service methods, and the command handler.
     *   [ ] Test this is working manually.
 
 7. **Task 7.7: Implement `/add_doc` Command (Proposer Only)**
     *   [ ] If the user just says `/add_doc`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/add_doc <doc_id>`".
     *   [ ] In `ProposalRepository`, ensure `get_proposal_by_id` fetches `proposer_id`.
-    *   [ ] Implement `add_doc_command` in `command_handlers.py`:
+    *   [ ] Implement `add_doc_command` in `document_command_handlers.py`:
         *   [ ] Parse `proposal_id`.
         *   [ ] Verify user is the proposer of `proposal_id`.
         *   [ ] If text/URL provided in command, call `ContextService.process_and_store_document
@@ -513,7 +513,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 9.  **Task 7.9: Implement Admin Global Document Management (List, Edit, Delete)**
     *   **Implement `/view_global_docs` Command (Admin Only):**
-        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `view_global_docs_command`.
+        *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `view_global_docs_command`.
         *   [ ] Verify user is an admin.
         *   [ ] In `DocumentRepository`, add `get_global_documents()` (e.g., where `proposal_id` is NULL).
         *   [ ] In `ContextService`, add `list_global_documents()` that calls the repository method and formats a list (ID, title).
@@ -521,7 +521,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Test this is working manually.
     *   **Implement `/edit_global_doc <document_id>` Command (Admin Only):**
         *   [ ] If the admin just says `/edit_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_global_doc <doc_id>`". 
-        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `edit_global_doc_command`.
+        *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `edit_global_doc_command`.
         *   [ ] Verify user is an admin.
         *   [ ] Handler parses `document_id`.
         *   [ ] In `ContextService`, add `is_global_document(document_id)` (checks if `proposal_id` is NULL).
@@ -533,7 +533,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Test this is working manually.
     *   **Implement `/delete_global_doc <document_id>` Command (Admin Only):**
         *   [ ] If the admin just says `/delete_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_global_doc <doc_id>`".
-        *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or admin handlers), implement `delete_global_doc_command`.
+        *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `delete_global_doc_command`.
         *   [ ] Verify user is an admin.
         *   [ ] Handler parses `document_id`.
         *   [ ] Verify document is a global document using `ContextService.is_global_document()`.
