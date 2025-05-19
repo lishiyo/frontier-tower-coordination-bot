@@ -398,6 +398,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] For each submission, fetch proposal details.
         *   [x] Format a list of (proposal title, user's response, proposal status/outcome).
     *   [x] In `app/telegram_handlers/command_handlers.py`, implement `my_votes_command` calling `SubmissionService.get_user_submission_history()` and DMs the result.
+    *   [ ] Write unit tests for the new repository and service methods, and the command handler.
     *   [x] Test this is working manually.
 
 2.  **Task 7.2: Implement `/my_proposals` command**
@@ -425,6 +426,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Fetch proposals from repository.
         *   [ ] Format list of (title, deadline/outcome).
     *   [ ] Implement `proposals_open_command` and `proposals_closed_command` in `command_handlers.py`, calling the service and DMing results.
+    *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 4.  **Task 7.4: Implement `/edit_proposal` Command (Proposer Only)**
@@ -436,6 +438,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Update proposal fields in `ProposalRepository`.
         *   [ ] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
     *   [ ] Implement `edit_proposal_command` in `command_handlers.py` (likely needs a conversation to get new details).
+    *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 5.  **Task 7.5: Implement `/cancel_proposal` Command (Proposer Only)**
@@ -445,6 +448,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Update status to "cancelled" via `ProposalRepository`.
         *   [ ] Update channel message (e.g., "Proposal cancelled").
     *   [ ] Implement `cancel_proposal_command` in `command_handlers.py`.
+    *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 6. **Task 7.6: Implement `/my_docs` Command**
@@ -473,6 +477,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         (content, proposal_id=proposal_id, source_type="proposer_added_context")`.
         *   [ ] (Optional) Could initiate a short conversation if no context provided in command.
     *   [ ] Send confirmation/error DM.
+    *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 8.  **Task 7.8: Implement Proposer Document Editing and Deletion**
@@ -491,6 +496,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] Updates `content_hash`.
         *   [ ] Call `ContextService.update_document_content()`.
         *   [ ] Send confirmation/error DM.
+        *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
     *   **Implement `/delete_doc <document_id>` Command (Proposer Only):**
         *   [ ] If the user just says `/delete_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_doc <doc_id>`".
@@ -502,6 +508,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] Deletes document from `DocumentRepository`.
         *   [ ] Call `ContextService.delete_document()`.
         *   [ ] Send confirmation/error DM.
+        *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
 
 9.  **Task 7.9: Implement Admin Global Document Management (List, Edit, Delete)**
@@ -522,6 +529,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Initiate a conversation (or expect further message) for new content/title.
         *   [ ] Call `ContextService.update_document_content()` (from Task 7.8).
         *   [ ] Send confirmation/error DM.
+        *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
     *   **Implement `/delete_global_doc <document_id>` Command (Admin Only):**
         *   [ ] If the admin just says `/delete_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_global_doc <doc_id>`".
@@ -531,6 +539,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Verify document is a global document using `ContextService.is_global_document()`.
         *   [ ] Call `ContextService.delete_document()` (from Task 7.8).
         *   [ ] Send confirmation/error DM.
+        *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
 
 10.  **Task 7.10: Implement `/view_results` Command**
@@ -541,11 +550,13 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] For "free_form" results, fetch `proposal.raw_results` (which should contain the list of anonymized submissions).
         *   [ ] Format for display.
     *   [ ] Implement `view_results_command` in `submission_command_handlers.py`.
+    *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 11.  **Task 7.11: Implement `/privacy` Command**
     *   [ ] Create a static privacy policy text.
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
+    *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 ## Phase 8: Multi-Channel Support Enhancements
@@ -570,6 +581,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Implement logic to detect in-channel `/propose` commands, verify channel authorization against the configured list/table, and set that channel as the proposal's `target_channel_id`.
     *   [ ] Update the channel results posting logic in `SchedulingService`/`ProposalService` to use the proposal's `target_channel_id`.
     *   [ ] Update user-facing proposal listings (like `/proposals open/closed`) to potentially include channel information or allow filtering.
+    *   [ ] Write unit tests, verify passing.
 
 2.  **Task 8.2: Enhance `/view_docs` for Multi-Channel Support**
     *   [ ] **`/view_docs` (no arguments):**
@@ -581,12 +593,14 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Consider if general documents (added via `/add_global_doc`) should be associable with specific authorized channels (new `associated_channel_id` field in `Document` model).
         *   [ ] If so, `/view_docs <channel_id>` could also list general documents associated with that channel.
         *   [ ] RAG queries via `/ask` could then also be filtered/prioritized by documents relevant to the channel a user is in or asking about.
+        *   [ ] Write unit tests, verify passing.
 
 3.  **Task 8.3: Testing Multi-Channel Document Viewing**
     *   [ ] Configure multiple authorized channels.
     *   [ ] Test `/view_docs` (no args) lists all configured channels.
     *   [ ] Test `/view_docs <channel_id>` for different authorized channels, ensuring correct proposal listings.
     *   [ ] Ensure `/view_docs <proposal_id>` and `/view_doc <document_id>` continue to function correctly regardless of how many channels are configured.
+    *   [ ] Write unit tests, verify passing.
 
 4.  **Task 8.4: Implement Intelligent Help via LLM (`/help <question>`)**
     *   **Goal:** Allow users to ask natural language questions about bot functionality using `/help <question>` and receive LLM-generated answers based on `bot_commands.md`.
@@ -605,6 +619,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] The prompt should instruct the LLM to use the provided `docs_content` to answer the `question` by explaining relevant commands and their usage.
             *   [ ] Call the LLM completion endpoint and return the answer.
         *   [ ] Ensure the `help_command` handler sends the response from the service back to the user via DM.
+        *   [ ] Write unit tests, verify passing.
         *   [ ] Test with various questions to ensure clarity and accuracy of LLM responses.
 
 ## Phase 9: Comprehensive Testing, Refinement, and Deployment Preparation
