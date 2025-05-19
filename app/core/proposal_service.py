@@ -159,6 +159,33 @@ class ProposalService:
             formatted_proposals.append(proposal_info)
         return formatted_proposals
 
+    async def get_proposal_for_editing(self, proposal_id: int, user_telegram_id: int) -> tuple[Optional[Proposal], Optional[str]]:
+        """
+        Retrieves a proposal for editing, performing necessary checks.
+        Checks: Proposal existence, user authorization, proposal status (must be OPEN),
+                and if there are any submissions.
+        Returns: (Proposal, None) if all checks pass, otherwise (None, error_message).
+        """
+        proposal = await self.proposal_repository.get_proposal_by_id(proposal_id)
+
+        if not proposal:
+            return None, "Proposal not found."
+
+        if proposal.proposer_telegram_id != user_telegram_id:
+            return None, "You are not authorized to edit this proposal."
+
+        if proposal.status != ProposalStatus.OPEN.value:
+            return None, f"This proposal is not open for editing (current status: {proposal.status})."
+
+        submission_count = await self.submission_repository.count_submissions_for_proposal(proposal_id)
+        if submission_count > 0:
+            return None, (
+                f"This proposal cannot be edited because it already has submissions or votes. "
+                f"Please cancel it using `/cancel_proposal {proposal_id}` and create a new one if changes are needed."
+            )
+
+        return proposal, None
+
     async def edit_proposal_details(
         self,
         proposal_id: int,

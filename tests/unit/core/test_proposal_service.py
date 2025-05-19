@@ -3,10 +3,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 from typing import List, Dict, Any # Added Dict, Any
+from telegram.constants import ParseMode # Import ParseMode
 
 from app.core.proposal_service import ProposalService
 from app.persistence.models.proposal_model import Proposal, ProposalStatus, ProposalType
 from app.utils import telegram_utils # For formatting dates
+from app.persistence.models.user_model import User
+from app.utils.telegram_utils import escape_markdown_v2 # Import for direct use
+# Assuming you have a way to get Application for bot_app context, or mock it appropriately
+# from telegram.ext import Application
 
 # Add fixtures for the new tests
 @pytest.fixture
@@ -567,4 +572,197 @@ async def test_edit_proposal_details_no_reindex_without_content_change(
     
     # Verify no embedding was generated or stored
     mock_llm_service_instance.generate_embedding.assert_not_called()
-    mock_vector_db_instance.add_proposal_embedding.assert_not_called() 
+    mock_vector_db_instance.add_proposal_embedding.assert_not_called()
+
+@pytest.fixture
+def mock_db_session():
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    return session
+
+@pytest.fixture
+def mock_bot_app():
+    bot_app = MagicMock()
+    bot_app.bot = AsyncMock()
+    bot_app.bot.edit_message_text = AsyncMock()
+    return bot_app
+
+@pytest.fixture
+def mock_proposal_repository(mock_db_session):
+    repo = AsyncMock()
+    repo.get_proposal_by_id = AsyncMock()
+    repo.update_proposal_status = AsyncMock()
+    # Add other methods if your service uses them and they need mocking for these tests
+    return repo
+
+@pytest.fixture
+def proposal_service(mock_db_session, mock_bot_app, mock_proposal_repository):
+    # Patch the ProposalRepository instance within the service,
+    # or ensure the service is instantiated with the mock.
+    # For simplicity, let's assume ProposalService takes repository as an arg or sets it.
+    # If ProposalService instantiates its own repository, patching might be needed at module level.
+    # For now, let's assume it can be injected or set.
+    
+    # Re-mocking ProposalRepository inside the fixture to ensure it's used by the service
+    # This approach assumes ProposalService might instantiate its own repo if not passed.
+    # A cleaner way is if ProposalService accepts the repo in __init__.
+    # Based on current service structure, it instantiates repo internally.
+    # So we need to patch where it's instantiated or pass it.
+    # The service takes session and bot_app. It instantiates repository internally.
+    # So, we'll patch 'app.core.proposal_service.ProposalRepository'
+    
+    with patch('app.core.proposal_service.ProposalRepository', return_value=mock_proposal_repository):
+        service = ProposalService(db_session=mock_db_session, bot_app=mock_bot_app)
+        # service.proposal_repository = mock_proposal_repository # If it were settable
+        return service
+
+@pytest.fixture
+def sample_user():
+    return User(id=1, telegram_id=12345, username="testuser", first_name="Test")
+
+@pytest.fixture
+def sample_proposal(sample_user):
+    return Proposal(
+        id=1,
+        proposer_telegram_id=sample_user.telegram_id,
+        title="Test Proposal",
+        description="A test proposal.",
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        options=["Opt1", "Opt2"],
+        target_channel_id="-100123",
+        channel_message_id=555,
+        creation_date=datetime.now(timezone.utc),
+        deadline_date=datetime.now(timezone.utc), # Make sure it's realistic for 'open'
+        status=ProposalStatus.OPEN.value,
+        proposer=sample_user # Eager loaded proposer
+    )
+
+@pytest.mark.asyncio
+async def test_cancel_proposal_success(proposal_service, mock_proposal_repository, mock_db_session, mock_bot_app, sample_proposal, sample_user):
+    mock_proposal_repository.get_proposal_by_id.return_value = sample_proposal
+    
+    cancelled_proposal_mock = MagicMock(spec=Proposal)
+    cancelled_proposal_mock.id = sample_proposal.id
+    cancelled_proposal_mock.title = sample_proposal.title
+    cancelled_proposal_mock.description = sample_proposal.description
+    cancelled_proposal_mock.status = ProposalStatus.CANCELLED.value
+    cancelled_proposal_mock.target_channel_id = sample_proposal.target_channel_id
+    cancelled_proposal_mock.channel_message_id = sample_proposal.channel_message_id
+    
+    mock_proposal_repository.update_proposal_status.return_value = cancelled_proposal_mock
+    
+    with patch('app.core.proposal_service.telegram_utils.format_proposal_message', return_value="Formatted cancelled message text") as mock_format_message:
+        success, message = await proposal_service.cancel_proposal_by_proposer(
+            proposal_id=sample_proposal.id,
+            user_telegram_id=sample_user.telegram_id
+        )
+
+    assert success is True
+    assert message == f"Proposal ID {sample_proposal.id} has been successfully cancelled."
+    mock_proposal_repository.get_proposal_by_id.assert_called_once_with(sample_proposal.id)
+    mock_proposal_repository.update_proposal_status.assert_called_once_with(sample_proposal.id, ProposalStatus.CANCELLED)
+    mock_db_session.commit.assert_called_once()
+    
+    mock_format_message.assert_called_once_with(
+        proposal=cancelled_proposal_mock,
+        proposer=sample_proposal.proposer
+    )
+    
+    # Construct expected prefix using the same logic as the service
+    expected_channel_text_prefix = escape_markdown_v2("--- CANCELLED ---\n\n")
+    expected_final_text = expected_channel_text_prefix + "Formatted cancelled message text"
+    
+    mock_bot_app.bot.edit_message_text.assert_called_once_with(
+        chat_id=sample_proposal.target_channel_id,
+        message_id=sample_proposal.channel_message_id,
+        text=expected_final_text,
+        reply_markup=None,
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+@pytest.mark.asyncio
+async def test_cancel_proposal_not_found(proposal_service, mock_proposal_repository, sample_user):
+    mock_proposal_repository.get_proposal_by_id.return_value = None
+
+    success, message = await proposal_service.cancel_proposal_by_proposer(
+        proposal_id=999, # Non-existent
+        user_telegram_id=sample_user.telegram_id
+    )
+
+    assert success is False
+    assert message == "Proposal not found."
+    mock_proposal_repository.get_proposal_by_id.assert_called_once_with(999)
+    mock_proposal_repository.update_proposal_status.assert_not_called()
+    
+@pytest.mark.asyncio
+async def test_cancel_proposal_not_proposer(proposal_service, mock_proposal_repository, sample_proposal, sample_user):
+    mock_proposal_repository.get_proposal_by_id.return_value = sample_proposal
+    
+    wrong_user_id = 67890
+
+    success, message = await proposal_service.cancel_proposal_by_proposer(
+        proposal_id=sample_proposal.id,
+        user_telegram_id=wrong_user_id 
+    )
+
+    assert success is False
+    assert message == "You are not authorized to cancel this proposal."
+    mock_proposal_repository.get_proposal_by_id.assert_called_once_with(sample_proposal.id)
+    mock_proposal_repository.update_proposal_status.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_cancel_proposal_not_open(proposal_service, mock_proposal_repository, sample_proposal, sample_user):
+    sample_proposal.status = ProposalStatus.CLOSED.value # Set to not open
+    mock_proposal_repository.get_proposal_by_id.return_value = sample_proposal
+
+    success, message = await proposal_service.cancel_proposal_by_proposer(
+        proposal_id=sample_proposal.id,
+        user_telegram_id=sample_user.telegram_id
+    )
+
+    assert success is False
+    assert message == f"This proposal cannot be cancelled. Its current status is: {ProposalStatus.CLOSED.value}"
+    mock_proposal_repository.get_proposal_by_id.assert_called_once_with(sample_proposal.id)
+    mock_proposal_repository.update_proposal_status.assert_not_called()
+    sample_proposal.status = ProposalStatus.OPEN.value # Reset for other tests if fixture is session-scoped
+
+@pytest.mark.asyncio
+async def test_cancel_proposal_update_repo_fails(proposal_service, mock_proposal_repository, mock_db_session, sample_proposal, sample_user):
+    mock_proposal_repository.get_proposal_by_id.return_value = sample_proposal
+    mock_proposal_repository.update_proposal_status.return_value = None # Simulate failure
+
+    success, message = await proposal_service.cancel_proposal_by_proposer(
+        proposal_id=sample_proposal.id,
+        user_telegram_id=sample_user.telegram_id
+    )
+
+    assert success is False
+    assert message == "Failed to update proposal status to cancelled."
+    mock_proposal_repository.get_proposal_by_id.assert_called_once_with(sample_proposal.id)
+    mock_proposal_repository.update_proposal_status.assert_called_once_with(sample_proposal.id, ProposalStatus.CANCELLED)
+    mock_db_session.commit.assert_not_called() # Should not commit if update failed
+
+@pytest.mark.asyncio
+async def test_cancel_proposal_channel_message_edit_fails(proposal_service, mock_proposal_repository, mock_db_session, mock_bot_app, sample_proposal, sample_user):
+    mock_proposal_repository.get_proposal_by_id.return_value = sample_proposal
+    
+    cancelled_proposal_mock = MagicMock(spec=Proposal) # As in success test
+    cancelled_proposal_mock.status = ProposalStatus.CANCELLED.value
+    cancelled_proposal_mock.target_channel_id = sample_proposal.target_channel_id
+    cancelled_proposal_mock.channel_message_id = sample_proposal.channel_message_id
+    # ... other fields if needed by format_proposal_message
+    mock_proposal_repository.update_proposal_status.return_value = cancelled_proposal_mock
+    
+    mock_bot_app.bot.edit_message_text.side_effect = Exception("Telegram API error")
+
+    with patch('app.core.proposal_service.telegram_utils.format_proposal_message', return_value="Formatted message"):
+        success, message = await proposal_service.cancel_proposal_by_proposer(
+            proposal_id=sample_proposal.id,
+            user_telegram_id=sample_user.telegram_id
+        )
+
+    assert success is True # Primary action (cancellation) succeeded
+    assert message == f"Proposal ID {sample_proposal.id} has been successfully cancelled."
+    mock_db_session.commit.assert_called_once() # Commit should still happen
+    mock_bot_app.bot.edit_message_text.assert_called_once() # Attempted to edit 
