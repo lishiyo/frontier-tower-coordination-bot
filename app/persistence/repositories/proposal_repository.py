@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Sequence
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.persistence.models.proposal_model import Proposal, ProposalStatus, ProposalType
@@ -148,4 +148,10 @@ class ProposalRepository:
             .order_by(Proposal.creation_date.desc())
         )
         result = await self.db_session.execute(stmt)
-        return list(result.scalars().all()) 
+        return list(result.scalars().all())
+
+    async def get_proposals_by_status(self, status: str) -> Sequence[Proposal]:
+        """Fetches proposals from the database by their status."""
+        query = select(Proposal).where(Proposal.status == status).order_by(Proposal.deadline_date.desc())
+        result = await self.db_session.execute(query)
+        return result.scalars().all() 

@@ -16,7 +16,9 @@ from app.telegram_handlers.document_command_handlers import (
     # edit_doc_command, delete_doc_command, view_global_docs_command, edit_global_doc_command, delete_global_doc_command, add_global_doc_command, add_doc_command, edit_proposal_command # Commented out
 )
 from app.telegram_handlers.proposal_command_handlers import (
-    proposal_conv_handler, my_proposals_command # get_proposal_creation_conv_handler, cancel_proposal_command, proposals_command 
+    proposal_conv_handler, 
+    my_proposals_command as my_proposals_command_from_proposal_handlers, # alias to avoid conflict if it exists elsewhere
+    proposals_command
 )
 from app.telegram_handlers.submission_command_handlers import (
     submit_command, handle_prefilled_submit #, my_votes_command, view_results_command, ask_command # Commented out
@@ -26,7 +28,7 @@ from app.telegram_handlers.callback_handlers import (
     handle_collect_proposal_type_callback, # Corrected name
     # handle_channel_selection_callback # Commented out - definition missing in callback_handlers.py
 )
-from app.telegram_handlers.admin_command_handlers import get_add_global_doc_conversation_handler # Added
+from app.telegram_handlers.admin_command_handlers import get_add_global_doc_conversation_handler # view_global_docs_command, edit_global_doc_command, delete_global_doc_command
 from app.telegram_handlers.error_handler import error_handler
 
 # Import scheduler functions
@@ -78,11 +80,10 @@ def main() -> None:
     # application.add_handler(CommandHandler("delete_global_doc", delete_global_doc_command)) # Task 7.9
     application.add_handler(CommandHandler("submit", submit_command, block=False)) # Task 4.3, added block=False
     application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
-    application.add_handler(CommandHandler("my_proposals", my_proposals_command)) # Task 7.2
+    application.add_handler(CommandHandler("my_proposals", my_proposals_command_from_proposal_handlers)) # Task 7.2
     # application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
     # application.add_handler(CommandHandler("view_results", view_results_command)) # Task 7.6
     application.add_handler(CommandHandler("ask", ask_command)) # Task 6.1
-    # application.add_handler(CommandHandler("proposals", proposals_command)) # Task 7.2
     # application.add_handler(CommandHandler("cancel_proposal", cancel_proposal_command)) # Task 7.4
     # application.add_handler(CommandHandler("add_doc", add_doc_command)) # Task 7.5
     # application.add_handler(CommandHandler("edit_proposal", edit_proposal_command)) # Task 7.3
@@ -98,6 +99,9 @@ def main() -> None:
     # Register CallbackQueryHandlers
     application.add_handler(CallbackQueryHandler(handle_collect_proposal_type_callback, pattern=f"^{PROPOSAL_TYPE_CALLBACK}")) # Corrected name
     application.add_handler(CallbackQueryHandler(handle_vote_callback, pattern=r"^vote_.*$")) # Task 4.2
+
+    # Proposal viewing commands
+    application.add_handler(CommandHandler("proposals", proposals_command))
 
     application.add_error_handler(error_handler) # Added error handler
 

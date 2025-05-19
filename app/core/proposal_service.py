@@ -95,6 +95,27 @@ class ProposalService:
             })
         return formatted_proposals
 
+    async def list_proposals_by_status(self, status: str) -> list[dict]:
+        """Lists proposals by their status (e.g., 'open', 'closed')."""
+        proposals = await self.proposal_repository.get_proposals_by_status(status)
+        formatted_proposals = []
+        for proposal in proposals:
+            proposal_info = {
+                "id": proposal.id,
+                "title": proposal.title,
+                "status": proposal.status.value if hasattr(proposal.status, 'value') else str(proposal.status),
+                "target_channel_id": proposal.target_channel_id,
+                "channel_message_id": proposal.channel_message_id
+            }
+            if proposal.status == ProposalStatus.OPEN.value:
+                proposal_info["deadline_date"] = telegram_utils.format_datetime_for_display(proposal.deadline_date)
+            elif proposal.status == ProposalStatus.CLOSED.value:
+                proposal_info["outcome"] = proposal.outcome or "Results not yet processed or N/A"
+                proposal_info["closed_date"] = telegram_utils.format_datetime_for_display(proposal.deadline_date) # Or a separate closed_at field if added
+            
+            formatted_proposals.append(proposal_info)
+        return formatted_proposals
+
     async def process_expired_proposals(self) -> List[Proposal]:
         """
         Processes proposals that have passed their deadline.

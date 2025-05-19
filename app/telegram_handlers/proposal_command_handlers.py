@@ -3,10 +3,11 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, CallbackQueryHandler
 from typing import List # Minimal imports from typing
 import telegram.ext.filters as filters # For PTB V20+
+from telegram.constants import ParseMode
 
 from app.core.user_service import UserService
 from app.persistence.database import AsyncSessionLocal
-from app.persistence.models.proposal_model import ProposalType
+from app.persistence.models.proposal_model import ProposalType, ProposalStatus
 from app.config import ConfigService
 from app.telegram_handlers.conversation_defs import (
     COLLECT_TITLE, COLLECT_DESCRIPTION, COLLECT_PROPOSAL_TYPE, COLLECT_OPTIONS, ASK_DURATION, 
@@ -27,6 +28,9 @@ from app.core.proposal_service import ProposalService
 from app.utils import telegram_utils
 
 logger = logging.getLogger(__name__)
+
+# Define states for the /proposals conversation if needed for the base command
+ASK_PROPOSAL_STATUS_FILTER = 1
 
 async def propose_command_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -171,7 +175,7 @@ async def my_proposals_command(update: Update, context: ContextTypes.DEFAULT_TYP
             channel_id_escaped = telegram_utils.escape_markdown_v2(str(prop['target_channel_id']))
             
             part = (
-                f"\- *Title:* {title} \(ID: `{prop['id']}`\)\n"
+                f"\\- *Title:* {title} \\(ID: `{prop['id']}`\\)\n"
                 f"  Status: {status}\n"
                 f"  Type: {telegram_utils.escape_markdown_v2(prop['proposal_type'])}\n"
                 f"  Channel: `{channel_id_escaped}`\n"
@@ -189,6 +193,85 @@ async def my_proposals_command(update: Update, context: ContextTypes.DEFAULT_TYP
         text=message_text, 
         parse_mode='MarkdownV2'
     )
+
+async def proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles /proposals [open|closed] command."""
+    if not update.effective_user or not update.message:
+        logger.warning("proposals_command called without effective_user or message.")
+        return
+
+    args = context.args
+    user_id = update.effective_user.id
+
+    if not args:
+        # Base /proposals command
+        await update.message.reply_text(
+            "Please specify if you want to see 'open' or 'closed' proposals.\n"
+            "Usage: `/proposals open` or `/proposals closed`"
+        )
+        return
+
+    filter_status_str = args[0].lower()
+    status_to_fetch = None
+    display_type = ""
+
+    if filter_status_str == "open":
+        status_to_fetch = ProposalStatus.OPEN
+        display_type = "Open"
+    elif filter_status_str == "closed":
+        status_to_fetch = ProposalStatus.CLOSED
+        display_type = "Closed"
+    else:
+        await update.message.reply_text(
+            f"Unknown filter: {args[0]}. Please use 'open' or 'closed'.\n"
+            "Usage: `/proposals open` or `/proposals closed`"
+        )
+        return
+
+    async with AsyncSessionLocal() as session:
+        proposal_service = ProposalService(session)
+        proposals = await proposal_service.list_proposals_by_status(status_to_fetch.value)
+
+    if not proposals:
+        await update.message.reply_text(f"No {display_type.lower()} proposals found.")
+        return
+
+    message_parts = [f"{display_type} Proposals:\n"]
+    for prop_data in proposals:
+        title_escaped = telegram_utils.escape_markdown_v2(prop_data['title'])
+        channel_id_str = str(prop_data['target_channel_id'])
+        
+        channel_display = telegram_utils.escape_markdown_v2(channel_id_str)
+        channel_message_id = prop_data.get('channel_message_id')
+
+        if channel_message_id and channel_id_str.startswith("-100"):
+            numeric_channel_id = channel_id_str[4:] # Remove leading -100
+            link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
+            # Escape the link URL itself for MarkdownV2, though for t.me links it's often not strictly needed if simple
+            escaped_link = telegram_utils.escape_markdown_v2(link)
+            channel_display = f"[Channel ID: {telegram_utils.escape_markdown_v2(channel_id_str)}]({escaped_link})"
+        else:
+            # Fallback to just displaying the ID if no message_id or not a private supergroup format
+            channel_display = f"Channel ID: {telegram_utils.escape_markdown_v2(channel_id_str)}"
+
+        part = f"\\- ID: `{prop_data['id']}`: {title_escaped}\n"
+        part += f"  {channel_display}\n" # Display modified channel_display
+
+        if status_to_fetch == ProposalStatus.OPEN:
+            deadline_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('deadline_date', 'N/A')))
+            part += f"  Voting ends: {deadline_escaped}\n"
+        elif status_to_fetch == ProposalStatus.CLOSED:
+            outcome_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('outcome', 'N/A')))
+            closed_date_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('closed_date', 'N/A')))
+            part += f"  Closed on: {closed_date_escaped}\n"
+            part += f"  Outcome: {outcome_escaped}\n"
+        message_parts.append(part)
+        
+    full_message = "\n".join(message_parts)
+    await telegram_utils.send_message_in_chunks(context, chat_id=update.effective_chat.id, text=full_message, parse_mode=ParseMode.MARKDOWN_V2)
+    logger.info(f"User {user_id} viewed {display_type.lower()} proposals.")
+
+# TODO: Add other proposal-related commands here if any (e.g., /edit_proposal, /cancel_proposal)
 
 # TODO: Move other proposal-related command handlers here:
 # - Handler for /proposals open/closed
