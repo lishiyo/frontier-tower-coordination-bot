@@ -1,5 +1,22 @@
 # Progress Log
 
+## Sun May 18 18:37:21 PDT 2025
+
+**Completed:**
+- Enhanced the `/proposals` command (Task 7.3):
+    - When called without arguments, it now presents "Open" and "Closed" inline buttons.
+    - Implemented a callback handler (`handle_proposal_filter_callback`) in `app/telegram_handlers/callback_handlers.py` to process these button presses. This handler displays the corresponding filtered list of proposals (open or closed) by editing the original message.
+    - Added new callback data constants (`PROPOSAL_FILTER_CALLBACK_PREFIX`, `PROPOSAL_FILTER_OPEN`, `PROPOSAL_FILTER_CLOSED`) to `app/telegram_handlers/conversation_defs.py`.
+    - Modified `proposals_command` in `app/telegram_handlers/proposal_command_handlers.py` to show buttons if no arguments are provided, and to handle argument-based calls for "open" or "closed" directly.
+    - Registered the new `handle_proposal_filter_callback` in `main.py` with the pattern `^{PROPOSAL_FILTER_CALLBACK_PREFIX}`.
+
+**Learnings & Fixes:**
+- Successfully used `InlineKeyboardMarkup` and `InlineKeyboardButton` to provide users with quick filter options for the `/proposals` command directly within the bot's response.
+- The `query.edit_message_text()` method is effective for updating the message content after a callback query, providing a seamless user experience by replacing the button prompt with the filtered results.
+
+**Next Steps:**
+- Implement unit tests for the updated `/proposals` command behavior in `app/telegram_handlers/proposal_command_handlers.py` and the new `handle_proposal_filter_callback` in `app/telegram_handlers/callback_handlers.py`.
+
 ## Sun May 18 17:57:02 PDT 2025
 
 **Completed:**
@@ -14,7 +31,7 @@
 - **`message_handlers.py` Test (`test_handle_ask_context_no_context_success`):** A `NameError` for `InlineKeyboardButton` occurred because it was used in a mock setup (`mock_telegram_utils.get_free_form_submit_button.return_value`) but was not imported in the test file. Ensured all necessary `telegram` library components are imported in test files where they are referenced, even if only within mock setups.
 
 **Next Steps:**
-- Begin Phase 7, Task 7.3: Implement `/proposals <proposal_id>` command.
+- Begin Phase 7, Task 7.2: Implement `/proposals open` and `/proposals closed` commands.
 
 
 ## Sun May 18 17:20:11 PDT 2025

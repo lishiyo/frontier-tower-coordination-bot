@@ -1,15 +1,15 @@
-# Active Context - Sun May 18 17:57:02 PDT 2025
+# Active Context - Sun May 18 18:37:21 PDT 2025
 
 ## Current Work Focus
-- Completed adding comprehensive unit tests for all `app/telegram_handlers` files:
-    - `error_handler.py`
-    - `message_handlers.py`
-    - `submission_command_handlers.py`
-- All new and previously added unit tests for services, repositories, and handlers are passing.
+- Completed Task 7.3 enhancement: `/proposals` command.
+    - The base `/proposals` command (when called without arguments) now displays "Open" and "Closed" inline buttons.
+    - A callback handler (`handle_proposal_filter_callback`) has been implemented to process these button presses and display the corresponding filtered list of proposals (open or closed) by editing the original message.
 
 ## What's Working
-- All unit tests for `UserRepository`, `UserService`, `LLMService`, `SchedulingService`, and all `telegram_handlers` are passing.
+- All unit tests for `UserRepository`, `UserService`, `LLMService`, `SchedulingService`, and all previously tested `telegram_handlers` are passing.
 - `/my_votes` command (Task 7.1) is fully functional.
+- `/proposals open` and `/proposals closed` commands (Task 7.2) are functional.
+- The `/proposals` command (no arguments) now correctly shows inline buttons for "Open" and "Closed" and filters accordingly.
 - URL content extraction (Task 6.3) using `crawl4ai`.
 - `/add_global_doc` command (Task 6.1).
 - `/ask` command (Task 6.2) with RAG pipeline.
@@ -35,12 +35,14 @@
 - Robust strategies for asserting mock call arguments, especially when positional vs. keyword arguments are involved.
 - **`error_handler.py` Test (`test_error_handler_no_update_object`):** The interaction of `str()`, `json.dumps()`, and `html.escape()` on non-`Update` objects in the error handler requires careful consideration for log assertions. `json.dumps()` on a string input wraps it in additional quotes.
 - **`message_handlers.py` Test (`test_handle_ask_context_no_context_success`):** Imports for `telegram` library components are needed even if they are only used within mock object setups (e.g., `InlineKeyboardButton` for a mock return value).
+- Using `CallbackQueryHandler` to handle inline button presses provides a good UX for dynamic content display.
+- Structuring callback data with prefixes (e.g., `PROPOSAL_FILTER_CALLBACK_PREFIX`) helps in routing and distinguishing different callback actions.
 
 ## Current Database/Model State
-- No schema changes during this unit testing phase for handlers.
+- No schema changes during this `/proposals` command enhancement.
 
 ## Next Steps
+- Implement unit tests for the updated `/proposals` command behavior in `app/telegram_handlers/proposal_command_handlers.py` and the new `handle_proposal_filter_callback` in `app/telegram_handlers/callback_handlers.py`.
 - Address pending Task 5.2 follow-ups:
     - Ensure consistent PST display for all user-facing times.
     - Update results message copy to use "(DM @botname)".
-- Begin Phase 7, Task 7.3: Implement `/proposals <proposal_id>` command (view proposal details).
