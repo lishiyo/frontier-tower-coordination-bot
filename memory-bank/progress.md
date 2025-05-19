@@ -1,5 +1,22 @@
 # Progress Log
 
+## Sun May 18 20:27:16 PDT 2025
+
+**Completed:**
+- Refactored `my_proposals_command`:
+    - Moved the command handler function from `app/telegram_handlers/proposal_command_handlers.py` to `app/telegram_handlers/user_command_handlers.py`.
+    - Updated imports and dependencies in both files accordingly.
+    - Moved the corresponding unit tests from `tests/unit/telegram_handlers/test_proposal_command_handlers.py` to `tests/unit/telegram_handlers/test_user_command_handlers.py`.
+    - Updated patch paths and imports in the unit test files.
+    - Modified `main.py` to reflect the new location of `my_proposals_command`.
+- Ensured all related unit tests pass after the refactoring.
+
+**Learnings & Fixes:**
+- Refactoring command handlers and their tests requires careful updates to import paths and mock patch locations to maintain test integrity.
+
+**Next Steps:**
+- Continue with next planned task as per `tasks.md`.
+
 ## Sun May 18 19:18:18 PDT 2025
 
 **Completed:**
