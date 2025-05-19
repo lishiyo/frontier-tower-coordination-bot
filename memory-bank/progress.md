@@ -1,5 +1,23 @@
 # Progress Log
 
+## Sun May 18 17:20:11 PDT 2025
+
+**Completed:**
+- Added comprehensive unit tests for several key service and repository layers:
+    - `tests/unit/persistence/repositories/test_user_repository.py` for `app/persistence/repositories/user_repository.py`
+    - `tests/unit/core/test_user_service.py` for `app/core/user_service.py`
+    - `tests/unit/services/test_llm_service.py` for `app/services/llm_service.py`
+    - `tests/unit/services/test_scheduling_service.py` for `app/services/scheduling_service.py`
+- Successfully debugged and fixed all identified issues in the newly created unit tests, ensuring they pass.
+
+**Learnings & Fixes (Unit Testing Focus):**
+- **SQLAlchemy `AsyncMock` for Result Proxies:** When mocking `session.execute()` in SQLAlchemy asynchronous tests, the mock `result` object (returned by `session.execute()`) should have its scalar methods like `scalar_one()` or `scalar_one_or_none()` configured as `MagicMock`s that return the actual data (e.g., a `User` instance or `None`) directly, not as `AsyncMock`s that would return a coroutine. This is because these methods are synchronous on the `Result` object, which is obtained after `await session.execute()`.
+- **`pytest caplog` Behavior:** If `caplog.text` is empty in tests where logs are expected, it might be due to the default log level or logger scope. Using `caplog.set_level(logging.INFO)` (or other levels like `logging.ERROR`) or `caplog.set_level(logging.INFO, logger="specific.logger.name")` within the test function ensures that the desired logs are captured.
+- **Mock Call Argument Assertions:** When `mock.assert_called_with()` or `mock.assert_called_once_with()` fails with seemingly identical "Expected" and "Actual" calls (especially when mocks are passed as arguments), it can be due to mock object comparison intricacies. A more robust approach is to assert the call count (`mock.assert_called_once()`) and then inspect `mock.call_args` (which provides `args` tuple and `kwargs` dict) to verify positional and keyword arguments individually. This was particularly relevant for distinguishing how `context` was passed (positional vs. keyword) to `send_message_in_chunks`.
+
+**Next Steps:**
+- Begin Phase 7, Task 7.2: Implement `/proposals open` and `/proposals closed` commands.
+
 ## Sun May 18 15:50:23 PDT 2025
 
 **Completed:**
@@ -16,9 +34,6 @@
 - Understanding the interplay between Python's string escaping and Telegram's MarkdownV2 escaping is crucial (e.g., needing `\\-\\-` in an f-string to produce `\\-` for MarkdownV2).
 
 **Next Steps:**
-- Address pending Task 5.2 follow-ups:
-    - Ensure all user-facing times (e.g., proposal deadlines, result announcements) are consistently displayed in PST.
-    - Tweak results message copy from "(DM the bot)" to "(DM @botname)".
 - Begin Phase 7, Task 7.2: Implement `/proposals open` and `/proposals closed`.
 
 ## Sat May 17 20:15:00 PDT 2025
