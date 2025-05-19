@@ -141,7 +141,7 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if not context.args:
         await update.message.reply_text(
-            "Please provide a question. Usage: /ask <your question> or /ask <proposal_id> <your question>"
+            "Please provide a question. Usage: /ask <your question>"
         )
         return
 
@@ -149,31 +149,31 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     llm_service = LLMService()
     vector_db_service = VectorDBService()
 
-    question_text: str
-    proposal_id_filter: Optional[int] = None
-
-    # Check if the first argument is a proposal_id (integer)
-    if len(context.args) > 1:
-        try:
-            potential_proposal_id = int(context.args[0])
-            # Further validation could be added here to check if it's a valid proposal_id format or exists
-            # For now, we assume if it's an int, it's a proposal_id
-            proposal_id_filter = potential_proposal_id
-            question_text = " ".join(context.args[1:])
-            logger.info(f"/ask command called with proposal_id_filter: {proposal_id_filter}, question: '{question_text}'")
-        except ValueError:
-            # First arg is not an int, so assume it's part of the question
-            question_text = " ".join(context.args)
-            logger.info(f"/ask command called with question: '{question_text}' (no proposal_id_filter)")
-    else:
-        question_text = " ".join(context.args)
-        logger.info(f"/ask command called with question: '{question_text}' (no proposal_id_filter)")
+    question_text = " ".join(context.args)
+    logger.info(f"/ask command called with question: '{question_text}' by user {update.effective_user.id}")
 
     if not question_text.strip():
         await update.message.reply_text("Your question seems to be empty. Please provide a question.")
         return
 
     await update.message.reply_chat_action(action='typing')
+
+    # Determine if the first argument is a proposal ID for specific document RAG
+    proposal_id_filter: Optional[int] = None
+    question_text_for_service = question_text
+
+    if context.args and len(context.args) > 1: # Need at least two args for <id> <question>
+        try:
+            potential_proposal_id = int(context.args[0])
+            # Check if it's a plausible ID (e.g., > 0, though DB would ultimately validate)
+            # For now, any int is considered a potential ID to filter by.
+            proposal_id_filter = potential_proposal_id
+            question_text_for_service = " ".join(context.args[1:])
+            logger.info(f"Detected proposal ID {proposal_id_filter} for specific document RAG. Question: '{question_text_for_service}'")
+        except ValueError:
+            # First arg is not an int, so it's part of a general question for intelligent ask
+            logger.info("First argument not a proposal ID, proceeding with intelligent ask for the full query.")
+            pass # proposal_id_filter remains None, question_text_for_service is already full query
 
     try:
         async with AsyncSessionLocal() as session:
@@ -182,10 +182,25 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 llm_service=llm_service,
                 vector_db_service=vector_db_service
             )
-            answer = await context_service.get_answer_for_question(
-                question_text=question_text, 
-                proposal_id_filter=proposal_id_filter
-            )
+            
+            answer: str
+            if proposal_id_filter is not None:
+                # Case 1: /ask <proposal_id> <question> - RAG on specific proposal's documents
+                logger.info(f"Calling get_answer_for_question for prop ID {proposal_id_filter} and question '{question_text_for_service}'")
+                answer = await context_service.get_answer_for_question(
+                    question_text=question_text_for_service,
+                    proposal_id_filter=proposal_id_filter
+                )
+            else:
+                # Case 2: /ask <general_question_about_proposals_or_docs> - Intelligent ask
+                logger.info(f"Calling handle_intelligent_ask for query '{question_text_for_service}'")
+                answer = await context_service.handle_intelligent_ask(
+                    query_text=question_text_for_service, 
+                    user_telegram_id=update.effective_user.id
+                )
+            
+            # MarkdownV2 escaping should be done carefully, especially if LLM already formats some markdown.
+            # For now, let's assume the answer from handle_intelligent_ask is plain text or simple markdown that needs escaping.
             escaped_answer = escape_markdown_v2(answer)
         # Ensure the message object exists before replying
         if update.message:

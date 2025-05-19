@@ -227,10 +227,25 @@ async def handle_ask_context(update: Update, context: ContextTypes.DEFAULT_TYPE)
             context_document_id = context.user_data.get(USER_DATA_CONTEXT_DOCUMENT_ID)
             if context_document_id:
                 doc_repo = DocumentRepository(session)
+                # Link the document to the proposal in the SQL database
                 linked_doc = await doc_repo.link_document_to_proposal(context_document_id, new_proposal.id)
                 if linked_doc:
                     await session.commit() # Commit the document link update
-                    logger.info(f"User {user.id}: Linked document {context_document_id} to proposal {new_proposal.id}.")
+                    logger.info(f"User {user.id}: Linked document {context_document_id} to proposal {new_proposal.id} in SQL.")
+
+                    # Now, update the metadata in ChromaDB
+                    # Instantiate services needed for ContextService within this session scope
+                    llm_service_for_linking = LLMService()
+                    vector_db_service_for_linking = VectorDBService()
+                    context_service_for_linking = ContextService(
+                        db_session=session, # Use the current session
+                        llm_service=llm_service_for_linking,
+                        vector_db_service=vector_db_service_for_linking
+                    )
+                    await context_service_for_linking.link_document_to_proposal_in_vector_store(
+                        document_sql_id=context_document_id,
+                        proposal_id=new_proposal.id
+                    )
                 else:
                     logger.error(f"User {user.id}: Failed to link document {context_document_id} to proposal {new_proposal.id}. Update returned None.")
                     # Decide if we should rollback or just log

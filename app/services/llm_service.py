@@ -171,6 +171,312 @@ class LLMService:
             logger.error(f"Unexpected error during text clustering and summarization for {len(texts)} texts: {e}", exc_info=True)
             return "An error occurred while generating the summary." # Return a placeholder
 
+    async def analyze_ask_query(self, query_text: str, model: str = "gpt-4o") -> Dict[str, Any]:
+        """
+        Analyzes the user's /ask query to determine intent and extract relevant entities.
+
+        Args:
+            query_text: The raw text of the user's query.
+            model: The LLM model to use for analysis.
+
+        Returns:
+            A dictionary containing:
+            - "intent": "query_proposals" or "query_general_docs"
+            - "content_keywords": Extracted keywords for semantic search (if intent is query_proposals).
+            - "structured_filters": A dict with keys like "status", "proposal_type", "date_query" (if intent is query_proposals).
+            - "error": An error message if parsing failed.
+        """
+        if not self.client:
+            logger.error("LLMService client not initialized. Cannot analyze ask query.")
+            return {"error": "LLMService not initialized."}
+
+        # Get current time in UTC to provide as context for date queries
+        now_utc = datetime.now(timezone.utc)
+        current_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+        prompt = f"""
+        You are an expert query analysis assistant for a Telegram bot.
+        Your task is to analyze the user's question and determine if they are asking about specific 'proposals'
+        or if they are asking a general question that should be answered from 'general_documents'.
+        If the question is about proposals, you also need to extract keywords for semantic content search and
+        any structured filters like status, proposal type, or date-related queries.
+
+        User Query: "{query_text}"
+        Current UTC Time for context (if needed for date queries): {current_time_str}
+
+        Allowed proposal statuses: "open", "closed", "cancelled"
+        Allowed proposal types: "multiple_choice", "free_form"
+
+        Output a JSON object with the following structure:
+        {{
+          "intent": "query_proposals" | "query_general_docs",
+          "content_keywords": "string (keywords or rephrased query for semantic search, only if intent is query_proposals, otherwise null)",
+          "structured_filters": {{
+            "status": "string (one of the allowed statuses, or null if not specified)",
+            "proposal_type": "string (one of the allowed types, or null if not specified)",
+            "date_query": "string (natural language date phrase like 'last week', 'July 2024', 'before May 10th', or null if not specified)"
+          }} (This whole dict is null if intent is query_general_docs)
+        }}
+
+        Examples:
+        1. User Query: "what proposals closed last week?"
+           Output:
+           {{
+             "intent": "query_proposals",
+             "content_keywords": "proposals closed last week",
+             "structured_filters": {{
+               "status": "closed",
+               "proposal_type": null,
+               "date_query": "last week"
+             }}
+           }}
+        2. User Query: "tell me about the pizza party proposal"
+           Output:
+           {{
+             "intent": "query_proposals",
+             "content_keywords": "pizza party proposal",
+             "structured_filters": {{
+               "status": null,
+               "proposal_type": null,
+               "date_query": null
+             }}
+           }}
+        3. User Query: "how does the budget work?"
+           Output:
+           {{
+             "intent": "query_general_docs",
+             "content_keywords": null,
+             "structured_filters": null
+           }}
+        4. User Query: "any open multiple choice proposals about funding from this month?"
+           Output:
+           {{
+             "intent": "query_proposals",
+             "content_keywords": "funding proposals",
+             "structured_filters": {{
+               "status": "open",
+               "proposal_type": "multiple_choice",
+               "date_query": "this month"
+             }}
+           }}
+        5. User Query: "what are the active proposals?"
+           Output:
+           {{
+             "intent": "query_proposals",
+             "content_keywords": "active proposals",
+             "structured_filters": {{
+               "status": "open",
+               "proposal_type": null,
+               "date_query": null
+             }}
+           }}
+        
+        VERY IMPORTANT: Respond with ONLY the JSON object. Do NOT include any other text, explanations, or conversational phrases.
+        If you cannot confidently determine the intent or extract information, lean towards "query_general_docs" or provide nulls for fields.
+        Ensure the output is a valid JSON.
+        """
+
+        logger.info(f"Attempting to analyze ask query: '{query_text}'")
+
+        try:
+            # Use a model that's good at following instructions and JSON output.
+            # gpt-4o or gpt-3.5-turbo with response_format={"type": "json_object"} could work.
+            # For now, just using get_completion and will parse JSON manually.
+            # response = await self.client.chat.completions.create(
+            #     model=model,
+            #     messages=[
+            #         {"role": "system", "content": "You are an expert query analysis assistant. Your output must be a valid JSON object."},
+            #         {"role": "user", "content": prompt}
+            #     ],
+            #     response_format={"type": "json_object"} # This requires newer OpenAI library versions and compatible models
+            # )
+            # raw_response_text = response.choices[0].message.content
+
+            # Using existing get_completion for now, as response_format might not be set up everywhere
+            raw_response_text = await self.get_completion(prompt, model=model)
+
+            if not raw_response_text:
+                logger.warning(f"LLM returned no response for ask query analysis of '{query_text}'.")
+                return {
+                    "intent": "query_general_docs",  # Fallback intent
+                    "content_keywords": None,
+                    "structured_filters": None,
+                    "error": "LLM provided no response."
+                }
+
+            logger.debug(f"Raw LLM response for ask query analysis: {raw_response_text}")
+            
+            # Clean the response to ensure it's valid JSON (e.g., remove potential markdown backticks)
+            cleaned_response_text = raw_response_text.strip()
+            if cleaned_response_text.startswith("```json"):
+                cleaned_response_text = cleaned_response_text[7:]
+            if cleaned_response_text.endswith("```"):
+                cleaned_response_text = cleaned_response_text[:-3]
+            cleaned_response_text = cleaned_response_text.strip()
+
+            import json # Import json here, as it's a standard library
+            parsed_response = json.loads(cleaned_response_text)
+            
+            # Basic validation of the parsed structure
+            if not isinstance(parsed_response, dict) or "intent" not in parsed_response:
+                logger.error(f"LLM response for ask query analysis was not a valid dictionary with 'intent'. Response: {cleaned_response_text}")
+                return {
+                    "intent": "query_general_docs", 
+                    "content_keywords": None,
+                    "structured_filters": None,
+                    "error": "LLM response was not in the expected format."
+                }
+            
+            # Ensure structured_filters is a dict or None if intent is not query_proposals
+            if parsed_response["intent"] == "query_proposals":
+                if "structured_filters" not in parsed_response or not isinstance(parsed_response.get("structured_filters"), dict):
+                    parsed_response["structured_filters"] = {"status": None, "proposal_type": None, "date_query": None} # Default if missing/malformed
+                if "content_keywords" not in parsed_response:
+                     parsed_response["content_keywords"] = query_text # Fallback if keywords are missing
+            else: # For query_general_docs
+                parsed_response["content_keywords"] = None
+                parsed_response["structured_filters"] = None
+
+
+            logger.info(f"Successfully analyzed ask query: '{query_text}'. Intent: {parsed_response.get('intent')}")
+            return parsed_response
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM JSON response for ask query analysis of '{query_text}': {e}. Response was: {cleaned_response_text}", exc_info=True)
+            return {
+                "intent": "query_general_docs", 
+                "content_keywords": None,
+                "structured_filters": None,
+                "error": "Failed to parse LLM JSON response."
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during ask query analysis for '{query_text}': {e}", exc_info=True)
+            return {
+                "intent": "query_general_docs",
+                "content_keywords": None,
+                "structured_filters": None,
+                "error": f"An unexpected error occurred: {str(e)}"
+            }
+
+    async def parse_natural_language_date_range_query(self, date_query_text: str, model: str = "gpt-4o") -> Optional[Dict[str, Optional[str]]]:
+        """
+        Parses a natural language date query text into a start and end datetime string.
+        Example: "last week", "this month", "July 2024", "next monday to friday"
+        Returns a dictionary {"start_datetime": "YYYY-MM-DD HH:MM:SS UTC", "end_datetime": "YYYY-MM-DD HH:MM:SS UTC"} 
+        or None if parsing fails or query is not a range.
+        Individual datetimes in the dict can be None if only one part of the range is specified (e.g. "before today").
+        """
+        if not self.client:
+            logger.error("LLMService client not initialized. Cannot parse date range query.")
+            return None
+
+        now_utc = datetime.now(timezone.utc)
+        current_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+        prompt = f"""
+        You are a precise date range parsing assistant.
+        Given the current time is {current_time_str}, parse the following user input to determine a start datetime and an end datetime for a date range.
+        User input: '{date_query_text}'.
+
+        RULES:
+        1.  Your entire response MUST be a JSON object.
+        2.  The JSON object should have two keys: "start_datetime" and "end_datetime".
+        3.  Values for these keys should be date strings in the exact format 'YYYY-MM-DD HH:MM:SS UTC'.
+        4.  If the user input implies an open-ended range (e.g., "since last Monday", "until next Friday"), one of the keys can be null.
+            - For "since last Monday": "start_datetime" would be last Monday 00:00:00 UTC, "end_datetime" would be null.
+            - For "until next Friday": "start_datetime" would be null, "end_datetime" would be next Friday 23:59:59 UTC.
+            - For "today": "start_datetime" is today 00:00:00 UTC, "end_datetime" is today 23:59:59 UTC.
+            - For "last week": "start_datetime" is the beginning of last week (e.g., Monday 00:00:00 UTC), "end_datetime" is the end of last week (e.g., Sunday 23:59:59 UTC).
+            - For "July 2024": "start_datetime" is "2024-07-01 00:00:00 UTC", "end_datetime" is "2024-07-31 23:59:59 UTC".
+        5.  If the input is not a recognizable date range or specific date, or is too vague, respond with: {{"start_datetime": null, "end_datetime": null, "error": "ERROR_CANNOT_PARSE"}}
+        6.  If the input refers to a single day (e.g. "yesterday", "May 10th"), set start_datetime to the beginning of that day (00:00:00 UTC) and end_datetime to the end of that day (23:59:59 UTC).
+
+        Examples:
+        User input: "last week" (Current time: 2024-05-20 10:00:00 UTC)
+        Output: {{"start_datetime": "2024-05-13 00:00:00 UTC", "end_datetime": "2024-05-19 23:59:59 UTC"}}
+
+        User input: "this month" (Current time: 2024-05-20 10:00:00 UTC)
+        Output: {{"start_datetime": "2024-05-01 00:00:00 UTC", "end_datetime": "2024-05-31 23:59:59 UTC"}}
+        
+        User input: "today" (Current time: 2024-05-20 10:00:00 UTC)
+        Output: {{"start_datetime": "2024-05-20 00:00:00 UTC", "end_datetime": "2024-05-20 23:59:59 UTC"}}
+
+        User input: "since yesterday" (Current time: 2024-05-20 10:00:00 UTC)
+        Output: {{"start_datetime": "2024-05-19 00:00:00 UTC", "end_datetime": null}}
+
+        User input: "until tomorrow evening" (Current time: 2024-05-20 10:00:00 UTC)
+        Output: {{"start_datetime": null, "end_datetime": "2024-05-21 23:59:59 UTC"}}
+        
+        User input: "gibberish"
+        Output: {{"start_datetime": null, "end_datetime": null, "error": "ERROR_CANNOT_PARSE"}}
+        """
+
+        logger.info(f"Attempting to parse date range from text: '{date_query_text}' with current time context: {current_time_str}")
+
+        try:
+            raw_response_text = await self.get_completion(prompt, model=model)
+
+            if not raw_response_text:
+                logger.warning(f"LLM returned no response for date range parsing of '{date_query_text}'.")
+                return None
+            
+            logger.debug(f"Raw LLM response for date range parsing: {raw_response_text}")
+
+            import json
+            cleaned_response_text = raw_response_text.strip()
+            if cleaned_response_text.startswith("```json"):
+                cleaned_response_text = cleaned_response_text[7:]
+            if cleaned_response_text.endswith("```"):
+                cleaned_response_text = cleaned_response_text[:-3]
+            cleaned_response_text = cleaned_response_text.strip()
+            
+            parsed_json = json.loads(cleaned_response_text)
+
+            if not isinstance(parsed_json, dict) or ("start_datetime" not in parsed_json and "end_datetime" not in parsed_json):
+                logger.error(f"LLM response for date range parsing was not a valid dictionary with expected keys. Response: {cleaned_response_text}")
+                return None
+            
+            if parsed_json.get("error") == "ERROR_CANNOT_PARSE":
+                logger.warning(f"LLM indicated it cannot parse date range: '{date_query_text}'.")
+                return None
+
+            # Validate date formats if they exist
+            start_dt_str = parsed_json.get("start_datetime")
+            end_dt_str = parsed_json.get("end_datetime")
+
+            if start_dt_str:
+                try:
+                    datetime.strptime(start_dt_str, "%Y-%m-%d %H:%M:%S %Z")
+                except ValueError:
+                    logger.warning(f"LLM returned invalid start_datetime format: {start_dt_str}. Query: '{date_query_text}'")
+                    # Decide if to return None or try to recover/ignore this part
+                    parsed_json["start_datetime"] = None # Invalidate if malformed
+            
+            if end_dt_str:
+                try:
+                    datetime.strptime(end_dt_str, "%Y-%m-%d %H:%M:%S %Z")
+                except ValueError:
+                    logger.warning(f"LLM returned invalid end_datetime format: {end_dt_str}. Query: '{date_query_text}'")
+                    parsed_json["end_datetime"] = None # Invalidate if malformed
+            
+            # Return the dict with potentially null start/end if one part was invalid but other was okay,
+            # or if LLM intentionally returned one as null for open ranges.
+            # If both are null and no error was explicitly set by LLM, it means parsing failed.
+            if not parsed_json.get("start_datetime") and not parsed_json.get("end_datetime") and not parsed_json.get("error"):
+                 logger.warning(f"LLM parsing for date range query '{date_query_text}' resulted in no valid start or end dates.")
+                 return None
+
+
+            logger.info(f"Successfully parsed date range query '{date_query_text}': {parsed_json}")
+            return {"start_datetime": parsed_json.get("start_datetime"), "end_datetime": parsed_json.get("end_datetime")}
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM JSON response for date range query '{date_query_text}': {e}. Response was: {cleaned_response_text}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during date range query parsing for '{date_query_text}': {e}", exc_info=True)
+            return None
+
 # Example usage (for testing purposes, would not be here in production)
 if __name__ == '__main__':
     import asyncio

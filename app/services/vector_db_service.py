@@ -77,6 +77,7 @@ class VectorDBService:
                     metadata.update(chunk_metadatas[i]) # Merge with provided metadata
                 final_metadatas.append(metadata)
 
+            logger.info(f"VectorDBService: About to add to collection '{collection_name}' for doc ID {doc_id}. Final metadatas: {final_metadatas}, Chroma IDs: {ids_for_chroma}")
             collection.add(
                 embeddings=embeddings,
                 documents=text_chunks, # Storing the text itself for potential retrieval
@@ -304,6 +305,86 @@ class VectorDBService:
         except Exception as e:
             logger.error(f"Error searching for similar proposals: {e}", exc_info=True)
             return None
+
+    async def assign_proposal_id_to_document_chunks(
+        self,
+        document_sql_id: int, # The SQL ID of the document
+        proposal_id: int,     # The SQL ID of the proposal to link
+        collection_name: str = DEFAULT_COLLECTION_NAME
+    ) -> bool:
+        """
+        Assigns or updates the proposal_id in the metadata of all chunks 
+        associated with a given document_sql_id in ChromaDB.
+        """
+        if not self.client:
+            logger.error("VectorDBService client not initialized. Cannot assign proposal_id to chunks.")
+            return False
+        try:
+            collection = self._get_or_create_collection(collection_name)
+            
+            # Get all chunks belonging to this document_sql_id
+            # Metadata in Chroma has document_sql_id stored as a string.
+            results = collection.get(
+                where={"document_sql_id": str(document_sql_id)},
+                include=["metadatas"] # We need IDs and their current metadatas
+            )
+
+            if not results or not results.get('ids'): # Check if 'ids' key exists and is not empty
+                logger.info(f"No chunks found in ChromaDB for document_sql_id {document_sql_id} in collection '{collection_name}'. Nothing to update.")
+                return True # No chunks to update is not an error in this context.
+
+            existing_chunk_ids = results['ids'] # CORRECTED: Directly use results['ids']
+            
+            # CORRECTED: Directly use results['metadatas'] if it exists, otherwise default to an empty list.
+            # This handles cases where 'metadatas' might be None or not present if no metadata was found for any ID.
+            existing_metadatas_list = results.get('metadatas', []) 
+            if existing_metadatas_list is None: # Explicitly ensure it's a list for safety, though .get with default handles it.
+                existing_metadatas_list = []
+            
+            # Log a warning if lengths don't match, as it's unexpected from ChromaDB
+            if len(existing_chunk_ids) != len(existing_metadatas_list):
+                logger.warning(
+                    f"ChromaDB 'get' returned mismatched lengths for IDs ({len(existing_chunk_ids)}) "
+                    f"and metadatas ({len(existing_metadatas_list)}) for document_sql_id {document_sql_id} in collection '{collection_name}'. "
+                    f"Proceeding by associating new proposal_id with all found IDs, using default "
+                    f"empty dict for any missing original metadata."
+                )
+            
+            updated_metadatas = []
+            for i in range(len(existing_chunk_ids)):
+                current_meta_for_id = None
+                # Safely access metadata for the current ID, if available
+                if i < len(existing_metadatas_list) and existing_metadatas_list[i] is not None:
+                    current_meta_for_id = existing_metadatas_list[i]
+                
+                new_meta = current_meta_for_id.copy() if current_meta_for_id else {}
+                new_meta["proposal_id"] = str(proposal_id) # Add or update proposal_id
+                updated_metadatas.append(new_meta)
+
+            if not existing_chunk_ids:
+                 logger.info(f"No chunk IDs to update for document_sql_id {document_sql_id} (second check after processing metadata).") # Minor log text update
+                 return True
+
+            # Ensure the updated_metadatas list is exactly the same length as existing_chunk_ids
+            # This should now always be true due to the loop structure above.
+            if len(existing_chunk_ids) != len(updated_metadatas):
+                logger.error(
+                    f"Internal logic error: Mismatch after preparing updated_metadatas. "
+                    f"IDs count: {len(existing_chunk_ids)}, Updated Metadatas count: {len(updated_metadatas)}. "
+                    f"Aborting update for document_sql_id {document_sql_id}."
+                )
+                return False
+
+            collection.update(
+                ids=existing_chunk_ids,
+                metadatas=updated_metadatas
+                # We are not updating documents or embeddings themselves here
+            )
+            logger.info(f"Successfully assigned/updated proposal_id {proposal_id} to {len(existing_chunk_ids)} chunks for document_sql_id {document_sql_id} in collection '{collection_name}'.")
+            return True
+        except Exception as e:
+            logger.error(f"Error assigning proposal_id to chunks for document_sql_id {document_sql_id} in collection '{collection_name}': {e}", exc_info=True)
+            return False
 
 # Example Usage (for testing - ensure LLMService is available for embeddings)
 if __name__ == '__main__':

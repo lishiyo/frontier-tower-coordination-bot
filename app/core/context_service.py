@@ -1,6 +1,7 @@
 import logging
 import hashlib
 from typing import Optional, List, Dict, Any, Tuple
+from datetime import datetime, timedelta, timezone # Import timedelta for date range parsing
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, BrowserConfig # For fetching and parsing URLs
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import PruningContentFilter
@@ -13,6 +14,7 @@ from app.utils.text_processing import simple_chunk_text # Moved import
 from app.persistence.models.proposal_model import Proposal
 from app.persistence.models.document_model import Document
 from app.persistence.repositories.proposal_repository import ProposalRepository
+from app.services.vector_db_service import DEFAULT_COLLECTION_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +204,8 @@ class ContextService:
             # The dynamic title for proposals will be constructed during retrieval in get_answer_for_question.
             chunk_metadatas.append(meta)
         
+        logger.info(f"ContextService: About to store embeddings for SQL document ID {sql_document.id}. Chunk metadatas being passed: {chunk_metadatas}")
+
         chroma_vector_ids = await self.vector_db_service.store_embeddings(
             doc_id=sql_document.id,
             text_chunks=text_chunks,
@@ -247,103 +251,369 @@ class ContextService:
         """Lists all documents associated with a given proposal_id."""
         return await self.document_repository.get_documents_by_proposal_id(proposal_id)
 
+    async def _get_raw_document_context_for_query(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> Tuple[str, List[str]]:
+        """
+        Fetches relevant raw document chunks and their sources for a given question.
+        Returns a tuple: (formatted_context_string, list_of_source_citations_display_names).
+        """
+        logger.info(f"_get_raw_document_context_for_query: question='{question_text}', proposal_id_filter={proposal_id_filter}")
+        query_embedding = await self.llm_service.generate_embedding(question_text)
+        if not query_embedding:
+            logger.warning("_get_raw_document_context_for_query: Failed to generate embedding for question.")
+            return "", [] # Return empty context and sources
+
+        similar_chunks_results = await self.vector_db_service.search_similar_chunks(
+            query_embedding=query_embedding,
+            proposal_id_filter=proposal_id_filter,
+            top_n=top_n_chunks
+        )
+
+        if not similar_chunks_results:
+            logger.info("_get_raw_document_context_for_query: No similar document chunks found.")
+            # If a filter was applied, don't retry here; let the caller decide on broader searches.
+            return "", []
+        
+        context_str_parts = []
+        sources_cited_display = [] # Using a list to maintain order and allow duplicates if different chunks from same doc
+
+        for chunk_info in similar_chunks_results:
+            text_chunk = chunk_info.get('document_content', '')
+            metadata = chunk_info.get('metadata', {})
+            doc_id = metadata.get('document_sql_id')
+            chunk_preview = metadata.get('chunk_text_preview', '')
+            actual_title = metadata.get('title')
+            linked_proposal_id = metadata.get('proposal_id')
+
+            doc_title_display: str
+            if linked_proposal_id:
+                preview_text = chunk_preview if chunk_preview else text_chunk
+                doc_title_display = f"Proposal {linked_proposal_id} context: {preview_text[:30]}..."
+            elif actual_title:
+                doc_title_display = actual_title
+            elif chunk_preview:
+                doc_title_display = f"Preview: {chunk_preview[:30]}..."
+            else:
+                doc_title_display = f"Document ID {doc_id}" if doc_id else "Unknown document"
+
+            if text_chunk:
+                context_str_parts.append(f"- {text_chunk}") # Store raw chunk
+                source_citation_display = f"'{doc_title_display}'"
+                if doc_id:
+                    source_citation_display += f" (Doc ID: {doc_id})"
+                sources_cited_display.append(source_citation_display) # Add to list of sources
+        
+        if not context_str_parts:
+            logger.info("_get_raw_document_context_for_query: No text content found in similar chunks.")
+            return "", []
+        
+        # Construct the full context string
+        # We don't add "Context from documents..." here, the caller can do that if needed.
+        full_context_str = "\n".join(context_str_parts)
+        return full_context_str, list(set(sources_cited_display)) # Return unique source display names
+
     async def get_answer_for_question(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> str:
         """
-        Answers a question using RAG by fetching relevant document chunks.
+        Answers a question using RAG by fetching relevant document chunks and synthesizing an answer.
         """
-        logger.info(f"Getting answer for question: '{question_text}', proposal_id_filter: {proposal_id_filter}")
+        logger.info(f"get_answer_for_question: question='{question_text}', proposal_id_filter={proposal_id_filter}")
 
         try:
-            query_embedding = await self.llm_service.generate_embedding(question_text)
-            if not query_embedding:
-                logger.warning("Failed to generate embedding for question.")
-                return "I couldn't process your question at the moment. Please try again later."
-
-            # Assuming search_similar_chunks returns a list of dicts like:
-            # [{'text_chunk': str, 'sql_document_id': int, 'score': float, 'metadata': {'title': 'Doc Title'}}]
-            # Or that metadata contains enough to fetch the title.
-            # The VectorDBService.search_similar_chunks might need to be adjusted or its return type confirmed.
-            # For now, we'll assume it returns the chunk text and some document metadata.
-            
-            # The task mentions: search_similar_chunks(query_embedding, proposal_id_filter, top_n)
-            # Let's assume it returns a list of dicts, each having 'text' and 'metadata' (which includes 'sql_document_id' and 'title')
-            similar_chunks_results = await self.vector_db_service.search_similar_chunks(
-                query_embedding=query_embedding,
+            raw_context, sources_cited_display = await self._get_raw_document_context_for_query(
+                question_text=question_text,
                 proposal_id_filter=proposal_id_filter,
-                top_n=top_n_chunks
+                top_n_chunks=top_n_chunks
             )
 
-            if not similar_chunks_results:
-                logger.info("No similar document chunks found for the question.")
-                # Try a general search if proposal_id_filter was used and nothing found
+            if not raw_context:
+                # If initial search (e.g., with proposal_id_filter) found nothing, try a broader search only if a filter was active.
                 if proposal_id_filter is not None:
-                    logger.info(f"Retrying search without proposal_id_filter for question: '{question_text}'")
-                    similar_chunks_results = await self.vector_db_service.search_similar_chunks(
-                        query_embedding=query_embedding,
-                        proposal_id_filter=None, # Search global docs too
-                        top_n=top_n_chunks
+                    logger.info(f"get_answer_for_question: No context found with proposal_id_filter {proposal_id_filter}. Retrying without filter.")
+                    raw_context, sources_cited_display = await self._get_raw_document_context_for_query(
+                        question_text=question_text,
+                        proposal_id_filter=None, # Broader search
+                        top_n_chunks=top_n_chunks
                     )
-                    if not similar_chunks_results:
-                         return "I couldn't find any relevant information for your question."
+                    if not raw_context:
+                        return "I couldn't find any relevant information for your question even after a broader search."
                 else:
                     return "I couldn't find any relevant information for your question."
             
-            context_str = ""
-            sources_cited = set() # To avoid duplicate source citations
-            source_details_for_prompt = []
-
-            for chunk_info in similar_chunks_results:
-                text_chunk = chunk_info.get('document_content', '')
-                metadata = chunk_info.get('metadata', {})
-                
-                doc_id = metadata.get('document_sql_id')
-                chunk_preview = metadata.get('chunk_text_preview', '')
-                actual_title = metadata.get('title') # Title stored in ChromaDB metadata
-                linked_proposal_id = metadata.get('proposal_id') # Proposal ID stored in ChromaDB metadata
-
-                doc_title_display: str
-                if linked_proposal_id:
-                    # If linked to a proposal, prioritize this format
-                    preview_text = chunk_preview if chunk_preview else text_chunk # Use chunk_preview first, then text_chunk
-                    doc_title_display = f"Proposal {linked_proposal_id} context: {preview_text[:30]}..."
-                elif actual_title:
-                    doc_title_display = actual_title
-                elif chunk_preview:
-                    doc_title_display = f"Preview: {chunk_preview[:30]}..."
-                else:
-                    doc_title_display = f"Document ID {doc_id}" if doc_id else "Unknown document"
-
-                logger.info(f"Got chunk! Chunk info: {chunk_info} has text_chunk: {text_chunk}")
-                if text_chunk:
-                    context_str += f"- {text_chunk}\\n"
-                    source_citation = f"'{doc_title_display}'"
-                    if doc_id: # Still useful to show the SQL document ID if available
-                        source_citation += f" (Doc ID: {doc_id})" # Clarified it's Doc ID
-                    source_details_for_prompt.append(f"Content from {source_citation}")
-                    sources_cited.add(source_citation)
-
-            if not context_str:
-                 logger.info("No text content found in similar chunks.")
-                 return "I found some documents that might be related, but I couldn't extract specific text to answer your question."
-
+            # Now, raw_context contains the chunks and sources_cited_display has the source names.
+            # We need to format the prompt for the LLM.
+            context_header = ""
+            if sources_cited_display:
+                context_header = f"Context from documents ({', '.join(sources_cited_display)}):\n"
+            
             prompt = (
-                f"You are a helpful assistant. Based on the following context, please answer the user's question.\\n"
-                f"Context from documents ({', '.join(sources_cited)}):\\n{context_str}\\n"
-                f"User's Question: {question_text}\\n\\n"
+                f"You are a helpful assistant. Based on the following context, please answer the user's question.\n"
+                f"{context_header}{raw_context}\n"
+                f"User's Question: {question_text}\n\n"
                 f"Answer directly. If the context does not provide a sufficient answer, please state that you don't have enough information from the provided context."
             )
             
-            logger.debug(f"Prompt for /ask command:\n{prompt}")
+            logger.info(f"get_answer_for_question: Prompt for LLM:\n{context_header}{raw_context}")
 
             answer = await self.llm_service.get_completion(prompt)
 
-            # Append source citation to the answer
-            if sources_cited:
-                answer += f"\n\nSources: {', '.join(list(sources_cited))}."
+            # Append source citation to the answer, using the unique list from _get_raw_document_context_for_query
+            if sources_cited_display and answer and not answer.startswith("I couldn't find any relevant information") and not answer.startswith("I don't have enough information") :
+                answer += f"\n\nSources: {', '.join(sources_cited_display)}."
             
             return answer
 
         except Exception as e:
-            logger.error(f"Error getting answer for question: {e}", exc_info=True)
+            logger.error(f"Error getting answer for question '{question_text}': {e}", exc_info=True)
             return "Sorry, I encountered an error while trying to answer your question. Please try again later."
+
+    async def _parse_date_query_to_range(self, date_query: Optional[str]) -> Optional[Tuple[Optional[datetime], Optional[datetime]]]:
+        """
+        Parses a natural language date query into a start and end datetime tuple using LLMService.
+        """
+        if not date_query:
+            logger.debug("_parse_date_query_to_range called with no date_query.")
+            return None
+
+        parsed_range_dict = await self.llm_service.parse_natural_language_date_range_query(date_query)
+
+        if not parsed_range_dict:
+            logger.warning(f"LLMService.parse_natural_language_date_range_query returned None for query: '{date_query}'.")
+            return None
+
+        start_datetime_str = parsed_range_dict.get("start_datetime")
+        end_datetime_str = parsed_range_dict.get("end_datetime")
+
+        start_datetime: Optional[datetime] = None
+        end_datetime: Optional[datetime] = None
+
+        try:
+            if start_datetime_str:
+                # LLMService should return it in "YYYY-MM-DD HH:MM:SS UTC" format
+                start_datetime = datetime.strptime(start_datetime_str, "%Y-%m-%d %H:%M:%S %Z")
+                # Ensure it's timezone-aware and UTC
+                if start_datetime.tzinfo is None:
+                    start_datetime = start_datetime.replace(tzinfo=timezone.utc)
+                else:
+                    start_datetime = start_datetime.astimezone(timezone.utc)
+            
+            if end_datetime_str:
+                end_datetime = datetime.strptime(end_datetime_str, "%Y-%m-%d %H:%M:%S %Z")
+                if end_datetime.tzinfo is None:
+                    end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+                else:
+                    end_datetime = end_datetime.astimezone(timezone.utc)
+            
+            if start_datetime or end_datetime:
+                logger.info(f"Successfully parsed date query '{date_query}' into range: Start={start_datetime}, End={end_datetime}")
+                return (start_datetime, end_datetime)
+            else:
+                logger.warning(f"Date query '{date_query}' resulted in no valid start or end datetimes after LLM parsing.")
+                return None
+                
+        except ValueError as ve:
+            logger.error(f"Error parsing datetime strings from LLM for date_query '{date_query}'. Start: '{start_datetime_str}', End: '{end_datetime_str}'. Error: {ve}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error in _parse_date_query_to_range for '{date_query}': {e}", exc_info=True)
+            return None
+
+    async def handle_intelligent_ask(self, query_text: str, user_telegram_id: int) -> str:
+        logger.info(f"Handling intelligent ask from user {user_telegram_id}: '{query_text}'")
+        
+        analysis = await self.llm_service.analyze_ask_query(query_text)
+        if analysis.get("error"):
+            logger.error(f"Error analyzing ask query: {analysis.get('error')}")
+            return "Sorry, I had trouble understanding your question. Please try rephrasing."
+
+        intent = analysis.get("intent", "query_general_docs")
+        logger.info(f"Determined intent: {intent}")
+
+        if intent == "query_proposals":
+            content_keywords = analysis.get("content_keywords")
+            structured_filters = analysis.get("structured_filters", {})
+            
+            status_filter = structured_filters.get("status")
+            type_filter = structured_filters.get("proposal_type")
+            date_query_filter = structured_filters.get("date_query")
+
+            # Initialize ProposalRepository
+            proposal_repo = ProposalRepository(self.db_session)
+
+            # Parse date_query into a date range
+            # This is a simplified date parsing. For production, this would need to be more robust.
+            deadline_range = await self._parse_date_query_to_range(date_query_filter)
+            
+            # 1. Get proposals based on structured filters (SQL query)
+            candidate_proposals_sql: List[Proposal] = []
+            if status_filter or type_filter or deadline_range:
+                candidate_proposals_sql = await proposal_repo.find_proposals_by_dynamic_criteria(
+                    status=status_filter,
+                    proposal_type=type_filter,
+                    deadline_date_range=deadline_range # Assuming this targets deadline_date
+                    # Add creation_date_range if LLM also extracts it for "created last week"
+                )
+                logger.info(f"Found {len(candidate_proposals_sql)} candidates via SQL filters.")
+            
+            sql_filtered_proposal_ids = [p.id for p in candidate_proposals_sql]
+
+            # 2. Get proposals based on semantic search (VectorDB query)
+            candidate_proposals_semantic: List[Dict[str, Any]] = []
+            if content_keywords:
+                query_embedding = await self.llm_service.generate_embedding(content_keywords)
+                if query_embedding:
+                    # If we have SQL results, we can pass their IDs to VectorDBService to narrow the semantic search space, if supported and efficient.
+                    # Or, perform semantic search more broadly and then intersect.
+                    # For simplicity, let's search broadly or filter if SQL results are very few.
+                    # `search_proposal_embeddings` can take `filter_proposal_ids`.
+                    # If we have SQL results, use them as a pre-filter for semantic search if the list isn't too large.
+                    # If no SQL filters were applied, sql_filtered_proposal_ids will be empty, so no filter for semantic search.
+                    
+                    # Decide on filter_ids for semantic search:
+                    # If structured filters were applied AND returned results, search within those.
+                    # Otherwise, search all proposals.
+                    ids_for_semantic_filter = sql_filtered_proposal_ids if (status_filter or type_filter or deadline_range) and sql_filtered_proposal_ids else None
+                    
+                    raw_semantic_results = await self.vector_db_service.search_proposal_embeddings(
+                        query_embedding=query_embedding,
+                        top_n=10, # Get more initial results for potential intersection
+                        filter_proposal_ids=ids_for_semantic_filter 
+                    )
+                    if raw_semantic_results:
+                        candidate_proposals_semantic = raw_semantic_results
+                        logger.info(f"Found {len(candidate_proposals_semantic)} candidates via semantic search (filtered by SQL: {ids_for_semantic_filter is not None}).")
+                else:
+                    logger.warning("Could not generate embedding for content_keywords.")
+            
+            semantic_filtered_proposal_ids = []
+            if candidate_proposals_semantic:
+                for hit in candidate_proposals_semantic:
+                    meta = hit.get("metadata", {})
+                    if meta and "proposal_id" in meta:
+                        try:
+                            semantic_filtered_proposal_ids.append(int(meta["proposal_id"]))
+                        except ValueError:
+                            logger.warning(f"Could not parse proposal_id from semantic search metadata: {meta['proposal_id']}")
+            
+            # 3. Consolidate results
+            final_proposal_ids = set()
+            if (status_filter or type_filter or deadline_range): # If SQL filters were applied
+                if content_keywords and candidate_proposals_semantic: # And semantic search also ran
+                    # Intersect SQL results with Semantic results
+                    final_proposal_ids = set(sql_filtered_proposal_ids).intersection(set(semantic_filtered_proposal_ids))
+                    logger.info(f"Intersected SQL ({len(sql_filtered_proposal_ids)}) and Semantic ({len(semantic_filtered_proposal_ids)}) results: {len(final_proposal_ids)} IDs.")
+                else: # Only SQL filters ran, or semantic search yielded nothing
+                    final_proposal_ids = set(sql_filtered_proposal_ids)
+                    logger.info(f"Using only SQL filter results: {len(final_proposal_ids)} IDs.")
+            elif content_keywords and candidate_proposals_semantic: # Only semantic search ran (no SQL filters)
+                final_proposal_ids = set(semantic_filtered_proposal_ids)
+                logger.info(f"Using only Semantic search results: {len(final_proposal_ids)} IDs.")
+            # If neither, final_proposal_ids remains empty
+
+            if not final_proposal_ids:
+                logger.info("No proposals found matching the combined criteria.")
+                return "I couldn't find any proposals matching your query. You could try rephrasing or broadening your search."
+
+            # Fetch full proposal objects
+            final_proposals = await proposal_repo.get_proposals_by_ids(list(final_proposal_ids))
+            
+            if not final_proposals:
+                return "I found some potential matches by ID, but couldn't retrieve their full details. Please try again."
+
+            # 4. Synthesize answer with LLM
+            proposal_summaries = []
+            for prop in final_proposals:
+                summary = f"Proposal ID: {prop.id}\nTitle: {prop.title}\nStatus: {prop.status}\nType: {prop.proposal_type}"
+                if prop.deadline_date:
+                    summary += f"\nDeadline: {prop.deadline_date.strftime('%Y-%m-%d %H:%M UTC')}"
+                proposal_summaries.append(summary)
+            
+            if not proposal_summaries: # Should not happen if final_proposals is not empty
+                 return "I couldn't find any proposals matching your query criteria."
+
+            # --- New: Gather context from documents attached to these proposals ---
+            additional_document_contexts = []
+            all_doc_sources_cited = set() # To collect unique sources from documents
+
+            if len(query_text.split()) > 3: # Arbitrary threshold
+                logger.info(f"Query '{query_text}' seems detailed enough to search attached documents for {len(final_proposals)} proposals.")
+                for prop in final_proposals:
+                    logger.info(f"Searching documents attached to proposal ID {prop.id} for query: '{query_text}'")
+                    # Call the new method to get raw context and sources
+                    raw_doc_context, doc_sources = await self._get_raw_document_context_for_query(
+                        question_text=query_text, 
+                        proposal_id_filter=prop.id,
+                        top_n_chunks=3
+                    )
+                    
+                    if raw_doc_context:
+                        # We want to provide the raw context directly to the final LLM
+                        # Construct a header for this proposal's document context
+                        context_header = f"From documents related to Proposal {prop.id} ('{prop.title}'):"
+                        additional_document_contexts.append(f"{context_header}\n{raw_doc_context}")
+                        all_doc_sources_cited.update(doc_sources) # Add sources from this proposal's docs
+                        logger.info(f"Added raw context from documents of proposal {prop.id}. Context length: {len(raw_doc_context)}")
+                    else:
+                        logger.info(f"No significant additional context found in documents for proposal {prop.id} regarding query: '{query_text}'")
+            # --- End new section ---
+
+            context_for_llm = "Here are the proposals I found matching your query:\n\n" + "\n\n---\n\n".join(proposal_summaries)
+            
+            if additional_document_contexts:
+                context_for_llm += "\n\n---\n\nAdditionally, here is some context from documents related to these proposals:\n\n" + "\n\n---\n\n".join(additional_document_contexts)
+
+            logger.info(f"=== Context for LLM: {context_for_llm} ===\n\n")
+            
+            # Prepare a list of all unique sources (proposal summaries don't have explicit 'sources' in this string)
+            final_sources_to_cite = list(all_doc_sources_cited)
+
+            synthesis_prompt = (
+                f"{context_for_llm}\n\nUser's original query: '{query_text}'\n\nBased on all the proposal information and any additional document context provided above, "
+                f"provide a concise answer to the user's query. "
+                f"List the relevant proposals clearly. "
+                # f"If you use information from the document contexts, mention their sources if distinct. " # LLM should handle this if sources are in the context
+                f"Also, remind the user that they can use '/my_vote <proposal_id>' to see their specific submission for any of these proposals."
+            )
+
+            final_answer = await self.llm_service.get_completion(synthesis_prompt)
+            if not final_answer:
+                return "I found some proposals, but I had trouble summarizing them. You can try viewing them individually."
+            
+            # Append document sources if they were used and the LLM didn't naturally include them
+            # This is tricky; the LLM should ideally incorporate source hints from the context_for_llm.
+            # For now, let's rely on the LLM to use the source info embedded in context_for_llm.
+            # If all_doc_sources_cited is not empty and the answer is positive, we could append them.
+            if final_sources_to_cite and final_answer and not final_answer.startswith("I couldn't find any proposals") and not final_answer.startswith("I couldn't find any relevant information"):
+                # Check if sources are already mentioned. This is complex. 
+                # A simpler approach: if doc context was added, always append sources used for that context.
+                final_answer += f"\n\nDocument data considered from: {', '.join(final_sources_to_cite)}."
+            
+            return final_answer
+
+        else: # Fallback to general document RAG
+            logger.info("Intent is query_general_docs, falling back to standard RAG.")
+            # Assuming no specific proposal_id is relevant for a general query fallback
+            return await self.get_answer_for_question(query_text, proposal_id_filter=None)
+
+    async def link_document_to_proposal_in_vector_store(
+        self,
+        document_sql_id: int,
+        proposal_id: int
+    ):
+        """
+        Updates the metadata of document chunks in the vector store to include the proposal_id.
+        This should be called after a document (already processed into chunks) is linked
+        to a proposal in the SQL database.
+        """
+        logger.info(f"Attempting to link document SQL ID {document_sql_id} to proposal ID {proposal_id} in vector store metadata (collection: {DEFAULT_COLLECTION_NAME}).")
+        
+        success = await self.vector_db_service.assign_proposal_id_to_document_chunks(
+            document_sql_id=document_sql_id,
+            proposal_id=proposal_id,
+            collection_name=DEFAULT_COLLECTION_NAME # Explicitly state, though it's the default
+        )
+
+        if success:
+            logger.info(f"Successfully initiated update for document SQL ID {document_sql_id} to link with proposal ID {proposal_id} in vector store.")
+        else:
+            logger.error(f"Failed to update vector store metadata for document SQL ID {document_sql_id} with proposal ID {proposal_id}.")
+        return success
  

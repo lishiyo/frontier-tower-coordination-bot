@@ -635,17 +635,17 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   **Dependencies:** `LLMService` (Phase 3.1), `VectorDBService` (Phase 3.2), `ProposalService`, `SubmissionService`, `ProposalRepository`, `SubmissionRepository`.
     *   **Subtasks:**
         *   **Subtask 9.5.1: Implement Proposal Content Indexing (Can be done earlier, e.g., alongside or after Phase 3/4)**
-            *   [ ] In `app/services/vector_db_service.py`, implement `add_proposal_embedding(proposal_id: int, text_content: str, embedding: list[float], metadata: dict)`:
-                *   [ ] This method should add/update the proposal's text and embedding in a new ChromaDB collection named `proposals_content` (or similar).
-                *   [ ] The `metadata` should include `proposal_id`, `status`, `deadline_date_iso`, `creation_date_iso`, `type`, `target_channel_id`.
-                *   [ ] Ensure the collection is created if it doesn't exist.
-            *   [ ] In `app/core/proposal_service.py`, modify `create_proposal(...)` and `edit_proposal_details(...)`:
+            *   [x] In `app/services/vector_db_service.py`, implement `add_proposal_embedding(proposal_id: int, text_content: str, embedding: list[float], metadata: dict)`:
+                *   [x] This method should add/update the proposal's text and embedding in a new ChromaDB collection named `proposals_content` (or similar).
+                *   [x] The `metadata` should include `proposal_id`, `status`, `deadline_date_iso`, `creation_date_iso`, `type`, `target_channel_id`.
+                *   [x] Ensure the collection is created if it doesn't exist.
+            *   [x] In `app/core/proposal_service.py`, modify `create_proposal(...)` and `edit_proposal_details(...)`:
                 *   [ ] After a proposal is successfully saved/updated in the SQL database:
-                    *   [ ] Concatenate `proposal.title` and `proposal.description` to form `proposal_text_to_index`.
-                    *   [ ] Call `LLMService.generate_embedding(proposal_text_to_index)`.
-                    *   [ ] Call `VectorDBService.add_proposal_embedding(...)` with the necessary details.
-            *   [ ] Write unit tests for the changes in `ProposalService` and `VectorDBService` related to proposal indexing.
-            *   [ ] Clear out old proposals and manually test new ones are working.
+                    *   [x] Concatenate `proposal.title` and `proposal.description` to form `proposal_text_to_index`.
+                    *   [x] Call `LLMService.generate_embedding(proposal_text_to_index)`.
+                    *   [x] Call `VectorDBService.add_proposal_embedding(...)` with the necessary details.
+            *   [x] Write unit tests for the changes in `ProposalService` and `VectorDBService` related to proposal indexing.
+            *   [x] Clear out old proposals and manually test new ones are working.
 
         *   **Subtask 9.5.2: Implement Core `/ask` Enhancement Logic for Proposal Queries**
             *   [ ] In `app/services/llm_service.py`:

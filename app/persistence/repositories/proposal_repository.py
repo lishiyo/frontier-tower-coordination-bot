@@ -155,4 +155,53 @@ class ProposalRepository:
         """Fetches proposals from the database by their status."""
         query = select(Proposal).where(Proposal.status == status).order_by(Proposal.deadline_date.desc())
         result = await self.db_session.execute(query)
-        return result.scalars().all() 
+        return result.scalars().all()
+
+    async def find_proposals_by_dynamic_criteria(
+        self,
+        status: Optional[str] = None,
+        deadline_date_range: Optional[tuple[datetime, datetime]] = None, # Renamed from date_range for clarity
+        creation_date_range: Optional[tuple[datetime, datetime]] = None,
+        proposal_type: Optional[str] = None,
+        proposer_telegram_id: Optional[int] = None,
+        target_channel_id: Optional[str] = None
+    ) -> List[Proposal]:
+        """
+        Finds proposals based on a dynamic set of criteria.
+        All provided criteria are ANDed together.
+        """
+        stmt = select(Proposal)
+
+        if status:
+            stmt = stmt.where(Proposal.status == status)
+        
+        if deadline_date_range:
+            start_date, end_date = deadline_date_range
+            if start_date:
+                stmt = stmt.where(Proposal.deadline_date >= start_date)
+            if end_date:
+                stmt = stmt.where(Proposal.deadline_date <= end_date)
+
+        if creation_date_range:
+            start_date, end_date = creation_date_range
+            if start_date:
+                stmt = stmt.where(Proposal.creation_date >= start_date)
+            if end_date:
+                stmt = stmt.where(Proposal.creation_date <= end_date)
+
+        if proposal_type:
+            # Assuming proposal_type in the model is stored as the string value (e.g., "MULTIPLE_CHOICE")
+            # If it's stored as ProposalType.MULTIPLE_CHOICE.value, this is correct.
+            stmt = stmt.where(Proposal.proposal_type == proposal_type)
+
+        if proposer_telegram_id is not None: # Check for None explicitly for integer 0
+            stmt = stmt.where(Proposal.proposer_telegram_id == proposer_telegram_id)
+        
+        if target_channel_id:
+            stmt = stmt.where(Proposal.target_channel_id == target_channel_id)
+            
+        # Default ordering, can be parameterized later if needed
+        stmt = stmt.order_by(Proposal.creation_date.desc())
+
+        result = await self.db_session.execute(stmt)
+        return list(result.scalars().all()) 
