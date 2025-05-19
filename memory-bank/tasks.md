@@ -398,7 +398,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] For each submission, fetch proposal details.
         *   [x] Format a list of (proposal title, user's response, proposal status/outcome).
     *   [x] In `app/telegram_handlers/command_handlers.py`, implement `my_votes_command` calling `SubmissionService.get_user_submission_history()` and DMs the result.
-    *   [ ] Write unit tests for the new repository and service methods, and the command handler.
+    *   [x] Write unit tests for the new repository and service methods, and the command handler.
     *   [x] Test this is working manually.
 
 2.  **Task 7.2: Implement `/my_proposals` command**
@@ -416,8 +416,8 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] If no proposals are found, it should inform the user (e.g., "You haven't created any proposals yet.").
     *   [x] Add `/my_proposals` command to `main.py` command registration.
     *   [x] Ensure `/my_proposals` is documented in `memory-bank/bot_commands.md`.
-    *   [ ] Write unit tests for the new repository and service methods, and the command handler.
-    *   [ ] Test this is working manually.
+    *   [x] Write unit tests for the new repository and service methods, and the command handler.
+    *   [x] Test this is working manually.
 
 3.  **Task 7.3: Implement `/proposals open` and `/proposals closed`**
     *   [ ] If the user just types `/proposals`, the bot should ask "open or closed?" If the user says "open", use `/proposals open` and if closed, use `/proposals closed`.
