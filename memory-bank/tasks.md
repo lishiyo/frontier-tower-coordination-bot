@@ -449,7 +449,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Update status to "cancelled" via `ProposalRepository`.
         *   [x] Update channel message (e.g., "Proposal cancelled").
     *   [x] Implement `cancel_proposal_command` in `proposal_command_handlers.py`.
-    *   [ ] Write unit tests, verify passing.
+    *   [x] Write unit tests, verify passing.
     *   [x] Test this is working manually.
 
 ## Phase 8: Doc Management Commands
