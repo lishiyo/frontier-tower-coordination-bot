@@ -114,7 +114,7 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<document_id>`: The ID of the document to view.
     *   **Context:** DM with the bot.
 
-*   `edit_doc` or `/edit_doc <document_id>`
+*   `/edit_doc` or `/edit_doc <document_id>`
     *   **Description:** Allows the original proposer to edit the content of a specific context document they previously added to one of their proposals. (Bot might initiate a conversation to get new content). If the user just says `/edit_doc`, the bot should say "which doc? use `/my_docs` to list all then use `/edit_doc <document_id>`".
     *   **Parameters:**
         *   `<document_id>`: The ID of the proposal-specific document to edit.

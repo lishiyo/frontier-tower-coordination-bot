@@ -430,19 +430,19 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Test this is working manually.
 
 4.  **Task 7.4: Implement `/edit_proposal` Command (Proposer Only)**
-    *   [ ] If the user just says `/edit_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`".
+    *   [ ] If the user just says `/edit_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`"; then show the button `/my_proposals`.
     *   [ ] In `SubmissionRepository`, add `count_submissions_for_proposal(proposal_id)`.
     *   [ ] In `ProposalService`, implement `edit_proposal_details(proposal_id, proposer_id, new_title, new_description, new_options)`:
         *   [ ] Fetch proposal. Verify `proposer_id` matches.
-        *   [ ] Check `SubmissionRepository.count_submissions_for_proposal()`. If > 0, reject edit.
+        *   [ ] Check `SubmissionRepository.count_submissions_for_proposal()`. If > 0, reject edit. Tell the user it is not possible to edit an already-created proposal, they have to cancel and make a new one.
         *   [ ] Update proposal fields in `ProposalRepository`.
         *   [ ] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
-    *   [ ] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details).
+    *   [ ] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details). 
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
 5.  **Task 7.5: Implement `/cancel_proposal` Command (Proposer Only)**
-    *   [ ] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`".
+    *   [ ] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`"; then show the button `/my_proposals`.
     *   [ ] In `ProposalService`, implement `cancel_proposal_by_proposer(proposal_id, proposer_id)`:
         *   [ ] Fetch proposal. Verify `proposer_id` matches and status is "open".
         *   [ ] Update status to "cancelled" via `ProposalRepository`.
@@ -470,7 +470,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Test this is working manually.
 
 2. **Task 8.2: Implement `/add_doc` Command (Proposer Only)**
-    *   [ ] If the user just says `/add_doc`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/add_doc <doc_id>`".
+    *   [ ] If the user just says `/add_doc`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/add_doc <doc_id>`"; then show the button for `/my_proposals`.
     *   [ ] In `ProposalRepository`, ensure `get_proposal_by_id` fetches `proposer_id`.
     *   [ ] Implement `add_doc_command` in `document_command_handlers.py`:
         *   [ ] Parse `proposal_id`.
@@ -484,7 +484,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 3.  **Task 8.3: Implement Proposer Document Editing and Deletion**
     *   **Implement `/edit_doc <document_id>` Command (Proposer Only):**
-        *   [ ] If the user just says `/edit_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_doc <doc_id>`".
+        *   [ ] If the user just says `/edit_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_doc <doc_id>`"; then show the button for `/my_docs`.
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `edit_doc_command`.
         *   [ ] Handler parses `document_id`.
         *   [ ] In `ContextService`, add `can_user_edit_document(user_id, document_id)`: 
@@ -501,7 +501,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
     *   **Implement `/delete_doc <document_id>` Command (Proposer Only):**
-        *   [ ] If the user just says `/delete_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_doc <doc_id>`".
+        *   [ ] If the user just says `/delete_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_doc <doc_id>`"; then show the button for `/my_docs`.
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `delete_doc_command`.
         *   [ ] Handler parses `document_id`.
         *   [ ] Use `ContextService.can_user_edit_document()` (or a similar `can_user_delete_document`) to verify proposer.
@@ -522,7 +522,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] DM the list to the admin.
         *   [ ] Test this is working manually.
     *   **Implement `/edit_global_doc <document_id>` Command (Admin Only):**
-        *   [ ] If the admin just says `/edit_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_global_doc <doc_id>`". 
+        *   [ ] If the admin just says `/edit_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_global_doc <doc_id>`"; then show the button for `/my_docs`.
         *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `edit_global_doc_command`.
         *   [ ] Verify user is an admin.
         *   [ ] Handler parses `document_id`.
@@ -534,7 +534,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
     *   **Implement `/delete_global_doc <document_id>` Command (Admin Only):**
-        *   [ ] If the admin just says `/delete_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_global_doc <doc_id>`".
+        *   [ ] If the admin just says `/delete_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_global_doc <doc_id>`"; then show the button for `/my_docs`.
         *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `delete_global_doc_command`.
         *   [ ] Verify user is an admin.
         *   [ ] Handler parses `document_id`.
@@ -545,7 +545,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Test this is working manually.
 
 5.  **Task 8.5: Implement `/view_results` Command**
-    *   [ ] If the user just says `/view_results`, the bot should ask "which proposal? use `/my_proposals` to list all your proposals, `/proposals open` for all open proposals, or `/proposals closed` for all closed proposals, then `/view_results <proposal_id>`".
+    *   [ ] If the user just says `/view_results`, the bot should ask "which proposal? use `/my_proposals` to list all your proposals, `/proposals open` for all open proposals, or `/proposals closed` for all closed proposals, then `/view_results <proposal_id>`". Show the buttons for `/my_proposals`, `/proposals open`, and `/proposals closed`.
     *   [ ] In `ProposalService`, implement `get_all_results_for_proposal_view(proposal_id)`:
         *   [ ] Fetch proposal. Ensure it's "closed".
         *   [ ] Free "multiple_choice" results, fetch the total vote counts for each of the options.
@@ -560,6 +560,9 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
+
+
+---
 
 ## Phase 9: Multi-Channel Support Enhancements
 
@@ -616,6 +619,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] Load the content of `memory-bank/bot_commands.md`.
             *   [ ] Call a new method in `LLMService` (e.g., `LLMService.answer_question_from_docs(question, docs_content)`) providing the user's question and the content of `bot_commands.md`.
             *   [ ] Return the LLM's formatted answer.
+            *   [ ] If the LLM's answer includes commands, also include the commands as button options. For example user says "/help how do I make a proposal" the bot should say "Use the `/proposal` command and I'll walk you through step by step. Or use `/proposal <Title>; <description>; <option1>, <option2>` for multiple-choice (or `freeform` for freeform)." The "proposal" button should appear.
         *   [ ] Implement `answer_question_from_docs(question, docs_content)` in `app/services/llm_service.py`:
             *   [ ] Construct a prompt for the LLM that includes the `docs_content` and the user's `question`.
             *   [ ] The prompt should instruct the LLM to use the provided `docs_content` to answer the `question` by explaining relevant commands and their usage.
