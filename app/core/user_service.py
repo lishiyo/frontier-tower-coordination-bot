@@ -19,3 +19,7 @@ class UserService:
             first_name=first_name,
         )
         return user 
+
+    async def get_user_by_telegram_id(self, telegram_id: int) -> User | None:
+        """Gets a user by their Telegram ID."""
+        return await self.user_repository.get_user_by_telegram_id(telegram_id) 

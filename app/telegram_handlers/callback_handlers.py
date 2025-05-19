@@ -262,4 +262,104 @@ async def handle_proposal_filter_callback(update: Update, context: ContextTypes.
             except Exception as edit_e:
                 logger.error(f"Error editing message on exception: {edit_e}")
 
-    logger.info(f"User {query.from_user.id} viewed {filter_type} proposals via callback.") 
+    logger.info(f"User {query.from_user.id} viewed {filter_type} proposals via callback.")
+
+async def handle_my_proposals_for_edit_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the 'My Proposals' button from the /edit_proposal prompt by displaying the user's proposals."""
+    query = update.callback_query
+    await query.answer()
+
+    if not query.from_user or not query.message or not query.message.chat:
+        logger.warning("handle_my_proposals_for_edit_prompt missing user/message/chat details.")
+        try:
+            await query.edit_message_text(text="Sorry, I couldn't retrieve the necessary details to show your proposals.")
+        except Exception as e:
+            logger.error(f"Error editing message in handle_my_proposals_for_edit_prompt (details missing): {e}")
+        return
+
+    user_id = query.from_user.id
+    chat_id = query.message.chat.id
+
+    async with AsyncSessionLocal() as session:
+        user_service = UserService(session)
+        # Ensure user is registered/updated. This typically happens in command entry, but good practice here too.
+        await user_service.register_user_interaction(
+            telegram_id=user_id, 
+            username=query.from_user.username, 
+            first_name=query.from_user.first_name
+        )
+        # No explicit commit needed here if register_user_interaction handles its transaction
+        # or if the main purpose is read-only for proposals.
+        # However, my_proposals_command does commit after user registration, so let's be consistent.
+        await session.commit()
+
+        proposal_service = ProposalService(session)
+        proposals_list_data = await proposal_service.list_proposals_by_proposer(user_id)
+
+    message_text_parts = []
+    if not proposals_list_data:
+        message_text_parts.append("You haven't created any proposals yet\.")
+    else:
+        message_text_parts.append("*Your Proposals:*\n")
+        for prop_data in proposals_list_data:
+            title_escaped = telegram_utils.escape_markdown_v2(prop_data['title'])
+            status_str = prop_data['status'].value if hasattr(prop_data['status'], 'value') else str(prop_data['status'])
+            status_escaped = telegram_utils.escape_markdown_v2(status_str)
+            
+            proposal_type_str = prop_data['proposal_type'].value if hasattr(prop_data['proposal_type'], 'value') else str(prop_data['proposal_type'])
+            type_escaped = telegram_utils.escape_markdown_v2(proposal_type_str)
+            
+            created_escaped = telegram_utils.escape_markdown_v2(str(prop_data['creation_date']))
+            deadline_escaped = telegram_utils.escape_markdown_v2(str(prop_data['deadline_date']))
+            outcome_display = prop_data.get('outcome') if prop_data.get('outcome') is not None else "N/A"
+            outcome_escaped = telegram_utils.escape_markdown_v2(outcome_display)
+
+            channel_id_str = str(prop_data['target_channel_id'])
+            channel_message_id = prop_data.get('channel_message_id')
+            
+            channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}`"
+            if channel_message_id and channel_id_str.startswith("-100"):
+                try:
+                    numeric_channel_id = channel_id_str[4:]
+                    link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}" 
+                    escaped_link_text = telegram_utils.escape_markdown_v2(f"Channel: {channel_id_str}")
+                    channel_display = f"[{escaped_link_text}]({link})"
+                except Exception as e:
+                    logger.error(f"Error creating channel link for my_proposals callback {channel_id_str}, {channel_message_id}: {e}")
+                    channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
+            elif channel_message_id:
+                 channel_display = f"Chat ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
+            
+            part = (
+                f"\\- *Title:* {title_escaped} \\(ID: `{prop_data['id']}`\\)\n"
+                f"  Status: {status_escaped}\n"
+                f"  Type: {type_escaped}\n"
+                f"  {channel_display}\n"
+                f"  Created: {created_escaped}\n"
+                f"  Deadline: {deadline_escaped}\n"
+                f"  Outcome: {outcome_escaped}\n"
+            )
+            message_text_parts.append(part)
+    
+    final_message_text = "\n".join(message_text_parts)
+
+    try:
+        # Send the list of proposals as a new message
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=final_message_text,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        # Then edit the original message (that had the button)
+        await query.edit_message_text(
+            text="Please use `/edit_proposal <ID>` with an ID from the list below to edit a proposal\.",
+            parse_mode=ParseMode.MARKDOWN_V2
+            # No reply_markup needed here, as we're removing the button implicitly by not providing it.
+        )
+    except Exception as e:
+        logger.error(f"Error sending/editing message in handle_my_proposals_for_edit_prompt: {e}", exc_info=True)
+        # If sending new message failed, at least try to edit the original to give some feedback
+        try:
+            await query.edit_message_text(text="Could not display your proposals due to an error\. Please try `/my_proposals` directly\.")
+        except Exception as e2:
+            logger.error(f"Nested error editing message in handle_my_proposals_for_edit_prompt: {e2}") 

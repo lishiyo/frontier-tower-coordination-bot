@@ -12,7 +12,16 @@
 ) = range(9)
 
 # States for /edit_proposal (if needed, or manage via context + simple handlers)
-EDIT_PROPOSAL_NEW_TITLE, EDIT_PROPOSAL_NEW_DESCRIPTION, EDIT_PROPOSAL_NEW_OPTIONS = range(8, 11)
+# EDIT_PROPOSAL_NEW_TITLE, EDIT_PROPOSAL_NEW_DESCRIPTION, EDIT_PROPOSAL_NEW_OPTIONS = range(8, 11) # Old, overlapping
+
+# New states for /edit_proposal ConversationHandler
+(
+    SELECT_EDIT_ACTION,     # Ask user what they want to edit (Title, Description, Options, All)
+    EDIT_TITLE,             # Collect new title
+    EDIT_DESCRIPTION,       # Collect new description
+    EDIT_OPTIONS,           # Collect new options (if MC proposal)
+    CONFIRM_EDIT_PROPOSAL   # Show changes and ask for confirmation
+) = range(13, 18) # Start from 13 to avoid conflict
 
 # States for /add_global_doc
 ADD_GLOBAL_DOC_CONTENT, ADD_GLOBAL_DOC_TITLE = range(11, 13)
@@ -36,7 +45,10 @@ USER_DATA_TARGET_CHANNEL_ID = "target_channel_id"
 USER_DATA_DEADLINE_DATE = "deadline_date"
 USER_DATA_CONTEXT_DOCUMENT_ID = "context_document_id"
 USER_DATA_PROPOSAL_PARTS = "proposal_parts" # For initial parsing
-USER_DATA_CURRENT_CONTEXT = "current_context" # For storing context during conversation 
+USER_DATA_CURRENT_CONTEXT = "current_context" # For storing context during conversation
+USER_DATA_EDIT_PROPOSAL_ID = "edit_proposal_id"
+USER_DATA_EDIT_PROPOSAL_ORIGINAL = "edit_proposal_original" # Store original proposal for reference
+USER_DATA_EDIT_CHANGES = "edit_proposal_changes" # dict to store {title: new_val, desc: new_val, opts: new_val}
 
 # Default values or special inputs
 NO_CONTEXT_INPUT = "no_context" 

@@ -4,6 +4,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert # For INSERT ... ON CONFLICT DO UPDATE
 from datetime import datetime
+from sqlalchemy.sql import func
 
 from app.persistence.models.submission_model import Submission
 
@@ -73,6 +74,7 @@ class SubmissionRepository:
         return result.scalars().all()
 
     async def count_submissions_for_proposal(self, proposal_id: int) -> int:
-        stmt = select(Submission).where(Submission.proposal_id == proposal_id)
+        stmt = select(func.count(Submission.id)).where(Submission.proposal_id == proposal_id)
         result = await self.db_session.execute(stmt)
-        return len(result.scalars().all()) 
+        count = result.scalar_one_or_none() or 0
+        return count 

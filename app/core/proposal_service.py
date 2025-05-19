@@ -117,6 +117,74 @@ class ProposalService:
             formatted_proposals.append(proposal_info)
         return formatted_proposals
 
+    async def edit_proposal_details(
+        self,
+        proposal_id: int,
+        proposer_telegram_id: int,
+        new_title: Optional[str] = None,
+        new_description: Optional[str] = None,
+        new_options: Optional[List[str]] = None,
+    ) -> tuple[Optional[Proposal], Optional[str]]:
+        """
+        Edits the details of an existing proposal if the user is the proposer
+        and no submissions have been made.
+        Returns a tuple (updated_proposal, error_message).
+        One of them will be None.
+        """
+        proposal = await self.proposal_repository.get_proposal_by_id(proposal_id)
+
+        if not proposal:
+            return None, "Proposal not found."
+
+        if proposal.proposer_telegram_id != proposer_telegram_id:
+            return None, "You are not authorized to edit this proposal."
+
+        if proposal.status != ProposalStatus.OPEN.value:
+            return None, f"This proposal is not open for editing (current status: {proposal.status})."
+
+        submission_count = await self.submission_repository.count_submissions_for_proposal(proposal_id)
+        if submission_count > 0:
+            return None, "This proposal cannot be edited because it already has submissions. Please cancel it and create a new one if changes are needed."
+
+        # At least one field must be provided for editing
+        if new_title is None and new_description is None and new_options is None:
+            return None, "No changes provided. Please specify what you want to edit (title, description, or options)."
+
+        updated_proposal = await self.proposal_repository.update_proposal_details(
+            proposal_id=proposal_id,
+            title=new_title if new_title is not None else proposal.title,
+            description=new_description if new_description is not None else proposal.description,
+            options=new_options if new_options is not None else proposal.options,
+            # Ensure proposal_type is not accidentally changed if options are None but type was MC
+            # This method assumes options are only provided if they are being changed.
+            # If new_options are provided and it's an empty list for an MC proposal, it should likely remain MC with no options or be an error.
+            # For simplicity, we'll assume type doesn't change here. It's complex if options make it freeform.
+        )
+
+        if not updated_proposal:
+            # This case should ideally not happen if the proposal existed and update logic is correct
+            return None, "Failed to update proposal in the database."
+            
+        # Caller (ConversationHandler) will be responsible for committing the session
+        # and for updating the message in the channel.
+        
+        # Re-index proposal for semantic search if title or description changed
+        if new_title or new_description:
+            try:
+                proposal_text_to_index = updated_proposal.title + " " + updated_proposal.description
+                embedding = await self.llm_service.generate_embedding(proposal_text_to_index)
+                
+                # Need VectorDBService instance here
+                # Assuming it's available or can be instantiated if not already.
+                # For now, let's log this step. A more robust solution would involve DI or service locator.
+                logger.info(f"Proposal {updated_proposal.id} content changed. Re-indexing would be needed here.")
+                # await self.vector_db_service.add_proposal_embedding(...) # Placeholder
+            except Exception as e:
+                logger.error(f"Error during re-indexing proposal {updated_proposal.id} after edit: {e}", exc_info=True)
+
+
+        return updated_proposal, None
+
     async def process_expired_proposals(self) -> List[Proposal]:
         """
         Processes proposals that have passed their deadline.

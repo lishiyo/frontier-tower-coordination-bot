@@ -14,7 +14,9 @@ from app.telegram_handlers.conversation_defs import (
     USER_DATA_PROPOSAL_PARTS, USER_DATA_PROPOSAL_TITLE, USER_DATA_PROPOSAL_DESCRIPTION,
     USER_DATA_PROPOSAL_TYPE, USER_DATA_PROPOSAL_OPTIONS, USER_DATA_DEADLINE_DATE,
     USER_DATA_TARGET_CHANNEL_ID, USER_DATA_CURRENT_CONTEXT, ASK_CONTEXT, PROPOSAL_TYPE_CALLBACK,
-    PROPOSAL_FILTER_OPEN, PROPOSAL_FILTER_CLOSED
+    PROPOSAL_FILTER_OPEN, PROPOSAL_FILTER_CLOSED,
+    SELECT_EDIT_ACTION, EDIT_TITLE, EDIT_DESCRIPTION, EDIT_OPTIONS, CONFIRM_EDIT_PROPOSAL,
+    USER_DATA_EDIT_PROPOSAL_ID, USER_DATA_EDIT_PROPOSAL_ORIGINAL, USER_DATA_EDIT_CHANGES
 )
 from app.telegram_handlers.message_handlers import (
     handle_collect_title,
@@ -233,6 +235,319 @@ async def proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await telegram_utils.send_message_in_chunks(context, chat_id=chat_id, text=full_message, parse_mode=ParseMode.MARKDOWN_V2)
 
 # TODO: Add other proposal-related commands here if any (e.g., /edit_proposal, /cancel_proposal)
+
+# TODO: Move other proposal-related command handlers here:
+# - Handler for /proposals open/closed
+# - Handler for /edit_proposal
+# - Handler for /cancel_proposal (if different from generic cancel_conversation)
+
+# --- Edit Proposal Conversation --- #
+
+async def edit_proposal_command_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    logger.info(f"User {update.effective_user.id} initiated /edit_proposal command.")
+    if not update.effective_user or not update.message:
+        if update.message: await update.message.reply_text("Cannot identify user.")
+        return ConversationHandler.END
+
+    context.user_data[USER_DATA_EDIT_PROPOSAL_ID] = None
+    context.user_data[USER_DATA_EDIT_PROPOSAL_ORIGINAL] = None
+    context.user_data[USER_DATA_EDIT_CHANGES] = {}
+
+    if not context.args:
+        keyboard = [[InlineKeyboardButton("📜 My Proposals", callback_data="my_proposals_for_edit_prompt")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "Which proposal do you want to edit? Please provide the Proposal ID\\.\n" \
+            "Example: `/edit_proposal 123`\n" \
+            "Use `/my_proposals` to see a list of your proposals and their IDs\\.",
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        return ConversationHandler.END
+
+    try:
+        proposal_id_to_edit = int(context.args[0])
+    except (IndexError, ValueError):
+        await update.message.reply_text("Invalid Proposal ID. Please provide a number. Example: `/edit_proposal 123`")
+        return ConversationHandler.END
+
+    async with AsyncSessionLocal() as session:
+        proposal_service = ProposalService(session, bot_app=context.application)
+        proposal = await proposal_service.proposal_repository.get_proposal_by_id(proposal_id_to_edit)
+
+        if not proposal:
+            await update.message.reply_text(f"Proposal with ID {proposal_id_to_edit} not found.")
+            return ConversationHandler.END
+
+        if proposal.proposer_telegram_id != update.effective_user.id:
+            await update.message.reply_text("You are not authorized to edit this proposal.")
+            return ConversationHandler.END
+
+        if proposal.status != ProposalStatus.OPEN.value:
+            await update.message.reply_text(f"This proposal is not open for editing (current status: {proposal.status}).")
+            return ConversationHandler.END
+
+        submission_count = await proposal_service.submission_repository.count_submissions_for_proposal(proposal_id_to_edit)
+        if submission_count > 0:
+            await update.message.reply_text(
+                f"This proposal cannot be edited because it already has submissions or votes. " \
+                f"Please cancel it using `/cancel_proposal {proposal_id_to_edit}` and create a new one if changes are needed."
+            )
+            return ConversationHandler.END
+
+        context.user_data[USER_DATA_EDIT_PROPOSAL_ID] = proposal_id_to_edit
+        context.user_data[USER_DATA_EDIT_PROPOSAL_ORIGINAL] = {
+            "title": proposal.title,
+            "description": proposal.description,
+            "options": proposal.options,
+            "proposal_type": proposal.proposal_type
+        }
+        context.user_data[USER_DATA_EDIT_CHANGES] = {}
+
+        keyboard = [
+            [InlineKeyboardButton("Edit Title", callback_data="edit_prop_title")],
+            [InlineKeyboardButton("Edit Description", callback_data="edit_prop_desc")],
+        ]
+        if proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value:
+            keyboard.append([InlineKeyboardButton("Edit Options", callback_data="edit_prop_opts")])
+        keyboard.append([InlineKeyboardButton("Edit All", callback_data="edit_prop_all")])
+        keyboard.append([InlineKeyboardButton("Finish Editing (No Changes)", callback_data="edit_prop_finish_no_change")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        original_title_escaped = telegram_utils.escape_markdown_v2(proposal.title)
+        await update.message.reply_text(
+            f"Editing proposal ID {proposal_id_to_edit}: *{original_title_escaped}*\n\nWhat would you like to edit?",
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        return SELECT_EDIT_ACTION
+
+async def handle_select_edit_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    action = query.data
+    context.user_data['_current_edit_action'] = action # Store which part we are editing sequentially for "All"
+
+    if action == "edit_prop_title" or action == "edit_prop_all":
+        await query.edit_message_text(text="Please send the new title for the proposal.")
+        return EDIT_TITLE
+    elif action == "edit_prop_desc":
+        await query.edit_message_text(text="Please send the new description for the proposal.")
+        return EDIT_DESCRIPTION
+    elif action == "edit_prop_opts":
+        original_proposal_type = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ORIGINAL, {}).get("proposal_type")
+        if original_proposal_type == ProposalType.MULTIPLE_CHOICE.value:
+            await query.edit_message_text(text="Please send the new options, separated by commas.")
+            return EDIT_OPTIONS
+        else:
+            await query.edit_message_text(text="This proposal is free-form and does not have editable options.")
+            # Go back to selection or end if they only chose options wrongly
+            # For simplicity, returning to selection for now
+            # TODO: Re-prompt with SELECT_EDIT_ACTION keyboard.
+            # This requires storing and resending the original message with keyboard.
+            # For now, just ending this path if invalid.
+            current_proposal_id = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ID)
+            await query.message.reply_text(f"Returning to edit options for proposal {current_proposal_id}.") 
+            # Need to re-send the SELECT_EDIT_ACTION prompt here. This part is tricky with edit_message_text.
+            # Let's just allow them to cancel or send another command.
+            return ConversationHandler.END # Simplified for now
+
+    elif action == "edit_prop_finish_no_change":
+        await query.edit_message_text(text="No changes made to the proposal.")
+        return ConversationHandler.END
+    
+    logger.warning(f"handle_select_edit_action: Unknown action '{action}'.")
+    await query.edit_message_text(text="Sorry, an unexpected error occurred.")
+    return ConversationHandler.END
+
+async def handle_edit_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    new_title = update.message.text.strip()
+    if not new_title:
+        await update.message.reply_text("Title cannot be empty. Please send a valid title, or /cancel_edit.")
+        return EDIT_TITLE
+    
+    context.user_data[USER_DATA_EDIT_CHANGES]['title'] = new_title
+    await update.message.reply_text(f"New title set to: '{new_title}'")
+
+    current_edit_action = context.user_data.get('_current_edit_action')
+    if current_edit_action == "edit_prop_all":
+        await update.message.reply_text("Now, please send the new description for the proposal.")
+        return EDIT_DESCRIPTION
+    else:
+        # Ask to confirm or select another field
+        # For simplicity, directly go to confirm after any single edit for now
+        return await prompt_confirm_edit_proposal(update, context)
+
+async def handle_edit_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    new_description = update.message.text.strip()
+    if not new_description:
+        await update.message.reply_text("Description cannot be empty. Please send a valid description, or /cancel_edit.")
+        return EDIT_DESCRIPTION
+
+    context.user_data[USER_DATA_EDIT_CHANGES]['description'] = new_description
+    await update.message.reply_text(f"New description set.") # Don't echo back potentially long desc
+
+    current_edit_action = context.user_data.get('_current_edit_action')
+    original_proposal_type = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ORIGINAL, {}).get("proposal_type")
+
+    if current_edit_action == "edit_prop_all":
+        if original_proposal_type == ProposalType.MULTIPLE_CHOICE.value:
+            await update.message.reply_text("Now, please send the new options, separated by commas.")
+            return EDIT_OPTIONS
+        else: # Freeform, skip options
+            return await prompt_confirm_edit_proposal(update, context)
+    else:
+        return await prompt_confirm_edit_proposal(update, context)
+
+async def handle_edit_options(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    new_options_str = update.message.text.strip()
+    if not new_options_str:
+        await update.message.reply_text("Options cannot be empty for a multiple-choice proposal. Please provide options or /cancel_edit.")
+        return EDIT_OPTIONS
+    
+    new_options_list = [opt.strip() for opt in new_options_str.split(',') if opt.strip()]
+    if not new_options_list:
+        await update.message.reply_text("No valid options provided. Please list options separated by commas, or /cancel_edit.")
+        return EDIT_OPTIONS
+
+    context.user_data[USER_DATA_EDIT_CHANGES]['options'] = new_options_list
+    await update.message.reply_text(f"New options set to: {', '.join(new_options_list)}")
+    
+    # Whether coming from "edit_prop_all" or "edit_prop_opts", options are last for MC
+    return await prompt_confirm_edit_proposal(update, context)
+
+async def prompt_confirm_edit_proposal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    changes = context.user_data.get(USER_DATA_EDIT_CHANGES, {})
+    original = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ORIGINAL, {})
+    proposal_id = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ID)
+
+    if not changes:
+        await update.message.reply_text("No changes were made. Finishing edit process.")
+        return ConversationHandler.END
+
+    summary_parts = [f"Summary of changes for proposal ID {proposal_id}:"]
+    if 'title' in changes:
+        summary_parts.append(f"  Title: '{telegram_utils.escape_markdown_v2(original.get('title'))}' \-\> '{telegram_utils.escape_markdown_v2(changes['title'])}'")
+    if 'description' in changes:
+        summary_parts.append(f"  Description: Changed \(new version will be applied\)")
+    if 'options' in changes:
+        original_opts_str = ", ".join(original.get('options', []))
+        new_opts_str = ", ".join(changes['options'])
+        summary_parts.append(f"  Options: '{telegram_utils.escape_markdown_v2(original_opts_str)}' \-\> '{telegram_utils.escape_markdown_v2(new_opts_str)}'")
+    
+    summary_text = "\n".join(summary_parts)
+    summary_text += "\n\nDo you want to apply these changes?"
+
+    keyboard = [
+        [InlineKeyboardButton("Yes, Apply Changes", callback_data="edit_prop_confirm_yes")],
+        [InlineKeyboardButton("No, Discard Changes", callback_data="edit_prop_confirm_no")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Ensure message is sent from update.message if available, or context.bot if from callback
+    if update.message:
+        await update.message.reply_text(summary_text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
+    elif update.callback_query and update.callback_query.message: # If called after a callback query message edit
+        # We might need to send a new message here, as edit_message_text was used before.
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=summary_text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
+    else:
+        logger.error("prompt_confirm_edit_proposal: Cannot find a message to reply to or a chat to send to.")
+        return ConversationHandler.END
+        
+    return CONFIRM_EDIT_PROPOSAL
+
+async def handle_confirm_edit_proposal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    decision = query.data
+
+    proposal_id = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ID)
+    changes = context.user_data.get(USER_DATA_EDIT_CHANGES, {})
+
+    if decision == "edit_prop_confirm_yes":
+        if not changes or not proposal_id:
+            await query.edit_message_text("No changes to apply or proposal ID missing. Edit cancelled.")
+            return ConversationHandler.END
+
+        async with AsyncSessionLocal() as session:
+            proposal_service = ProposalService(session, bot_app=context.application)
+            updated_proposal, error_msg = await proposal_service.edit_proposal_details(
+                proposal_id=proposal_id,
+                proposer_telegram_id=update.effective_user.id,
+                new_title=changes.get('title'),
+                new_description=changes.get('description'),
+                new_options=changes.get('options')
+            )
+            if error_msg:
+                await query.edit_message_text(f"Error applying changes: {error_msg}")
+                return ConversationHandler.END
+            
+            if updated_proposal:
+                await session.commit() # Commit changes here as service layer doesn't
+                await query.edit_message_text(f"Proposal ID {proposal_id} has been successfully updated.")
+                
+                # Update message in channel
+                if updated_proposal.target_channel_id and updated_proposal.channel_message_id:
+                    try:
+                        # We need the proposer User object to format the message correctly
+                        proposer_user = await proposal_service.user_service.get_user_by_telegram_id(updated_proposal.proposer_telegram_id)
+                        if not proposer_user:
+                             logger.error(f"Could not find proposer user {updated_proposal.proposer_telegram_id} for updating channel message of proposal {updated_proposal.id}")
+                        else:
+                            new_channel_message_text = telegram_utils.format_proposal_message(updated_proposal, proposer_user)
+                            reply_markup_channel = None
+                            if updated_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value and updated_proposal.options:
+                                reply_markup_channel = telegram_utils.create_proposal_options_keyboard(updated_proposal.id, updated_proposal.options)
+                            elif updated_proposal.proposal_type == ProposalType.FREE_FORM.value and context.bot.username:
+                                reply_markup_channel = telegram_utils.get_free_form_submit_button(updated_proposal.id, context.bot.username)
+
+                            await context.bot.edit_message_text(
+                                chat_id=updated_proposal.target_channel_id,
+                                message_id=updated_proposal.channel_message_id,
+                                text=new_channel_message_text,
+                                reply_markup=reply_markup_channel,
+                                parse_mode=ParseMode.MARKDOWN_V2
+                            )
+                            logger.info(f"Updated message for proposal {updated_proposal.id} in channel {updated_proposal.target_channel_id}.")
+                    except Exception as e:
+                        logger.error(f"Failed to update message in channel for proposal {updated_proposal.id}: {e}", exc_info=True)
+                        await query.message.reply_text("Proposal details updated, but failed to update the message in the channel. Please check manually.")
+            else:
+                # This case is theoretically covered by error_msg from edit_proposal_details
+                await query.edit_message_text("Failed to update proposal for an unknown reason.")
+        
+    elif decision == "edit_prop_confirm_no":
+        await query.edit_message_text("Changes discarded. Proposal not modified.")
+    else:
+        logger.warning(f"handle_confirm_edit_proposal: Unknown decision '{decision}'.")
+        await query.edit_message_text("Invalid confirmation. Edit cancelled.")
+
+    # Clean up user_data
+    for key in [USER_DATA_EDIT_PROPOSAL_ID, USER_DATA_EDIT_PROPOSAL_ORIGINAL, USER_DATA_EDIT_CHANGES, '_current_edit_action']:
+        if key in context.user_data: del context.user_data[key]
+    return ConversationHandler.END
+
+async def cancel_edit_proposal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancels the edit proposal conversation."""
+    await update.message.reply_text("Proposal edit cancelled.")
+    # Clean up user_data
+    for key in [USER_DATA_EDIT_PROPOSAL_ID, USER_DATA_EDIT_PROPOSAL_ORIGINAL, USER_DATA_EDIT_CHANGES, '_current_edit_action']:
+        if key in context.user_data: del context.user_data[key]
+    return ConversationHandler.END
+
+edit_proposal_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("edit_proposal", edit_proposal_command_entry)],
+    states={
+        SELECT_EDIT_ACTION: [CallbackQueryHandler(handle_select_edit_action, pattern=r"^edit_prop_(title|desc|opts|all|finish_no_change)$")],
+        EDIT_TITLE: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_edit_title)],
+        EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_edit_description)],
+        EDIT_OPTIONS: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_edit_options)],
+        CONFIRM_EDIT_PROPOSAL: [CallbackQueryHandler(handle_confirm_edit_proposal, pattern=r"^edit_prop_confirm_(yes|no)$")]
+    },
+    fallbacks=[CommandHandler("cancel_edit", cancel_edit_proposal)], # New cancel command for this convo
+    name="edit_proposal_conversation",
+    # persistent=False # Consider persistence if needed
+)
 
 # TODO: Move other proposal-related command handlers here:
 # - Handler for /proposals open/closed

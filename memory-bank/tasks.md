@@ -440,6 +440,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details). 
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
+    *   [ ] Move to Subtask 9.5.1 (indexing proposals on create/edit) now that we have edit functionality.
 
 5.  **Task 7.5: Implement `/cancel_proposal` Command (Proposer Only)**
     *   [ ] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`"; then show the button `/my_proposals`.

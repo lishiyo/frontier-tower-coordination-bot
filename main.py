@@ -17,7 +17,8 @@ from app.telegram_handlers.document_command_handlers import (
 )
 from app.telegram_handlers.proposal_command_handlers import (
     proposal_conv_handler, 
-    proposals_command
+    proposals_command,
+    edit_proposal_conv_handler # Added for /edit_proposal
 )
 from app.telegram_handlers.submission_command_handlers import (
     submit_command, handle_prefilled_submit #, my_votes_command, view_results_command, ask_command # Commented out
@@ -26,6 +27,7 @@ from app.telegram_handlers.callback_handlers import (
     handle_vote_callback, 
     handle_collect_proposal_type_callback, # Corrected name
     handle_proposal_filter_callback, # Added new handler
+    handle_my_proposals_for_edit_prompt # Added for /edit_proposal prompt button
     # handle_channel_selection_callback # Commented out - definition missing in callback_handlers.py
 )
 from app.telegram_handlers.admin_command_handlers import get_add_global_doc_conversation_handler # view_global_docs_command, edit_global_doc_command, delete_global_doc_command
@@ -81,15 +83,15 @@ def main() -> None:
     application.add_handler(CommandHandler("submit", submit_command, block=False)) # Task 4.3, added block=False
     application.add_handler(CommandHandler("my_votes", my_votes_command)) # Task 7.1
     application.add_handler(CommandHandler("my_proposals", my_proposals_command)) # Task 7.2
-    # application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
+    application.add_handler(CommandHandler("my_submissions", my_votes_command)) # Alias for my_votes (Task 7.1)
     # application.add_handler(CommandHandler("view_results", view_results_command)) # Task 7.6
     application.add_handler(CommandHandler("ask", ask_command)) # Task 6.1
     # application.add_handler(CommandHandler("cancel_proposal", cancel_proposal_command)) # Task 7.4
     # application.add_handler(CommandHandler("add_doc", add_doc_command)) # Task 7.5
-    # application.add_handler(CommandHandler("edit_proposal", edit_proposal_command)) # Task 7.3
 
     # Register ConversationHandlers
     application.add_handler(proposal_conv_handler)
+    application.add_handler(edit_proposal_conv_handler) # Added for /edit_proposal
     application.add_handler(get_add_global_doc_conversation_handler()) # Added
 
     # Register MessageHandler for prefilled submits (must be before generic message handlers if any)
@@ -100,6 +102,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_collect_proposal_type_callback, pattern=f"^{PROPOSAL_TYPE_CALLBACK}")) # Corrected name
     application.add_handler(CallbackQueryHandler(handle_vote_callback, pattern=r"^vote_.*$")) # Task 4.2
     application.add_handler(CallbackQueryHandler(handle_proposal_filter_callback, pattern=f"^{PROPOSAL_FILTER_CALLBACK_PREFIX}")) # New handler
+    application.add_handler(CallbackQueryHandler(handle_my_proposals_for_edit_prompt, pattern=r"^my_proposals_for_edit_prompt$")) # Added
 
     # Proposal viewing commands
     application.add_handler(CommandHandler("proposals", proposals_command))
