@@ -20,6 +20,12 @@ ADD_GLOBAL_DOC_CONTENT, ADD_GLOBAL_DOC_TITLE = range(11, 13)
 # Callback data prefixes
 PROPOSAL_TYPE_CALLBACK = "proposal_type_"
 CHANNEL_SELECT_CALLBACK = "channel_select_"
+VOTE_CALLBACK_PREFIX = "vote_" # For actual votes
+
+# New callback data for /proposals filter
+PROPOSAL_FILTER_CALLBACK_PREFIX = "proposal_filter_"
+PROPOSAL_FILTER_OPEN = f"{PROPOSAL_FILTER_CALLBACK_PREFIX}open"
+PROPOSAL_FILTER_CLOSED = f"{PROPOSAL_FILTER_CALLBACK_PREFIX}closed"
 
 # User data keys
 USER_DATA_PROPOSAL_TITLE = "proposal_title"

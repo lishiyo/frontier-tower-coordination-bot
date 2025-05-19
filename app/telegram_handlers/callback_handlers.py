@@ -1,15 +1,20 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+from telegram.constants import ParseMode
 
 from app.telegram_handlers.conversation_defs import (
     COLLECT_PROPOSAL_TYPE, COLLECT_OPTIONS, ASK_DURATION,
-    USER_DATA_PROPOSAL_TYPE, PROPOSAL_TYPE_CALLBACK
+    USER_DATA_PROPOSAL_TYPE, PROPOSAL_TYPE_CALLBACK,
+    VOTE_CALLBACK_PREFIX, PROPOSAL_FILTER_CALLBACK_PREFIX,
+    PROPOSAL_FILTER_OPEN, PROPOSAL_FILTER_CLOSED
 )
-from app.persistence.models.proposal_model import ProposalType
+from app.persistence.models.proposal_model import ProposalType, ProposalStatus
 from app.core.submission_service import SubmissionService
+from app.core.proposal_service import ProposalService
 from app.persistence.database import AsyncSessionLocal
 from app.core.user_service import UserService
+from app.utils import telegram_utils
 
 # Placeholder for imports that will be needed soon:
 # from app.core.services import AppServiceFactory # Or direct service instantiation
@@ -100,7 +105,7 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     success_for_alert = False # Determines if the final alert is for success or error
 
     callback_data = query.data
-    if not callback_data or not callback_data.startswith("vote_"):
+    if not callback_data or not callback_data.startswith(VOTE_CALLBACK_PREFIX):
         logger.warning(f"handle_vote_callback received invalid data: {callback_data}")
         response_message_text = "Error: Invalid vote data received."
         await query.answer(text=response_message_text, show_alert=True)
@@ -147,3 +152,73 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     # For success, submission_service.record_vote already provides a good message.
     # For errors caught here, response_message_text is set accordingly.
     await query.answer(text=response_message_text, show_alert=True) 
+
+async def handle_proposal_filter_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles callback query for filtering proposals (open/closed)."""
+    query = update.callback_query
+    await query.answer() # Acknowledge callback
+
+    if not query.data or not query.data.startswith(PROPOSAL_FILTER_CALLBACK_PREFIX):
+        logger.warning(f"Invalid callback data received for proposal filter: {query.data}")
+        if query.message:
+            await query.edit_message_text(text="Invalid selection. Please try again.")
+        return
+
+    filter_type = query.data
+    status_to_fetch = None
+    display_type = ""
+
+    if filter_type == PROPOSAL_FILTER_OPEN:
+        status_to_fetch = ProposalStatus.OPEN
+        display_type = "Open"
+    elif filter_type == PROPOSAL_FILTER_CLOSED:
+        status_to_fetch = ProposalStatus.CLOSED
+        display_type = "Closed"
+    else:
+        logger.warning(f"Unknown proposal filter callback: {filter_type}")
+        if query.message:
+            await query.edit_message_text(text="Invalid filter selected. Please try again.")
+        return
+
+    async with AsyncSessionLocal() as session:
+        proposal_service = ProposalService(session)
+        proposals = await proposal_service.list_proposals_by_status(status_to_fetch.value)
+
+    if not proposals:
+        if query.message: # Check if query.message exists before trying to edit it
+            await query.edit_message_text(text=f"No {display_type.lower()} proposals found.")
+        return
+
+    message_parts = [f"{display_type} Proposals:\n"]
+    for prop_data in proposals:
+        title_escaped = telegram_utils.escape_markdown_v2(prop_data['title'])
+        channel_id_str = str(prop_data['target_channel_id'])
+        channel_message_id = prop_data.get('channel_message_id')
+        
+        channel_display = telegram_utils.escape_markdown_v2(channel_id_str)
+        if channel_message_id and channel_id_str.startswith("-100"):
+            numeric_channel_id = channel_id_str[4:] # Remove leading -100
+            link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
+            escaped_link = telegram_utils.escape_markdown_v2(link)
+            channel_display = f"[Channel ID: {telegram_utils.escape_markdown_v2(channel_id_str)}]({escaped_link})"
+        else:
+            channel_display = f"Channel ID: {telegram_utils.escape_markdown_v2(channel_id_str)}"
+
+        part = f"\\- ID: `{prop_data['id']}`: {title_escaped}\n"
+        part += f"  {channel_display}\n"
+
+        if status_to_fetch == ProposalStatus.OPEN:
+            deadline_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('deadline_date', 'N/A')))
+            part += f"  Voting ends: {deadline_escaped}\n"
+        elif status_to_fetch == ProposalStatus.CLOSED:
+            outcome_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('outcome', 'N/A')))
+            closed_date_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('closed_date', 'N/A')))
+            part += f"  Closed on: {closed_date_escaped}\n"
+            part += f"  Outcome: {outcome_escaped}\n"
+        message_parts.append(part)
+        
+    full_message = "\n".join(message_parts)
+    if query.message: # Check if query.message exists
+        # Edit the original message that had the buttons
+        await query.edit_message_text(text=full_message, parse_mode=ParseMode.MARKDOWN_V2)
+    logger.info(f"User {query.from_user.id} viewed {display_type.lower()} proposals via callback.") 

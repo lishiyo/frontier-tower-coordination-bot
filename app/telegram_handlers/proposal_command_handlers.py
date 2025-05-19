@@ -1,5 +1,5 @@
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, CallbackQueryHandler
 from typing import List # Minimal imports from typing
 import telegram.ext.filters as filters # For PTB V20+
@@ -13,7 +13,8 @@ from app.telegram_handlers.conversation_defs import (
     COLLECT_TITLE, COLLECT_DESCRIPTION, COLLECT_PROPOSAL_TYPE, COLLECT_OPTIONS, ASK_DURATION, 
     USER_DATA_PROPOSAL_PARTS, USER_DATA_PROPOSAL_TITLE, USER_DATA_PROPOSAL_DESCRIPTION,
     USER_DATA_PROPOSAL_TYPE, USER_DATA_PROPOSAL_OPTIONS, USER_DATA_DEADLINE_DATE,
-    USER_DATA_TARGET_CHANNEL_ID, USER_DATA_CURRENT_CONTEXT, ASK_CONTEXT, PROPOSAL_TYPE_CALLBACK
+    USER_DATA_TARGET_CHANNEL_ID, USER_DATA_CURRENT_CONTEXT, ASK_CONTEXT, PROPOSAL_TYPE_CALLBACK,
+    PROPOSAL_FILTER_OPEN, PROPOSAL_FILTER_CLOSED
 )
 from app.telegram_handlers.message_handlers import (
     handle_collect_title,
@@ -195,7 +196,7 @@ async def my_proposals_command(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
 async def proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles /proposals [open|closed] command."""
+    """Handles /proposals [open|closed] command, or prompts with buttons if no args."""
     if not update.effective_user or not update.message:
         logger.warning("proposals_command called without effective_user or message.")
         return
@@ -204,10 +205,14 @@ async def proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = update.effective_user.id
 
     if not args:
-        # Base /proposals command
+        # Base /proposals command - show buttons
+        keyboard = [
+            [InlineKeyboardButton("Open Proposals", callback_data=PROPOSAL_FILTER_OPEN)],
+            [InlineKeyboardButton("Closed Proposals", callback_data=PROPOSAL_FILTER_CLOSED)],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            "Please specify if you want to see 'open' or 'closed' proposals.\n"
-            "Usage: `/proposals open` or `/proposals closed`"
+            "Which proposals would you like to see?", reply_markup=reply_markup
         )
         return
 
@@ -223,13 +228,18 @@ async def proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         display_type = "Closed"
     else:
         await update.message.reply_text(
-            f"Unknown filter: {args[0]}. Please use 'open' or 'closed'.\n"
-            "Usage: `/proposals open` or `/proposals closed`"
+            f"Unknown filter: {args[0]}. Please use 'open' or 'closed', or use /proposals to get selection buttons."
         )
         return
 
     async with AsyncSessionLocal() as session:
         proposal_service = ProposalService(session)
+        # Ensure status_to_fetch is not None before accessing .value
+        if status_to_fetch is None:
+            # This case should ideally be caught by the arg checks above, but defensive check
+            logger.error(f"proposals_command: status_to_fetch is None for filter '{filter_status_str}'")
+            await update.message.reply_text("An unexpected error occurred. Please try again.")
+            return
         proposals = await proposal_service.list_proposals_by_status(status_to_fetch.value)
 
     if not proposals:

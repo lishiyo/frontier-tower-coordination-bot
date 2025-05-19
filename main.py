@@ -26,6 +26,7 @@ from app.telegram_handlers.submission_command_handlers import (
 from app.telegram_handlers.callback_handlers import (
     handle_vote_callback, 
     handle_collect_proposal_type_callback, # Corrected name
+    handle_proposal_filter_callback, # Added new handler
     # handle_channel_selection_callback # Commented out - definition missing in callback_handlers.py
 )
 from app.telegram_handlers.admin_command_handlers import get_add_global_doc_conversation_handler # view_global_docs_command, edit_global_doc_command, delete_global_doc_command
@@ -35,7 +36,7 @@ from app.telegram_handlers.error_handler import error_handler
 from app.services.scheduling_service import start_scheduler_async, stop_scheduler
 
 # For PROPOSAL_TYPE_CALLBACK and CHANNEL_SELECT_CALLBACK patterns
-from app.telegram_handlers.conversation_defs import PROPOSAL_TYPE_CALLBACK, CHANNEL_SELECT_CALLBACK
+from app.telegram_handlers.conversation_defs import PROPOSAL_TYPE_CALLBACK, PROPOSAL_FILTER_CALLBACK_PREFIX
 
 # message_handlers, callback_handlers, and conversation_defs are now used within proposal_command_handlers.py
 # and no longer need to be directly imported into main.py
@@ -99,6 +100,7 @@ def main() -> None:
     # Register CallbackQueryHandlers
     application.add_handler(CallbackQueryHandler(handle_collect_proposal_type_callback, pattern=f"^{PROPOSAL_TYPE_CALLBACK}")) # Corrected name
     application.add_handler(CallbackQueryHandler(handle_vote_callback, pattern=r"^vote_.*$")) # Task 4.2
+    application.add_handler(CallbackQueryHandler(handle_proposal_filter_callback, pattern=f"^{PROPOSAL_FILTER_CALLBACK_PREFIX}")) # New handler
 
     # Proposal viewing commands
     application.add_handler(CommandHandler("proposals", proposals_command))
