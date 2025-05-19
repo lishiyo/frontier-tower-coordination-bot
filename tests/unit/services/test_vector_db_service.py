@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.vector_db_service import VectorDBService, CHROMA_DATA_PATH, DEFAULT_COLLECTION_NAME
+from app.services.vector_db_service import VectorDBService, CHROMA_DATA_PATH, DEFAULT_COLLECTION_NAME, PROPOSALS_COLLECTION_NAME
 
 # Mock chromadb parts
 @pytest.fixture
@@ -8,6 +8,7 @@ def mock_chroma_client_and_collection():
     mock_collection = MagicMock()
     mock_collection.add = MagicMock()
     mock_collection.query = MagicMock()
+    mock_collection.upsert = MagicMock()  # Add upsert mock for proposal tests
 
     mock_client = MagicMock()
     mock_client.get_or_create_collection = MagicMock(return_value=mock_collection)
@@ -159,4 +160,164 @@ async def test_vector_db_service_client_not_initialized(vector_db_service_with_m
     assert await service.store_embeddings(1, ["c"], [[0.1]], [{}]) is None
     assert await service.search_similar_chunks([0.1]) is None
     with pytest.raises(ConnectionError):
-        service._get_or_create_collection("any_collection") 
+        service._get_or_create_collection("any_collection")
+
+# Tests for proposal embedding functionality - converted from unittest style to pytest style
+@pytest.mark.asyncio
+async def test_add_proposal_embedding(vector_db_service_with_mocked_client):
+    """Test adding a proposal embedding to ChromaDB"""
+    service, _, mock_collection = vector_db_service_with_mocked_client
+    
+    # Test data
+    proposal_id = 123
+    text_content = "Test Title Test Description"
+    embedding = [0.1, 0.2, 0.3, 0.4, 0.5]  # Simplified embedding vector
+    metadata = {
+        "status": "open",
+        "deadline_date_iso": "2023-12-31T23:59:59",
+        "creation_date_iso": "2023-01-01T12:00:00",
+        "proposal_type": "multiple_choice",
+        "target_channel_id": "-1001234567890"
+    }
+    
+    # Mock _get_or_create_collection before calling the method that uses it
+    service._get_or_create_collection = MagicMock(return_value=mock_collection)
+
+    # Call the method
+    result = await service.add_proposal_embedding(
+        proposal_id=proposal_id,
+        text_content=text_content,
+        embedding=embedding,
+        metadata=metadata
+    )
+    
+    # Assertions
+    expected_chroma_id = f"proposal_{proposal_id}"
+    assert result == expected_chroma_id
+    
+    # Verify ChromaDB interactions
+    service._get_or_create_collection.assert_called_once_with(PROPOSALS_COLLECTION_NAME)
+    
+    # Verify upsert call
+    mock_collection.upsert.assert_called_once()
+    call_args = mock_collection.upsert.call_args[1]
+    
+    assert call_args["ids"] == [expected_chroma_id]
+    assert call_args["embeddings"] == [embedding]
+    assert call_args["documents"] == [text_content]
+    
+    # Verify metadata
+    actual_metadata = call_args["metadatas"][0]
+    assert actual_metadata["proposal_id"] == str(proposal_id)
+    for key, value in metadata.items():
+        assert actual_metadata[key] == value
+
+@pytest.mark.asyncio
+async def test_add_proposal_embedding_null_client(vector_db_service_with_mocked_client):
+    """Test handling when client is not initialized"""
+    service, _, _ = vector_db_service_with_mocked_client
+    service.client = None
+    
+    result = await service.add_proposal_embedding(
+        proposal_id=123,
+        text_content="Test",
+        embedding=[0.1, 0.2],
+        metadata={}
+    )
+    
+    assert result is None
+
+@pytest.mark.asyncio
+async def test_add_proposal_embedding_null_embedding(vector_db_service_with_mocked_client):
+    """Test handling when embedding is None"""
+    service, _, mock_collection = vector_db_service_with_mocked_client
+    
+    result = await service.add_proposal_embedding(
+        proposal_id=123,
+        text_content="Test",
+        embedding=None,
+        metadata={}
+    )
+    
+    assert result is None
+    mock_collection.upsert.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_search_proposal_embeddings(vector_db_service_with_mocked_client):
+    """Test searching proposal embeddings"""
+    service, _, mock_collection = vector_db_service_with_mocked_client
+    
+    # Mock query results
+    mock_results = {
+        'ids': [['proposal_123', 'proposal_456']],
+        'distances': [[0.1, 0.2]],
+        'metadatas': [[
+            {"proposal_id": "123", "status": "open"},
+            {"proposal_id": "456", "status": "closed"}
+        ]],
+        'documents': [["Test 1", "Test 2"]]
+    }
+    mock_collection.query.return_value = mock_results
+    service._get_or_create_collection = MagicMock(return_value=mock_collection)
+    
+    # Call the method
+    query_embedding = [0.1, 0.2, 0.3]
+    results = await service.search_proposal_embeddings(
+        query_embedding=query_embedding,
+        top_n=5,
+        filter_proposal_ids=[123, 789]
+    )
+    
+    # Assertions
+    assert len(results) == 2
+    
+    # Verify first result
+    assert results[0]["id"] == "proposal_123"
+    assert results[0]["distance"] == 0.1
+    assert results[0]["metadata"]["proposal_id"] == "123"
+    assert results[0]["metadata"]["status"] == "open"
+    assert results[0]["document_content"] == "Test 1"
+    
+    # Verify query call
+    service._get_or_create_collection.assert_called_once_with(PROPOSALS_COLLECTION_NAME)
+    mock_collection.query.assert_called_once()
+    call_args = mock_collection.query.call_args[1]
+    
+    assert call_args["query_embeddings"] == [query_embedding]
+    assert call_args["n_results"] == 5
+    
+    # Verify filter was correctly built
+    where_filter = call_args["where"]
+    assert where_filter == {"proposal_id": {"$in": ["123", "789"]}}
+
+@pytest.mark.asyncio
+async def test_search_proposal_embeddings_null_client(vector_db_service_with_mocked_client):
+    """Test handling when client is not initialized during search"""
+    service, _, _ = vector_db_service_with_mocked_client
+    service.client = None
+    
+    result = await service.search_proposal_embeddings(
+        query_embedding=[0.1, 0.2]
+    )
+    
+    assert result is None
+
+@pytest.mark.asyncio
+async def test_search_proposal_embeddings_no_results(vector_db_service_with_mocked_client):
+    """Test handling when search returns no results"""
+    service, _, mock_collection = vector_db_service_with_mocked_client
+    
+    # Mock empty query results
+    mock_collection.query.return_value = {
+        'ids': [[]],
+        'distances': [[]],
+        'metadatas': [[]],
+        'documents': [[]]
+    }
+    service._get_or_create_collection = MagicMock(return_value=mock_collection)
+    
+    results = await service.search_proposal_embeddings(
+        query_embedding=[0.1, 0.2, 0.3]
+    )
+    
+    assert len(results) == 0 

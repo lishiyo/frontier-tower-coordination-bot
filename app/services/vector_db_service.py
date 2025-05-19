@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Define a path for the persistent ChromaDB data
 CHROMA_DATA_PATH = "./chroma_db_store"
 DEFAULT_COLLECTION_NAME = "general_context"
+PROPOSALS_COLLECTION_NAME = "proposals_content"  # New constant for proposals collection
 
 class VectorDBService:
     def __init__(self, path: str = CHROMA_DATA_PATH):
@@ -188,6 +189,120 @@ class VectorDBService:
 
         except Exception as e:
             logger.error(f"Error retrieving chunks for SQL document ID {sql_document_id}: {e}", exc_info=True)
+            return None
+
+    async def add_proposal_embedding(
+        self, 
+        proposal_id: int, 
+        text_content: str, 
+        embedding: List[float],
+        metadata: Dict[str, Any]
+    ) -> Optional[str]:
+        """
+        Adds or updates a proposal's embedding in the proposals_content collection.
+        
+        Args:
+            proposal_id: The SQL ID of the proposal
+            text_content: The text to be indexed (typically title + description)
+            embedding: The pre-computed embedding vector for the text
+            metadata: Additional metadata to store with the embedding, including:
+                      - proposal_id: The SQL ID of the proposal
+                      - status: The proposal status (e.g., "open", "closed")
+                      - deadline_date_iso: ISO format of the deadline date
+                      - creation_date_iso: ISO format of the creation date
+                      - proposal_type: The type of proposal (e.g., "multiple_choice", "free_form")
+                      - target_channel_id: The channel where the proposal is posted
+                      
+        Returns:
+            The ChromaDB ID of the stored embedding if successful, else None
+        """
+        if not self.client:
+            logger.error("VectorDBService client not initialized. Cannot store proposal embedding.")
+            return None
+        
+        if not embedding:
+            logger.error(f"No embedding provided for proposal ID {proposal_id}. Cannot store.")
+            return None
+            
+        try:
+            collection = self._get_or_create_collection(PROPOSALS_COLLECTION_NAME)
+            
+            # Create a unique ID for this proposal in ChromaDB
+            chroma_id = f"proposal_{proposal_id}"
+            
+            # Ensure the required metadata is included
+            # Convert numeric IDs to strings for ChromaDB compatibility
+            metadata["proposal_id"] = str(proposal_id)
+            
+            # For updates, we use upsert (add or update if exists)
+            collection.upsert(
+                ids=[chroma_id],
+                embeddings=[embedding],
+                documents=[text_content],
+                metadatas=[metadata]
+            )
+            
+            logger.info(f"Successfully stored/updated embedding for proposal ID {proposal_id} in collection '{PROPOSALS_COLLECTION_NAME}'. Chroma ID: {chroma_id}")
+            return chroma_id
+        except Exception as e:
+            logger.error(f"Error storing embedding for proposal ID {proposal_id}: {e}", exc_info=True)
+            return None
+            
+    async def search_proposal_embeddings(
+        self,
+        query_embedding: List[float],
+        top_n: int = 5,
+        filter_proposal_ids: Optional[List[int]] = None
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Searches for proposals in ChromaDB similar to the given query_embedding.
+        Can optionally filter by proposal_ids.
+        
+        Args:
+            query_embedding: The embedding vector of the query
+            top_n: Maximum number of results to return
+            filter_proposal_ids: Optional list of proposal IDs to restrict the search to
+            
+        Returns:
+            A list of search results, each containing metadata and distance, or None if error
+        """
+        if not self.client:
+            logger.error("VectorDBService client not initialized. Cannot search proposal embeddings.")
+            return None
+            
+        try:
+            collection = self._get_or_create_collection(PROPOSALS_COLLECTION_NAME)
+            
+            where_filter = None
+            if filter_proposal_ids is not None and len(filter_proposal_ids) > 0:
+                # Convert numeric IDs to strings for ChromaDB compatibility
+                filter_proposal_ids_str = [str(pid) for pid in filter_proposal_ids]
+                where_filter = {"proposal_id": {"$in": filter_proposal_ids_str}}
+                logger.info(f"Searching proposals with filter: {where_filter}")
+            
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_n,
+                where=where_filter,
+                include=['metadatas', 'documents', 'distances']
+            )
+            
+            # Transform results into a list of dicts for easier use
+            search_hits = []
+            if results and results.get('ids') and results['ids'][0]:
+                for i in range(len(results['ids'][0])):
+                    hit = {
+                        "id": results['ids'][0][i],
+                        "distance": results['distances'][0][i] if results.get('distances') else None,
+                        "metadata": results['metadatas'][0][i] if results.get('metadatas') else None,
+                        "document_content": results['documents'][0][i] if results.get('documents') else None,
+                    }
+                    search_hits.append(hit)
+            
+            logger.info(f"Found {len(search_hits)} similar proposals for query.")
+            return search_hits
+        except Exception as e:
+            logger.error(f"Error searching for similar proposals: {e}", exc_info=True)
             return None
 
 # Example Usage (for testing - ensure LLMService is available for embeddings)

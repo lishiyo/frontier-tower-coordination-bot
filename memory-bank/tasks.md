@@ -438,7 +438,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Update proposal fields in `ProposalRepository`.
         *   [x] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
     *   [x] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details). 
-    *   [ ] Write unit tests, verify passing.
+    *   [x] Write unit tests, verify passing.
     *   [x] Test this is working manually.
     *   [ ] Move to Subtask 9.5.1 (indexing proposals on create/edit) now that we have edit functionality.
 
@@ -645,7 +645,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
                     *   [ ] Call `LLMService.generate_embedding(proposal_text_to_index)`.
                     *   [ ] Call `VectorDBService.add_proposal_embedding(...)` with the necessary details.
             *   [ ] Write unit tests for the changes in `ProposalService` and `VectorDBService` related to proposal indexing.
-            *   [ ] (Optional, Post-MVP) Consider creating a one-time script to backfill embeddings for existing proposals in the database.
+            *   [ ] Clear out old proposals and manually test new ones are working.
 
         *   **Subtask 9.5.2: Implement Core `/ask` Enhancement Logic for Proposal Queries**
             *   [ ] In `app/services/llm_service.py`:

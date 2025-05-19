@@ -8,6 +8,26 @@ from app.core.proposal_service import ProposalService
 from app.persistence.models.proposal_model import Proposal, ProposalStatus, ProposalType
 from app.utils import telegram_utils # For formatting dates
 
+# Add fixtures for the new tests
+@pytest.fixture
+def mock_session():
+    return AsyncMock()
+
+@pytest.fixture
+def mock_proposal_repo():
+    repo = AsyncMock()
+    return repo
+
+@pytest.fixture
+def mock_submission_repo():
+    repo = AsyncMock()
+    return repo
+
+@pytest.fixture
+def mock_user_service():
+    service = AsyncMock()
+    return service
+
 @pytest.mark.asyncio
 async def test_list_proposals_by_proposer_found():
     # Arrange
@@ -88,6 +108,7 @@ def mock_proposal_service(mock_session_arg): # Renamed fixture argument
     service.proposal_repository = AsyncMock()
     service.submission_repository = AsyncMock()
     service.llm_service = AsyncMock()  # Add this for re-indexing
+    service.vector_db_service = AsyncMock()  # Add this for vector DB testing
     return service
 
 @pytest.fixture
@@ -230,4 +251,320 @@ async def test_edit_proposal_details_no_changes_provided(mock_proposal_service, 
 
     assert updated_proposal_obj is None
     assert message == "No changes provided. Please specify what you want to edit (title, description, or options)."
-    mock_proposal_service.proposal_repository.update_proposal_details.assert_not_called() 
+    mock_proposal_service.proposal_repository.update_proposal_details.assert_not_called()
+
+# Add new test functions for proposal indexing with properly defined fixtures
+
+@pytest.mark.asyncio
+@patch('app.core.proposal_service.LLMService')
+@patch('app.core.proposal_service.VectorDBService')
+async def test_create_proposal_indexes_proposal(
+    mock_vector_db_service, 
+    mock_llm_service, 
+    mock_session, 
+    mock_proposal_repo, 
+    mock_submission_repo, 
+    mock_user_service
+):
+    """Test that create_proposal calls the embedding and indexing functions"""
+    # Setup
+    mock_bot_app = MagicMock()
+    mock_proposal_id = 123
+    mock_title = "Test Proposal Title"
+    mock_description = "Test Proposal Description"
+    mock_deadline = datetime.now(timezone.utc)
+    
+    # Mock the proposal repository to return a new proposal
+    mock_new_proposal = Proposal(
+        id=mock_proposal_id,
+        title=mock_title,
+        description=mock_description,
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        status=ProposalStatus.OPEN.value,
+        deadline_date=mock_deadline,
+        creation_date=datetime.now(timezone.utc),
+        target_channel_id="-1001234567890"
+    )
+    mock_proposal_repo.add_proposal.return_value = mock_new_proposal
+    
+    # Mock the user service
+    mock_user = MagicMock()
+    mock_user.telegram_id = 456
+    mock_user_service.register_user_interaction.return_value = mock_user
+    
+    # Mock LLMService for embedding generation
+    mock_embedding = [0.1, 0.2, 0.3, 0.4, 0.5]  # Simplified embedding vector
+    mock_llm_service_instance = mock_llm_service.return_value
+    mock_llm_service_instance.generate_embedding = AsyncMock(return_value=mock_embedding)
+    
+    # Mock VectorDBService for storing embeddings
+    mock_vector_db_instance = mock_vector_db_service.return_value
+    mock_vector_db_instance.add_proposal_embedding.return_value = f"proposal_{mock_proposal_id}"
+    
+    # Create service
+    service = ProposalService(mock_session, mock_bot_app)
+    service.proposal_repository = mock_proposal_repo
+    service.user_service = mock_user_service
+    service.submission_repository = mock_submission_repo
+    service.llm_service = mock_llm_service_instance
+    service.vector_db_service = mock_vector_db_instance
+    
+    # Call the method
+    result = await service.create_proposal(
+        proposer_telegram_id=456,
+        proposer_username="testuser",
+        proposer_first_name="Test",
+        title=mock_title,
+        description=mock_description,
+        proposal_type=ProposalType.MULTIPLE_CHOICE,
+        options=["Option 1", "Option 2"],
+        deadline_date=mock_deadline,
+        target_channel_id="-1001234567890"
+    )
+    
+    # Assertions
+    assert result == mock_new_proposal
+    
+    # Verify embedding was generated
+    mock_llm_service_instance.generate_embedding.assert_called_once()
+    call_args = mock_llm_service_instance.generate_embedding.call_args[0]
+    assert call_args[0] == f"{mock_title} {mock_description}"
+    
+    # Verify embedding was stored
+    mock_vector_db_instance.add_proposal_embedding.assert_called_once()
+    call_args = mock_vector_db_instance.add_proposal_embedding.call_args[1]
+    assert call_args["proposal_id"] == mock_proposal_id
+    assert call_args["text_content"] == f"{mock_title} {mock_description}"
+    assert call_args["embedding"] == mock_embedding
+    assert call_args["metadata"]["proposal_id"] == mock_proposal_id
+    assert call_args["metadata"]["status"] == ProposalStatus.OPEN.value
+    assert call_args["metadata"]["proposal_type"] == ProposalType.MULTIPLE_CHOICE.value
+    assert call_args["metadata"]["target_channel_id"] == "-1001234567890"
+
+@pytest.mark.asyncio
+@patch('app.core.proposal_service.LLMService')
+@patch('app.core.proposal_service.VectorDBService')
+async def test_create_proposal_handles_embedding_error(
+    mock_vector_db_service, 
+    mock_llm_service, 
+    mock_session, 
+    mock_proposal_repo, 
+    mock_submission_repo, 
+    mock_user_service
+):
+    """Test that create_proposal gracefully handles embedding errors"""
+    # Setup
+    mock_bot_app = MagicMock()
+    mock_new_proposal = Proposal(
+        id=123,
+        title="Test Title",
+        description="Test Description",
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        status=ProposalStatus.OPEN.value
+    )
+    mock_proposal_repo.add_proposal.return_value = mock_new_proposal
+    
+    mock_user = MagicMock()
+    mock_user.telegram_id = 456
+    mock_user_service.register_user_interaction.return_value = mock_user
+    
+    # Mock LLMService to return None (error case)
+    mock_llm_service_instance = mock_llm_service.return_value
+    mock_llm_service_instance.generate_embedding = AsyncMock(return_value=None)
+    
+    # Mock VectorDBService
+    mock_vector_db_instance = mock_vector_db_service.return_value
+    
+    # Create service
+    service = ProposalService(mock_session, mock_bot_app)
+    service.proposal_repository = mock_proposal_repo
+    service.user_service = mock_user_service
+    service.submission_repository = mock_submission_repo
+    service.llm_service = mock_llm_service_instance
+    service.vector_db_service = mock_vector_db_instance
+    
+    # Call the method
+    result = await service.create_proposal(
+        proposer_telegram_id=456,
+        proposer_username="testuser",
+        proposer_first_name="Test",
+        title="Test Title",
+        description="Test Description",
+        proposal_type=ProposalType.MULTIPLE_CHOICE,
+        options=["Option 1", "Option 2"],
+        deadline_date=datetime.now(timezone.utc),
+        target_channel_id="-1001234567890"
+    )
+    
+    # Assertions
+    assert result == mock_new_proposal
+    
+    # Verify embedding was attempted but storage was not called
+    mock_llm_service_instance.generate_embedding.assert_called_once()
+    mock_vector_db_instance.add_proposal_embedding.assert_not_called()
+
+@pytest.mark.asyncio
+@patch('app.core.proposal_service.LLMService')
+@patch('app.core.proposal_service.VectorDBService')
+async def test_edit_proposal_details_reindexes_on_content_change(
+    mock_vector_db_service, 
+    mock_llm_service, 
+    mock_session, 
+    mock_proposal_repo, 
+    mock_submission_repo, 
+    mock_user_service
+):
+    """Test that edit_proposal_details reindexes proposal when title/description changes"""
+    # Setup
+    mock_bot_app = MagicMock()
+    proposer_id = 456
+    proposal_id = 123
+    old_title = "Old Title"
+    old_description = "Old Description"
+    new_title = "New Title"
+    
+    # Create the existing proposal
+    mock_proposal = Proposal(
+        id=proposal_id,
+        proposer_telegram_id=proposer_id,
+        title=old_title,
+        description=old_description,
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        status=ProposalStatus.OPEN.value,
+        target_channel_id="-1001234567890"
+    )
+    mock_proposal_repo.get_proposal_by_id.return_value = mock_proposal
+    
+    # Create the updated proposal
+    mock_updated_proposal = Proposal(
+        id=proposal_id,
+        proposer_telegram_id=proposer_id,
+        title=new_title,  # Changed title
+        description=old_description,
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        status=ProposalStatus.OPEN.value,
+        target_channel_id="-1001234567890"
+    )
+    mock_proposal_repo.update_proposal_details.return_value = mock_updated_proposal
+    
+    # No submissions
+    mock_submission_repo.count_submissions_for_proposal.return_value = 0
+    
+    # Mock LLMService for embedding generation
+    mock_embedding = [0.1, 0.2, 0.3, 0.4, 0.5]  # Simplified embedding vector
+    mock_llm_service_instance = mock_llm_service.return_value
+    mock_llm_service_instance.generate_embedding = AsyncMock(return_value=mock_embedding)
+    
+    # Mock VectorDBService for storing embeddings
+    mock_vector_db_instance = mock_vector_db_service.return_value
+    mock_vector_db_instance.add_proposal_embedding.return_value = f"proposal_{proposal_id}"
+    
+    # Create service
+    service = ProposalService(mock_session, mock_bot_app)
+    service.proposal_repository = mock_proposal_repo
+    service.user_service = mock_user_service
+    service.submission_repository = mock_submission_repo
+    service.llm_service = mock_llm_service_instance
+    service.vector_db_service = mock_vector_db_instance
+    
+    # Call the method
+    result, error = await service.edit_proposal_details(
+        proposal_id=proposal_id,
+        proposer_telegram_id=proposer_id,
+        new_title=new_title,  # Only changing title
+        new_description=None,
+        new_options=None
+    )
+    
+    # Assertions
+    assert result == mock_updated_proposal
+    assert error is None
+    
+    # Verify embedding was generated with new content
+    mock_llm_service_instance.generate_embedding.assert_called_once()
+    call_args = mock_llm_service_instance.generate_embedding.call_args[0]
+    assert call_args[0] == f"{new_title} {old_description}"
+    
+    # Verify embedding was stored
+    mock_vector_db_instance.add_proposal_embedding.assert_called_once()
+    call_args = mock_vector_db_instance.add_proposal_embedding.call_args[1]
+    assert call_args["proposal_id"] == proposal_id
+    assert call_args["text_content"] == f"{new_title} {old_description}"
+    assert call_args["embedding"] == mock_embedding
+
+@pytest.mark.asyncio
+@patch('app.core.proposal_service.LLMService')
+@patch('app.core.proposal_service.VectorDBService')
+async def test_edit_proposal_details_no_reindex_without_content_change(
+    mock_vector_db_service, 
+    mock_llm_service, 
+    mock_session, 
+    mock_proposal_repo, 
+    mock_submission_repo, 
+    mock_user_service
+):
+    """Test that edit_proposal_details doesn't reindex if only options change (not title/description)"""
+    # Setup
+    mock_bot_app = MagicMock()
+    proposer_id = 456
+    proposal_id = 123
+    title = "Test Title"
+    description = "Test Description"
+    old_options = ["Option A", "Option B"]
+    new_options = ["Option C", "Option D"]  # Only changing options
+    
+    # Create the existing proposal
+    mock_proposal = Proposal(
+        id=proposal_id,
+        proposer_telegram_id=proposer_id,
+        title=title,
+        description=description,
+        options=old_options,
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        status=ProposalStatus.OPEN.value
+    )
+    mock_proposal_repo.get_proposal_by_id.return_value = mock_proposal
+    
+    # Create the updated proposal
+    mock_updated_proposal = Proposal(
+        id=proposal_id,
+        proposer_telegram_id=proposer_id,
+        title=title,
+        description=description,
+        options=new_options,
+        proposal_type=ProposalType.MULTIPLE_CHOICE.value,
+        status=ProposalStatus.OPEN.value
+    )
+    mock_proposal_repo.update_proposal_details.return_value = mock_updated_proposal
+    
+    # No submissions
+    mock_submission_repo.count_submissions_for_proposal.return_value = 0
+    
+    # Mock services
+    mock_llm_service_instance = mock_llm_service.return_value
+    mock_vector_db_instance = mock_vector_db_service.return_value
+    
+    # Create service
+    service = ProposalService(mock_session, mock_bot_app)
+    service.proposal_repository = mock_proposal_repo
+    service.user_service = mock_user_service
+    service.submission_repository = mock_submission_repo
+    service.llm_service = mock_llm_service_instance
+    service.vector_db_service = mock_vector_db_instance
+    
+    # Call the method
+    result, error = await service.edit_proposal_details(
+        proposal_id=proposal_id,
+        proposer_telegram_id=proposer_id,
+        new_title=None,
+        new_description=None,
+        new_options=new_options  # Only changing options
+    )
+    
+    # Assertions
+    assert result == mock_updated_proposal
+    assert error is None
+    
+    # Verify no embedding was generated or stored
+    mock_llm_service_instance.generate_embedding.assert_not_called()
+    mock_vector_db_instance.add_proposal_embedding.assert_not_called() 

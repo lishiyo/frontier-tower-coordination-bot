@@ -7,6 +7,7 @@ from app.persistence.models.proposal_model import Proposal, ProposalType, Propos
 from app.persistence.repositories.proposal_repository import ProposalRepository
 from app.persistence.repositories.submission_repository import SubmissionRepository
 from app.services.llm_service import LLMService
+from app.services.vector_db_service import VectorDBService
 from app.utils import telegram_utils
 from app.config import ConfigService
 from telegram.ext import Application
@@ -25,6 +26,7 @@ class ProposalService:
         self.user_service = UserService(db_session)
         self.submission_repository = SubmissionRepository(db_session)
         self.llm_service = LLMService()
+        self.vector_db_service = VectorDBService()
         self.bot_app = bot_app
 
 
@@ -70,6 +72,43 @@ class ProposalService:
         
         # No commit here. The caller (e.g., conversation handler) will commit.
         # await self.db_session.commit() # REMOVED
+        
+        # Index the proposal for semantic search
+        try:
+            # Concatenate title and description for indexing
+            proposal_text_to_index = new_proposal.title + " " + new_proposal.description
+            
+            # Generate embedding using LLMService
+            embedding = await self.llm_service.generate_embedding(proposal_text_to_index)
+            
+            if embedding:
+                # Prepare metadata for the embedding
+                metadata = {
+                    "proposal_id": new_proposal.id,
+                    "status": new_proposal.status,
+                    "deadline_date_iso": new_proposal.deadline_date.isoformat() if new_proposal.deadline_date else None,
+                    "creation_date_iso": new_proposal.creation_date.isoformat() if new_proposal.creation_date else None,
+                    "proposal_type": new_proposal.proposal_type,
+                    "target_channel_id": new_proposal.target_channel_id
+                }
+                
+                # Store the embedding
+                chroma_id = await self.vector_db_service.add_proposal_embedding(
+                    proposal_id=new_proposal.id,
+                    text_content=proposal_text_to_index,
+                    embedding=embedding,
+                    metadata=metadata
+                )
+                
+                if chroma_id:
+                    logger.info(f"Successfully indexed proposal ID {new_proposal.id} for semantic search with ChromaDB ID {chroma_id}")
+                else:
+                    logger.error(f"Failed to index proposal ID {new_proposal.id} in ChromaDB")
+            else:
+                logger.error(f"Failed to generate embedding for proposal ID {new_proposal.id}")
+        except Exception as e:
+            # We don't want to fail the proposal creation if indexing fails
+            logger.error(f"Error during indexing of new proposal ID {new_proposal.id}: {e}", exc_info=True)
 
         return new_proposal 
 
@@ -174,14 +213,33 @@ class ProposalService:
                 proposal_text_to_index = updated_proposal.title + " " + updated_proposal.description
                 embedding = await self.llm_service.generate_embedding(proposal_text_to_index)
                 
-                # Need VectorDBService instance here
-                # Assuming it's available or can be instantiated if not already.
-                # For now, let's log this step. A more robust solution would involve DI or service locator.
-                logger.info(f"Proposal {updated_proposal.id} content changed. Re-indexing would be needed here.")
-                # await self.vector_db_service.add_proposal_embedding(...) # Placeholder
+                if embedding:
+                    # Prepare metadata for the embedding
+                    metadata = {
+                        "proposal_id": updated_proposal.id,
+                        "status": updated_proposal.status,
+                        "deadline_date_iso": updated_proposal.deadline_date.isoformat() if updated_proposal.deadline_date else None,
+                        "creation_date_iso": updated_proposal.creation_date.isoformat() if updated_proposal.creation_date else None,
+                        "proposal_type": updated_proposal.proposal_type,
+                        "target_channel_id": updated_proposal.target_channel_id
+                    }
+                    
+                    # Update the embedding in ChromaDB
+                    chroma_id = await self.vector_db_service.add_proposal_embedding(
+                        proposal_id=updated_proposal.id,
+                        text_content=proposal_text_to_index,
+                        embedding=embedding,
+                        metadata=metadata
+                    )
+                    
+                    if chroma_id:
+                        logger.info(f"Successfully re-indexed proposal ID {updated_proposal.id} for semantic search with ChromaDB ID {chroma_id}")
+                    else:
+                        logger.error(f"Failed to re-index proposal ID {updated_proposal.id} in ChromaDB")
+                else:
+                    logger.error(f"Failed to generate embedding for updated proposal ID {updated_proposal.id}")
             except Exception as e:
                 logger.error(f"Error during re-indexing proposal {updated_proposal.id} after edit: {e}", exc_info=True)
-
 
         return updated_proposal, None
 
