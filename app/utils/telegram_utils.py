@@ -26,8 +26,16 @@ def format_proposal_message(proposal: Proposal, proposer: User) -> str:
     # Escape all user-provided and potentially problematic parts
     escaped_title = escape_markdown_v2(proposal.title)
     escaped_description = escape_markdown_v2(proposal.description)
-    # Proposer name might come from Telegram, usually safe, but good to be cautious if ever user-settable
-    proposer_name = escape_markdown_v2(proposer.first_name or proposer.username or f"User {proposer.telegram_id}")
+    
+    # Determine proposer display name: @username, then first_name, then User ID
+    if proposer.username:
+        proposer_display_name = f"@{proposer.username}"
+    elif proposer.first_name:
+        proposer_display_name = proposer.first_name
+    else:
+        proposer_display_name = f"User {proposer.telegram_id}"
+    
+    proposer_name = escape_markdown_v2(proposer_display_name)
     
     # Dates formatted by strftime with '-' or '.' should also be escaped if they are part of the text argument of send_message.
     # Here, deadline_str is interpolated into an f-string which is then sent.
