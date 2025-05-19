@@ -43,6 +43,3 @@
 
 ## Next Steps
 - Implement unit tests for the updated `/proposals` command behavior in `app/telegram_handlers/proposal_command_handlers.py` and the new `handle_proposal_filter_callback` in `app/telegram_handlers/callback_handlers.py`.
-- Address pending Task 5.2 follow-ups:
-    - Ensure consistent PST display for all user-facing times.
-    - Update results message copy to use "(DM @botname)".

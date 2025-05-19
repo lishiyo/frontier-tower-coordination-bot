@@ -2,16 +2,21 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch, call
 from telegram import Update, User, Message, Chat, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from telegram.ext import ContextTypes, ConversationHandler, Application
+from telegram.constants import ParseMode
 
 from app.telegram_handlers.callback_handlers import (
     handle_collect_proposal_type_callback,
-    handle_vote_callback
+    handle_vote_callback,
+    handle_proposal_filter_callback
 )
 from app.telegram_handlers.conversation_defs import (
     COLLECT_PROPOSAL_TYPE, COLLECT_OPTIONS, ASK_DURATION,
-    USER_DATA_PROPOSAL_TYPE, PROPOSAL_TYPE_CALLBACK
+    USER_DATA_PROPOSAL_TYPE, PROPOSAL_TYPE_CALLBACK,
+    PROPOSAL_FILTER_OPEN,
+    PROPOSAL_FILTER_CLOSED,
+    PROPOSAL_FILTER_CALLBACK_PREFIX
 )
-from app.persistence.models.proposal_model import ProposalType
+from app.persistence.models.proposal_model import ProposalType, ProposalStatus
 from app.core.submission_service import SubmissionService
 from app.core.user_service import UserService
 from app.persistence.database import AsyncSessionLocal
@@ -281,6 +286,209 @@ async def test_handle_vote_callback_user_service_exception(
     mock_update_callback.callback_query.answer.assert_called_once_with(
         text="An unexpected error occurred while processing your vote. Please try again.", show_alert=True
     )
+
+# Tests for handle_proposal_filter_callback
+
+@pytest.mark.asyncio
+async def test_handle_proposal_filter_callback_open():
+    # Arrange
+    mock_update = AsyncMock(spec=Update)
+    mock_context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    
+    mock_callback_query = AsyncMock(spec=CallbackQuery)
+    mock_callback_query.data = PROPOSAL_FILTER_OPEN
+    mock_callback_query.answer = AsyncMock()
+    mock_callback_query.edit_message_text = AsyncMock()
+    mock_callback_query.from_user = MagicMock(id=12345) # For logger
+    
+    mock_update.callback_query = mock_callback_query
+    
+    mock_session_instance = AsyncMock()
+    mock_async_session_local_callable = MagicMock()
+    mock_async_session_local_callable.return_value.__aenter__ = AsyncMock(return_value=mock_session_instance)
+    mock_async_session_local_callable.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    # Mock data returned by ProposalService.list_proposals_by_status
+    proposals_data_open = [
+        {
+            "id": 1, "title": "Open Prop 1", "status": "OPEN", 
+            "target_channel_id": "-1001", "channel_message_id": "11",
+            "deadline_date": "2024-01-01 PST"
+        },
+        {
+            "id": 2, "title": "Open Prop 2", "status": "OPEN", 
+            "target_channel_id": "-1002", "channel_message_id": "22",
+            "deadline_date": "2024-02-01 PST"
+        }
+    ]
+    # Expected formatted message (simplified for brevity, adapt to your exact formatting)
+    expected_formatted_list = (
+        '*Open Proposals:*\n\n'
+        '\- *ID:* `1` *Title:* Open Prop 1\n'
+        '  [Channel: \-1001](https://t\.me/c/1/11)\n'
+        '  *Voting ends:* 2024\-01\-01 PST\n\n'
+        '\- *ID:* `2` *Title:* Open Prop 2\n'
+        '  [Channel: \-1002](https://t\.me/c/2/22)\n'
+        '  *Voting ends:* 2024\-02\-01 PST\n'
+    )
+
+
+    with patch('app.telegram_handlers.callback_handlers.AsyncSessionLocal', mock_async_session_local_callable):
+        with patch('app.telegram_handlers.callback_handlers.ProposalService') as MockProposalService:
+            mock_proposal_service_instance = MockProposalService.return_value
+            mock_proposal_service_instance.list_proposals_by_status = AsyncMock(return_value=proposals_data_open)
+
+            # Act
+            await handle_proposal_filter_callback(mock_update, mock_context)
+
+            # Assert
+            MockProposalService.assert_called_once_with(mock_session_instance)
+            mock_proposal_service_instance.list_proposals_by_status.assert_called_once_with(ProposalStatus.OPEN.value)
+            mock_callback_query.edit_message_text.assert_called_once_with(
+                text=expected_formatted_list,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            mock_callback_query.answer.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_handle_proposal_filter_callback_closed():
+    # Arrange
+    mock_update = AsyncMock(spec=Update)
+    mock_context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    
+    mock_callback_query = AsyncMock(spec=CallbackQuery)
+    mock_callback_query.data = PROPOSAL_FILTER_CLOSED
+    mock_callback_query.answer = AsyncMock()
+    mock_callback_query.edit_message_text = AsyncMock()
+    mock_callback_query.from_user = MagicMock(id=12345) # For logger
+    
+    mock_update.callback_query = mock_callback_query
+    
+    mock_session_instance = AsyncMock()
+    mock_async_session_local_callable = MagicMock()
+    mock_async_session_local_callable.return_value.__aenter__ = AsyncMock(return_value=mock_session_instance)
+    mock_async_session_local_callable.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    proposals_data_closed = [
+        {
+            "id": 3, "title": "Closed Prop 1", "status": "CLOSED", 
+            "target_channel_id": "-1003", "channel_message_id": "33",
+            "closed_date": "2023-12-01 PST", "outcome": "Result A"
+        }
+    ]
+    expected_formatted_list = (
+        '*Closed Proposals:*\n\n'
+        '\- *ID:* `3` *Title:* Closed Prop 1\n'
+        '  [Channel: \-1003](https://t\.me/c/3/33)\n'
+        '  *Closed on:* 2023\-12\-01 PST\n'
+        '  *Outcome:* Result A\n'
+    )
+
+    with patch('app.telegram_handlers.callback_handlers.AsyncSessionLocal', mock_async_session_local_callable):
+        with patch('app.telegram_handlers.callback_handlers.ProposalService') as MockProposalService:
+            mock_proposal_service_instance = MockProposalService.return_value
+            mock_proposal_service_instance.list_proposals_by_status = AsyncMock(return_value=proposals_data_closed)
+
+            # Act
+            await handle_proposal_filter_callback(mock_update, mock_context)
+
+            # Assert
+            MockProposalService.assert_called_once_with(mock_session_instance)
+            mock_proposal_service_instance.list_proposals_by_status.assert_called_once_with(ProposalStatus.CLOSED.value)
+            mock_callback_query.edit_message_text.assert_called_once_with(
+                text=expected_formatted_list,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            mock_callback_query.answer.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_handle_proposal_filter_callback_open_no_proposals():
+    # Arrange
+    mock_update = AsyncMock(spec=Update)
+    mock_context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    mock_callback_query = AsyncMock(spec=CallbackQuery)
+    mock_callback_query.data = PROPOSAL_FILTER_OPEN
+    mock_callback_query.answer = AsyncMock()
+    mock_callback_query.edit_message_text = AsyncMock()
+    mock_callback_query.from_user = MagicMock(id=12345)
+    mock_update.callback_query = mock_callback_query
+    
+    mock_session_instance = AsyncMock()
+    mock_async_session_local_callable = MagicMock()
+    mock_async_session_local_callable.return_value.__aenter__ = AsyncMock(return_value=mock_session_instance)
+    mock_async_session_local_callable.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    # Corrected expected text to match the handler change
+    expected_text_no_proposals = '*Open Proposals:*\n\nNo proposals found\\.'
+
+    with patch('app.telegram_handlers.callback_handlers.AsyncSessionLocal', mock_async_session_local_callable):
+        with patch('app.telegram_handlers.callback_handlers.ProposalService') as MockProposalService:
+            mock_proposal_service_instance = MockProposalService.return_value
+            mock_proposal_service_instance.list_proposals_by_status = AsyncMock(return_value=[]) # Empty list
+
+            # Act
+            await handle_proposal_filter_callback(mock_update, mock_context)
+
+            # Assert
+            mock_proposal_service_instance.list_proposals_by_status.assert_called_once_with(ProposalStatus.OPEN.value)
+            mock_callback_query.edit_message_text.assert_called_once_with(
+                text=expected_text_no_proposals,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            mock_callback_query.answer.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_handle_proposal_filter_callback_unknown_data():
+    # Arrange
+    mock_update = AsyncMock(spec=Update)
+    mock_context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    
+    mock_callback_query = AsyncMock(spec=CallbackQuery)
+    mock_callback_query.data = "some_unknown_filter_action" # Not OPEN or CLOSED
+    mock_callback_query.answer = AsyncMock()
+    mock_callback_query.edit_message_text = AsyncMock()
+    
+    mock_update.callback_query = mock_callback_query
+    
+    mock_session_instance = AsyncMock()
+    mock_async_session_local_callable = MagicMock()
+    mock_async_session_local_callable.return_value.__aenter__ = AsyncMock(return_value=mock_session_instance)
+    mock_async_session_local_callable.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch('app.telegram_handlers.callback_handlers.AsyncSessionLocal', mock_async_session_local_callable):
+        with patch('app.telegram_handlers.callback_handlers.ProposalService') as MockProposalService:
+            with patch('app.telegram_handlers.callback_handlers.logger.warning') as mock_logger_warning:
+                mock_proposal_service_instance = MockProposalService.return_value
+                mock_proposal_service_instance.list_proposals_by_status = AsyncMock()
+
+                # Act
+                await handle_proposal_filter_callback(mock_update, mock_context)
+
+                # Assert
+                MockProposalService.assert_not_called()
+                mock_proposal_service_instance.list_proposals_by_status.assert_not_called()
+                
+                mock_callback_query.edit_message_text.assert_called_once_with(text="Invalid selection. Please try again.")
+                
+                mock_logger_warning.assert_called_once_with(f"Invalid callback data for proposal filter: {mock_callback_query.data}")
+                
+                mock_callback_query.answer.assert_called_once_with()
+
+@pytest.mark.asyncio
+async def test_handle_proposal_filter_callback_no_query():
+    # Arrange
+    mock_update = AsyncMock(spec=Update)
+    mock_context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    mock_update.callback_query = None # No callback query
+
+    with patch('app.telegram_handlers.callback_handlers.logger.error') as mock_logger_error:
+        # Act
+        await handle_proposal_filter_callback(mock_update, mock_context)
+
+        # Assert
+        mock_logger_error.assert_called_once_with("handle_proposal_filter_callback called without callback_query.")
+        # Ensure no other actions like edit_message_text or answer are attempted
+        # (implicitly tested as mocks for those aren't set up on update/context directly here)
 
 # Remove placeholder
 # def test_placeholder():

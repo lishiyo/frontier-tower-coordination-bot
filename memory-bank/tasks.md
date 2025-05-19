@@ -420,12 +420,12 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Test this is working manually.
 
 3.  **Task 7.3: Implement `/proposals`, `/proposals open` and `/proposals closed`**
-    *   [ ] If the user just types `/proposals`, the bot should ask "open or closed?" If the user says "open", use `/proposals open` and if closed, use `/proposals closed`.
-    *   [ ] In `ProposalRepository`, add `get_proposals_by_status(status: str)`.
-    *   [ ] In `ProposalService`, implement `list_proposals_by_status(status: str)`:
-        *   [ ] Fetch proposals from repository.
-        *   [ ] Format list of (title, deadline/outcome).
-    *   [ ] Implement `proposals_open_command` and `proposals_closed_command` in `proposal_command_handlers.py`, calling the service and DMing results.
+    *   [x] If the user just types `/proposals`, the bot should ask "open or closed?" If the user says "open", use `/proposals open` and if closed, use `/proposals closed`.
+    *   [x] In `ProposalRepository`, add `get_proposals_by_status(status: str)`.
+    *   [x] In `ProposalService`, implement `list_proposals_by_status(status: str)`:
+        *   [x] Fetch proposals from repository.
+        *   [x] Format list of (title, deadline/outcome).
+    *   [x] Implement `proposals_open_command` and `proposals_closed_command` in `proposal_command_handlers.py`, calling the service and DMing results.
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 

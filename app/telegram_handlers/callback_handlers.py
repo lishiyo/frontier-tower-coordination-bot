@@ -132,7 +132,7 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 username=user_username,
                 first_name=user_first_name
             )
-            await session.commit()
+            await session.commit() # Commit user interaction separately
 
             submission_service = SubmissionService(session)
             success_for_alert, response_message_text = await submission_service.record_vote(
@@ -140,6 +140,7 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 submitter_telegram_id=user_telegram_id,
                 option_index=option_index
             )
+            # record_vote now handles its own commit for the submission, so no session.commit() here for that.
 
     except ValueError as ve:
         logger.error(f"Error parsing vote callback data '{callback_data}': {ve}", exc_info=True)
@@ -148,77 +149,117 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.error(f"Error processing vote callback for data '{callback_data}': {e}", exc_info=True)
         response_message_text = "An unexpected error occurred while processing your vote. Please try again."
     
-    # Single call to query.answer() at the end
-    # For success, submission_service.record_vote already provides a good message.
-    # For errors caught here, response_message_text is set accordingly.
-    await query.answer(text=response_message_text, show_alert=True) 
+    await query.answer(text=response_message_text, show_alert=True)
 
 async def handle_proposal_filter_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles callback query for filtering proposals (open/closed)."""
     query = update.callback_query
+
+    if not query: # Guard clause for no callback query
+        logger.error("handle_proposal_filter_callback called without callback_query.")
+        return
+
     await query.answer() # Acknowledge callback
 
-    if not query.data or not query.data.startswith(PROPOSAL_FILTER_CALLBACK_PREFIX):
-        logger.warning(f"Invalid callback data received for proposal filter: {query.data}")
+    if not query.data:
+        logger.warning("Callback query received without data.")
         if query.message:
-            await query.edit_message_text(text="Invalid selection. Please try again.")
+            try:
+                await query.edit_message_text(text="Error: No action specified.")
+            except Exception as e:
+                logger.error(f"Error editing message (no data): {e}")
+        return
+
+    if not query.data.startswith(PROPOSAL_FILTER_CALLBACK_PREFIX):
+        logger.warning(f"Invalid callback data for proposal filter: {query.data}")
+        if query.message:
+            try:
+                await query.edit_message_text(text="Invalid selection. Please try again.")
+            except Exception as e:
+                logger.error(f"Error editing message (invalid prefix): {e}")
         return
 
     filter_type = query.data
     status_to_fetch = None
-    display_type = ""
+    display_title = ""
 
     if filter_type == PROPOSAL_FILTER_OPEN:
         status_to_fetch = ProposalStatus.OPEN
-        display_type = "Open"
+        display_title = "Open Proposals"
     elif filter_type == PROPOSAL_FILTER_CLOSED:
         status_to_fetch = ProposalStatus.CLOSED
-        display_type = "Closed"
+        display_title = "Closed Proposals"
     else:
-        logger.warning(f"Unknown proposal filter callback: {filter_type}")
+        logger.warning(f"Unknown proposal filter action: {filter_type}")
         if query.message:
-            await query.edit_message_text(text="Invalid filter selected. Please try again.")
+            try:
+                await query.edit_message_text(text="Invalid filter selected. Please try again.")
+            except Exception as e:
+                logger.error(f"Error editing message (unknown action): {e}")    
         return
 
-    async with AsyncSessionLocal() as session:
-        proposal_service = ProposalService(session)
-        proposals = await proposal_service.list_proposals_by_status(status_to_fetch.value)
+    try:
+        async with AsyncSessionLocal() as session:
+            proposal_service = ProposalService(session)
+            proposals_data = await proposal_service.list_proposals_by_status(status_to_fetch.value)
+            
+            full_message = f"*{telegram_utils.escape_markdown_v2(display_title)}:*\n\n"
+            if not proposals_data:
+                full_message += "No proposals found\\."
+            else:
+                message_parts = []
+                for prop_data in proposals_data:
+                    title_escaped = telegram_utils.escape_markdown_v2(prop_data['title'])
+                    channel_id_str = str(prop_data['target_channel_id'])
+                    channel_message_id = prop_data.get('channel_message_id')
+                    
+                    channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}`"
+                    if channel_message_id and channel_id_str.startswith("-100"):
+                        # Attempt to create a direct link if it's a supergroup/channel
+                        try:
+                            numeric_channel_id = channel_id_str[4:] # Remove leading -100
+                            link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
+                            escaped_link = telegram_utils.escape_markdown_v2(link)
+                            channel_display = f"[Channel: {telegram_utils.escape_markdown_v2(channel_id_str)}]({escaped_link})"
+                        except Exception as e:
+                            logger.error(f"Error creating channel link for {channel_id_str}, {channel_message_id}: {e}")
+                            # Fallback to simple display if link creation fails
+                            channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
+                    elif channel_message_id: # For other chat types with message ID
+                         channel_display = f"Chat ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
 
-    if not proposals:
-        if query.message: # Check if query.message exists before trying to edit it
-            await query.edit_message_text(text=f"No {display_type.lower()} proposals found.")
-        return
+                    part = f"\\- *ID:* `{prop_data['id']}` *Title:* {title_escaped}\n"
+                    part += f"  {channel_display}\n"
+            
+                    if status_to_fetch == ProposalStatus.OPEN:
+                        deadline_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('deadline_date', 'N/A')))
+                        part += f"  *Voting ends:* {deadline_escaped}\n"
+                    elif status_to_fetch == ProposalStatus.CLOSED:
+                        outcome_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('outcome', 'Not Processed')))
+                        closed_date_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('closed_date', 'N/A')))
+                        part += f"  *Closed on:* {closed_date_escaped}\n"
+                        part += f"  *Outcome:* {outcome_escaped}\n"
+                    message_parts.append(part)
+                full_message += "\n".join(message_parts)
+            
+            if query.message:
+                if not full_message.strip(): # Ensure message is not empty after formatting
+                    logger.warning(f"Formatted message for {filter_type} is empty. Defaulting text.")
+                    full_message = "No proposals found or an error occurred generating the list."
+                
+                await query.edit_message_text(
+                    text=full_message,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+            else:
+                logger.warning("Callback query message does not exist, cannot edit.")
 
-    message_parts = [f"{display_type} Proposals:\n"]
-    for prop_data in proposals:
-        title_escaped = telegram_utils.escape_markdown_v2(prop_data['title'])
-        channel_id_str = str(prop_data['target_channel_id'])
-        channel_message_id = prop_data.get('channel_message_id')
-        
-        channel_display = telegram_utils.escape_markdown_v2(channel_id_str)
-        if channel_message_id and channel_id_str.startswith("-100"):
-            numeric_channel_id = channel_id_str[4:] # Remove leading -100
-            link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
-            escaped_link = telegram_utils.escape_markdown_v2(link)
-            channel_display = f"[Channel ID: {telegram_utils.escape_markdown_v2(channel_id_str)}]({escaped_link})"
-        else:
-            channel_display = f"Channel ID: {telegram_utils.escape_markdown_v2(channel_id_str)}"
+    except Exception as e:
+        logger.error(f"Error processing proposal filter callback ({filter_type}): {e}", exc_info=True)
+        if query.message:
+            try:
+                await query.edit_message_text(text="Sorry, an error occurred while fetching proposals.")
+            except Exception as edit_e:
+                logger.error(f"Error editing message on exception: {edit_e}")
 
-        part = f"\\- ID: `{prop_data['id']}`: {title_escaped}\n"
-        part += f"  {channel_display}\n"
-
-        if status_to_fetch == ProposalStatus.OPEN:
-            deadline_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('deadline_date', 'N/A')))
-            part += f"  Voting ends: {deadline_escaped}\n"
-        elif status_to_fetch == ProposalStatus.CLOSED:
-            outcome_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('outcome', 'N/A')))
-            closed_date_escaped = telegram_utils.escape_markdown_v2(str(prop_data.get('closed_date', 'N/A')))
-            part += f"  Closed on: {closed_date_escaped}\n"
-            part += f"  Outcome: {outcome_escaped}\n"
-        message_parts.append(part)
-        
-    full_message = "\n".join(message_parts)
-    if query.message: # Check if query.message exists
-        # Edit the original message that had the buttons
-        await query.edit_message_text(text=full_message, parse_mode=ParseMode.MARKDOWN_V2)
-    logger.info(f"User {query.from_user.id} viewed {display_type.lower()} proposals via callback.") 
+    logger.info(f"User {query.from_user.id} viewed {filter_type} proposals via callback.") 

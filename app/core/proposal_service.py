@@ -91,7 +91,8 @@ class ProposalService:
                 "creation_date": telegram_utils.format_datetime_for_display(proposal.creation_date),
                 "outcome": proposal.outcome,
                 "target_channel_id": proposal.target_channel_id,
-                "proposal_type": proposal.proposal_type
+                "proposal_type": proposal.proposal_type,
+                "channel_message_id": proposal.channel_message_id
             })
         return formatted_proposals
 
