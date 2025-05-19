@@ -628,6 +628,76 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test with various questions to ensure clarity and accuracy of LLM responses.
 
+5.  **Task 9.5: Implement Enhanced `/ask` for Proposal Querying and `/my_vote` Command**
+    *   **Goal:** Allow users to ask natural language questions about proposals via `/ask` (e.g., "what proposals closed last week?", "which proposals mentioned funding?") and view their specific vote/submission for an identified proposal via `/my_vote <proposal_id>`.
+    *   **Strategy Document:** See `memory-bank/intelligentAsks.md`.
+    *   **Dependencies:** `LLMService` (Phase 3.1), `VectorDBService` (Phase 3.2), `ProposalService`, `SubmissionService`, `ProposalRepository`, `SubmissionRepository`.
+    *   **Subtasks:**
+        *   **Subtask 9.5.1: Implement Proposal Content Indexing (Can be done earlier, e.g., alongside or after Phase 3/4)**
+            *   [ ] In `app/services/vector_db_service.py`, implement `add_proposal_embedding(proposal_id: int, text_content: str, embedding: list[float], metadata: dict)`:
+                *   [ ] This method should add/update the proposal's text and embedding in a new ChromaDB collection named `proposals_content` (or similar).
+                *   [ ] The `metadata` should include `proposal_id`, `status`, `deadline_date_iso`, `creation_date_iso`, `type`, `target_channel_id`.
+                *   [ ] Ensure the collection is created if it doesn't exist.
+            *   [ ] In `app/core/proposal_service.py`, modify `create_proposal(...)` and `edit_proposal_details(...)`:
+                *   [ ] After a proposal is successfully saved/updated in the SQL database:
+                    *   [ ] Concatenate `proposal.title` and `proposal.description` to form `proposal_text_to_index`.
+                    *   [ ] Call `LLMService.generate_embedding(proposal_text_to_index)`.
+                    *   [ ] Call `VectorDBService.add_proposal_embedding(...)` with the necessary details.
+            *   [ ] Write unit tests for the changes in `ProposalService` and `VectorDBService` related to proposal indexing.
+            *   [ ] (Optional, Post-MVP) Consider creating a one-time script to backfill embeddings for existing proposals in the database.
+
+        *   **Subtask 9.5.2: Implement Core `/ask` Enhancement Logic for Proposal Queries**
+            *   [ ] In `app/services/llm_service.py`:
+                *   [ ] Implement/Modify `analyze_ask_query(query_text: str) -> dict`.
+                    *   [ ] Design prompt to determine primary intent (`query_proposals` or `query_general_docs`).
+                    *   [ ] If `query_proposals`, extract `content_keywords` (for semantic search) and `structured_filters` (e.g., status, date_query, proposal_type).
+                *   [ ] (If necessary) Enhance `parse_natural_language_duration(text: str)` to reliably parse date ranges or relative queries (e.g., "last month") into start/end datetimes for filtering.
+            *   [ ] In `app/persistence/repositories/proposal_repository.py`:
+                *   [ ] Implement `find_proposals_by_dynamic_criteria(status: Optional[str] = None, date_range: Optional[tuple[datetime, datetime]] = None, proposal_type: Optional[str] = None, creation_date_range: Optional[tuple[datetime, datetime]] = None) -> list[Proposal]`.
+                    *   [ ] This method should construct and execute a dynamic SQLAlchemy query.
+            *   [ ] In `app/services/vector_db_service.py`:
+                *   [ ] Implement `search_proposal_embeddings(query_embedding: list[float], top_n: int = 5, filter_proposal_ids: Optional[list[int]] = None) -> list[dict]`.
+                    *   [ ] This method searches the `proposals_content` collection.
+                    *   [ ] It should return a list of results, each including at least `proposal_id` and `score`.
+            *   [ ] In `app/core/context_service.py`:
+                *   [ ] Implement/Refactor `handle_intelligent_ask(query_text: str, user_telegram_id: int) -> str` (this will be the main orchestrator for the `/ask` command logic):
+                    *   [ ] Call `LLMService.analyze_ask_query(query_text)`.
+                    *   [ ] If intent is `query_proposals`:
+                        *   [ ] Perform date parsing for `structured_filters.date_query` (if any) using `LLMService`.
+                        *   [ ] Perform structured filtering using `ProposalRepository.find_proposals_by_dynamic_criteria()`.
+                        *   [ ] If `content_keywords` exist, generate their embedding and search using `VectorDBService.search_proposal_embeddings()`.
+                        *   [ ] Consolidate proposal IDs from structured and semantic searches.
+                        *   [ ] Fetch full `Proposal` objects for the final list of IDs using `ProposalRepository.get_proposals_by_ids()`.
+                        *   [ ] Construct prompt for `LLMService.get_completion` to synthesize an answer. The answer should list matching proposals and guide the user to use `/my_vote <proposal_id>` to see their specific submission for any of these proposals.
+                        *   [ ] Call `LLMService.get_completion()` to get the final answer string.
+                    *   [ ] Else (intent is `query_general_docs` or fallback):
+                        *   [ ] Proceed with the existing RAG flow for general documents.
+            *   [ ] In `app/telegram_handlers/command_handlers.py` (or wherever `ask_command` is):
+                *   [ ] Modify the `ask_command` handler to call `ContextService.handle_intelligent_ask(question_text, user_telegram_id)`.
+            *   [ ] Write unit tests for all new/modified methods in `LLMService`, `ProposalRepository`, `VectorDBService`, and `ContextService` related to the enhanced `/ask` flow.
+
+        *   **Subtask 9.5.3: Implement `/my_vote <proposal_id>` Command**
+            *   [ ] In `app/persistence/repositories/submission_repository.py`:
+                *   [ ] Implement `get_submission_by_proposal_and_user(proposal_id: int, submitter_id: int) -> Submission | None`.
+            *   [ ] In `app/core/submission_service.py`:
+                *   [ ] Implement `get_user_submission_for_proposal(user_id: int, proposal_id: int) -> str`:
+                    *   [ ] Calls `ProposalRepository.get_proposal_by_id()` to get proposal details (e.g., title).
+                    *   [ ] Calls `SubmissionRepository.get_submission_by_proposal_and_user()`.
+                    *   [ ] Formats a response string (e.g., "For proposal '[Title]', your submission was: '[content]'" or "You did not make a submission for...").
+            *   [ ] In `app/telegram_handlers/user_command_handlers.py` (or similar):
+                *   [ ] Implement `my_vote_command(update: Update, context: ContextTypes.DEFAULT_TYPE)`:
+                    *   [ ] Parses `proposal_id` from command arguments.
+                    *   [ ] If `proposal_id` is missing: Send a message asking "Which proposal? Use /my_vote <proposal_id>. You can see all open and closed proposals for their IDs." with inline buttons for `/proposals open` and `/proposals closed`.
+                    *   [ ] If `proposal_id` is present, call `SubmissionService.get_user_submission_for_proposal()`.
+                    *   [ ] Send the formatted response string to the user via DM.
+            *   [ ] Register the `/my_vote` command handler in `main.py`.
+            *   [ ] Write unit tests for the new handler in `user_command_handlers.py`, and new methods in `SubmissionService` and `SubmissionRepository`.
+
+        *   **Subtask 9.5.4: Final Documentation Review & End-to-End Testing**
+            *   [ ] Review `intelligentAsks.md`, `projectbrief.md`, `systemPatterns.md`, and `bot_commands.md` to ensure consistency with the implemented features.
+            *   [ ] Perform thorough end-to-end manual testing of the enhanced `/ask` flow with various types of natural language queries (testing structured filters, content search, and combined queries).
+            *   [ ] Perform thorough end-to-end manual testing of the `/my_vote` command, including the case where no `proposal_id` is provided.
+
 ## Phase 10: Comprehensive Testing, Refinement, and Deployment Preparation
 
 **Goal:** Ensure bot stability, reliability, and user-friendliness; prepare for deployment.

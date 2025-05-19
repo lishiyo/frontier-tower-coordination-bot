@@ -43,6 +43,7 @@ This document outlines the product requirements for `CoordinationBot`, which is 
     *   View all open proposals and their deadlines.
     *   View all closed proposals and their outcomes (including aggregated vote counts for multiple-choice or a list/summary of free-form submissions via `/view_results <proposal_id>`).
     *   DM the bot to ask questions about existing policies or context documents and receive relevant answers.
+    *   DM the bot to ask natural language questions about proposals, like "what proposals closed last week?" or "which proposals are about funding?", and receive relevant answers summarizing the matching proposals. (Enhances `/ask` command).
     *   **(New)** Type `/help <my question about how to use the bot>` and get an intelligent answer explaining the relevant commands and steps, so I don't have to read the full command list or documentation every time.
 *   **As an Admin/Moderator, I want to:**
     *   Upload general context documents using `/add_global_doc <URL or paste text>`, view them with `/view_global_docs`, edit them with `/edit_global_doc <document_id>`, and delete them with `/delete_global_doc <document_id>`, so the bot can use these for answering questions.
@@ -177,10 +178,19 @@ This document outlines the product requirements for `CoordinationBot`, which is 
         *   `/view_global_docs` (DM): Admin lists all global documents (ID, title).
         *   `/edit_global_doc <document_id>` (DM): Admin edits a global document. Bot may initiate a conversation for new content. Updates `raw_content` and re-processes for vector DB.
         *   `/delete_global_doc <document_id>` (DM): Admin deletes a global document. Removes from `Document` table and vector DB.
-    *   **FR7.2 (User):** `/ask <question>` or `/ask <proposal_id> <question>` command (DM): User asks a question.
-        *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal. If multi-channel RAG becomes a feature, context searching might also be scoped by channel.
-        *   Bot uses LLM (e.g., GPT) with retrieved context + question to generate an answer.
-        *   Bot DMs answer to user, citing sources (e.g., document name/link, or "From the context provided for Proposal X") and showing relevant snippets.
+    *   **FR7.2 (User):** `/ask <question>` or `/ask <proposal_id> <question>` command (DM):
+        *   User asks a natural language question.
+        *   The bot will first attempt to understand if the question pertains to existing proposals or general context documents.
+        *   **If proposal-related:**
+            *   The bot will use an LLM to extract structured filters (like status, dates, type) and content keywords from the question.
+            *   It will query the database for proposals matching the structured filters.
+            *   It will perform a semantic search on indexed proposal titles and descriptions (in a vector DB) for proposals matching content keywords, further refining based on the structured filter results.
+            *   The bot will synthesize an answer using an LLM based on the matching proposals and DM it to the user.
+        *   **If general document-related (existing RAG behavior):**
+            *   Bot embeds question, retrieves relevant chunks from vector DB. If `proposal_id` is provided, prioritize documents linked to that proposal. If multi-channel RAG becomes a feature, context searching might also be scoped by channel.
+            *   Bot uses LLM (e.g., GPT) with retrieved context + question to generate an answer.
+            *   Bot DMs answer to user, citing sources (e.g., document name/link, or "From the context provided for Proposal X") and showing relevant snippets.
+        *   *(The bot should aim to provide a coherent answer even if the query is ambiguous, potentially asking for clarification or stating its interpretation).*
 
     *   **FR7.3 (User - Viewing Context Documents):**
         *   `/view_docs` command (DM): Lists all authorized channels the bot is configured with, showing channel names and IDs.

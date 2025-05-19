@@ -47,16 +47,16 @@ Here's a breakdown of the major components:
     *   Modules: `user_service.py`, `proposal_service.py`, `submission_service.py`, `context_service.py`.
     *   **Responsibilities (General):** Encapsulate the main business logic (use cases) of the application. They are the orchestrators.
         *   `UserService`: Manages user registration (implicit on first interaction), retrieval.
-        *   `ProposalService`: Handles proposal creation (including orchestrating conversational context gathering), editing, cancellation, closing (triggered by scheduler), and retrieval. Supports multi-channel functionality where proposals can be posted to different authorized channels, either specified during DM conversation or detected when initiated in-channel.
+        *   `ProposalService`: Handles proposal creation (including orchestrating conversational context gathering), editing, cancellation, closing (triggered by scheduler), and retrieval. Supports multi-channel functionality where proposals can be posted to different authorized channels, either specified during DM conversation or detected when initiated in-channel. It also triggers the embedding and indexing of proposal title and description in `VectorDBService` upon proposal creation or update.
         *   `SubmissionService`: Handles recording and validation of votes (multiple-choice) and free-form text submissions.
-        *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers via `/add_doc <proposal_id>` or admins via `/add_global_doc`), editing/deleting these documents, processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval. It also handles intelligent help requests by using `LLMService` to interpret user questions against the `bot_commands.md` documentation.
+        *   `ContextService`: Manages the RAG pipeline – adding documents/context (from proposers via `/add_doc <proposal_id>` or admins via `/add_global_doc`), editing/deleting these documents, processing queries (`/ask`), interacting with `LLMService` for answer generation/clustering and `VectorDBService` for retrieval. It also handles intelligent help requests by using `LLMService` to interpret user questions against the `bot_commands.md` documentation. For `/ask` queries specifically targeting proposals, it orchestrates intent analysis (via `LLMService`), structured querying of proposals (via `ProposalRepository`), semantic search of proposal content (via `VectorDBService`), and LLM-based synthesis of the final answer.
     *   **Interactions:** `Repositories` (for data persistence), other `CoreServices` if necessary, `LLMService`, `VectorDBService`, `TelegramUtils` (for direct notifications if needed).
 
 5.  **`ExternalServices` (`app/services/`)**
     *   Modules: `llm_service.py`, `vector_db_service.py`, `scheduling_service.py`.
     *   **Responsibilities (General):** Abstract interactions with external systems or complex shared functionalities.
-        *   `LLMService`: Manages all interactions with the OpenAI API (or other LLM providers). This includes generating embeddings, getting chat completions for Q&A, parsing natural language for proposal durations, clustering free-form submissions, and answering natural language questions based on provided context text (e.g., for the enhanced `/help` command using `bot_commands.md`).
-        *   `VectorDBService`: Manages all interactions with the vector database (ChromaDB). Stores, searches, and retrieves text embeddings/chunks.
+        *   `LLMService`: Manages all interactions with the OpenAI API (or other LLM providers). This includes generating embeddings, getting chat completions for Q&A, parsing natural language for proposal durations, clustering free-form submissions, answering natural language questions based on provided context text (e.g., for the enhanced `/help` command using `bot_commands.md`), and intent analysis and entity extraction for complex `/ask` queries related to proposals.
+        *   `VectorDBService`: Manages all interactions with the vector database (ChromaDB). Stores, searches, and retrieves text embeddings/chunks. This includes managing a dedicated collection for proposal text embeddings (`proposals_content`) and searching proposal embeddings with metadata filtering.
         *   `SchedulingService`: Configures and runs `APScheduler`. Defines scheduled jobs (e.g., checking for proposal deadlines) that trigger actions in `CoreServices`.
     *   **Interactions:** External APIs (OpenAI), ChromaDB library, `APScheduler` library, `CoreServices`.
 
@@ -265,15 +265,29 @@ This section covers how users cast votes on multiple-choice proposals, submit fr
 1.  **User (Telegram):** Sends `/ask <question>` or `/ask <proposal_id> <question>`.
 2.  **`main.py`/PTB `Application`:** Routes to `CommandHandlers.handle_ask_question`.
 3.  **`CommandHandlers.handle_ask_question`:**
-    *   Parses `question` and optional `proposal_id`.
-    *   Calls `ContextService.get_answer_for_question(question_text, proposal_id_filter)`.
-4.  **`ContextService.get_answer_for_question`:**
-    *   Calls `LLMService.generate_embedding(question_text)` for the question.
-    *   Calls `VectorDBService.search_similar_chunks(question_embedding, proposal_id_filter)` to get relevant document chunks. `proposal_id_filter` helps prioritize proposal-specific context.
-    *   Retrieves full text of relevant chunks (possibly from `DocumentRepository` or if `VectorDBService` stores it).
-    *   Constructs a prompt for the LLM including retrieved context and the original question.
-    *   Calls `LLMService.get_completion(prompt)` to generate an answer.
-    *   Formats the answer, including citing sources/snippets.
+    *   Parses `question` and optional `proposal_id` (though the new flow focuses more on the general `question_text`).
+    *   Calls `ContextService.handle_intelligent_ask(question_text)` (new central method for `/ask`).
+4.  **`ContextService.handle_intelligent_ask(question_text)`:**
+    *   Calls `LLMService.analyze_ask_query(question_text)` to determine intent and extract entities (content keywords, structured filters like status, dates, type).
+    *   **If `intent == "query_proposals"`:**
+        *   Parses `date_query` from structured filters using `LLMService.parse_natural_language_duration` (if present).
+        *   Calls `ProposalRepository.find_proposals_by_dynamic_criteria(status, date_range, type)` to get an initial list of proposals (or their IDs) based on structured filters.
+        *   If `content_keywords` were extracted:
+            *   Calls `LLMService.generate_embedding(content_keywords)` to get `query_embedding`.
+            *   Calls `VectorDBService.search_proposal_embeddings(query_embedding, filter_proposal_ids=initial_list_from_sql)` to get semantically matching proposal IDs from the `proposals_content` collection, potentially filtering against the SQL results.
+        *   Consolidates the list of matching proposal IDs from structured and semantic searches.
+        *   Fetches full `Proposal` objects for these IDs using `ProposalRepository.get_proposals_by_ids()`.
+        *   Constructs a prompt for `LLMService.get_completion` including the user's original question and the summarized details of the matching proposals.
+        *   Calls `LLMService.get_completion(prompt)` to get the synthesized natural language answer.
+        *   Returns the formatted answer.
+    *   **Else (`intent == "query_general_docs"` or fallback):**
+        *   (Existing RAG flow) Calls `LLMService.generate_embedding(question_text)` for the question.
+        *   Calls `VectorDBService.search_similar_chunks(question_embedding, proposal_id_filter)` to get relevant general document chunks.
+        *   Retrieves full text of relevant chunks.
+        *   Constructs a prompt for `LLMService.get_completion` with retrieved document context and the original question.
+        *   Calls `LLMService.get_completion(prompt)` to generate an answer.
+        *   Formats the answer, citing sources/snippets.
+        *   Returns the formatted answer.
 5.  **`CommandHandlers.handle_ask_question`:**
     *   Receives formatted answer from `ContextService`.
     *   Sends the answer back to the user via DM.
@@ -295,6 +309,10 @@ This section covers how users cast votes on multiple-choice proposals, submit fr
             *   Calls `SubmissionRepository.get_submissions_for_proposal(proposal_id)`.
             *   Calls `LLMService.cluster_and_summarize_texts([submission.response_content for submission in submissions])`.
             *   Updates `Proposal.outcome` (summary) and `Proposal.raw_results` (full list) via `ProposalRepository`.
+        *   (On proposal creation/update in `ProposalService`):
+            *   Concatenate `proposal.title` and `proposal.description`.
+            *   Call `LLMService.generate_embedding()` on this text.
+            *   Call `VectorDBService.add_proposal_embedding()` to store in `proposals_content` collection with relevant metadata.
         *   Calls `TelegramUtils.format_results_message(...)` and posts results to the proposal's `target_channel_id` (retrieving the channel ID from the proposal record).
         *   (Optional v0/Core v1) Prepares and sends notifications to proposer/voters.
 

@@ -17,7 +17,11 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
     *   **Context:** DM with the bot.
 
 *   `/ask` or `/ask <question>` or `/ask <proposal_id> <question>`
-    *   **Description:** Allows users to ask questions. If a `proposal_id` is provided, the question is specifically about that proposal, and related context is prioritized. If the user only types `ask`, the bot will ask if this is specific to a proposal (and if yes, to use `/proposals open` and `/proposals closed` to see their titles and ids), then the user can choose `/ask <question>` for global questions or `/ask <proposal_id> <question>` for proposal-questions.
+    *   **Description:** Allows users to ask questions. 
+        *   If the question is about general topics or documents, the bot uses its RAG capabilities.
+        *   If the question is about finding proposals (e.g., "which proposals mentioned 'budget review'?"), the bot will identify matching proposals. 
+        *   To see your specific submission for an identified proposal, the bot will guide you to use the `/my_vote <proposal_id>` command.
+        *   If the user only types `/ask` without a question, the bot will provide guidance on how to ask effectively.
     *   **Parameters:**
         *   `<question>`: (Optional) The user's question.
         *   `<proposal_id>` (Optional): The ID of a specific proposal to ask about.
@@ -71,8 +75,14 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
 
 ### User History
 
-*   `/my_votes`
+*   `/my_votes` (same as `/my_submissions`)
     *   **Description:** Shows the user a list of proposals they have voted on or submitted to, including their response and the proposal's current status/outcome.
+    *   **Context:** DM with the bot.
+
+*   `/my_vote <proposal_id>` or `/my_vote`
+    *   **Description:** Shows the user their specific vote or submission for a given proposal ID. Useful after `/ask` identifies a proposal of interest. If the user says `/my_vote` the bot asks "which proposal? use `/my_vote <proposal-id>`. You can see all open and closed proposals for their ids." with buttons to view all proposals ('open proposals', 'closed proposals').
+    *   **Parameters:**
+        *   `<proposal_id>`: The ID of the proposal.
     *   **Context:** DM with the bot.
 
 *   `/my_proposals`
