@@ -17,7 +17,7 @@ from app.persistence.models.document_model import Document
 from app.persistence.models.proposal_model import Proposal
 from app.persistence.models.submission_model import Submission # Uncommented
 from app.config import ConfigService # Explicitly load to ensure .env is processed if needed
-from app.services.vector_db_service import VectorDBService, DEFAULT_COLLECTION_NAME # Added
+from app.services.vector_db_service import VectorDBService, DEFAULT_COLLECTION_NAME, PROPOSALS_COLLECTION_NAME # Added PROPOSALS_COLLECTION_NAME
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -61,11 +61,22 @@ async def clear_data_from_tables():
             vdb_service.client.delete_collection(name=DEFAULT_COLLECTION_NAME)
             logger.info(f"Successfully deleted ChromaDB collection: {DEFAULT_COLLECTION_NAME}.")
         else:
-            logger.error("VectorDBService client not initialized. Cannot delete ChromaDB collection.")
+            logger.error(f"VectorDBService client not initialized. Cannot delete ChromaDB collection: {DEFAULT_COLLECTION_NAME}.")
     except Exception as e:
         # Log error but don't let it stop the script if SQL part was successful
         # ChromaDB might raise an exception if the collection doesn't exist, which is fine.
         logger.warning(f"Could not delete ChromaDB collection '{DEFAULT_COLLECTION_NAME}' (it might not exist or another error occurred): {e}")
+
+    try:
+        logger.info(f"Attempting to delete ChromaDB collection: {PROPOSALS_COLLECTION_NAME}...")
+        vdb_service = VectorDBService() # Re-initialize or ensure client is available
+        if vdb_service.client:
+            vdb_service.client.delete_collection(name=PROPOSALS_COLLECTION_NAME)
+            logger.info(f"Successfully deleted ChromaDB collection: {PROPOSALS_COLLECTION_NAME}.")
+        else:
+            logger.error(f"VectorDBService client not initialized. Cannot delete ChromaDB collection: {PROPOSALS_COLLECTION_NAME}.")
+    except Exception as e:
+        logger.warning(f"Could not delete ChromaDB collection '{PROPOSALS_COLLECTION_NAME}' (it might not exist or another error occurred): {e}")
 
     logger.info("Data clearing process fully completed.")
 
@@ -75,8 +86,9 @@ async def main_script_runner():
     print("  - documents")
     print("  - submissions")
     print("  - proposals")
-    print("AND WILL DELETE THE FOLLOWING VECTOR DATABASE COLLECTION:")
+    print("AND WILL DELETE THE FOLLOWING VECTOR DATABASE COLLECTIONS:")
     print(f"  - {DEFAULT_COLLECTION_NAME}")
+    print(f"  - {PROPOSALS_COLLECTION_NAME}")
     print("This operation is irreversible.")
     print("="*60 + "\n")
     

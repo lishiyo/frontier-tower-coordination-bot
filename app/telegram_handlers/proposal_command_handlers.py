@@ -296,7 +296,7 @@ async def edit_proposal_command_entry(update: Update, context: ContextTypes.DEFA
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
-                f"Editing Proposal ID: {proposal_id_to_edit} - '{telegram_utils.escape_markdown_v2(proposal.title)}'\nWhat would you like to change?",
+                f"Editing Proposal ID: {proposal_id_to_edit} \\- {telegram_utils.escape_markdown_v2(proposal.title)}\nWhat would you like to change?",
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.MARKDOWN_V2
             )
@@ -312,13 +312,13 @@ async def handle_select_edit_action(update: Update, context: ContextTypes.DEFAUL
     action = query.data
     context.user_data['_current_edit_action'] = action # Store which part we are editing sequentially for "All"
 
-    if action == "edit_prop_title" or action == "edit_prop_all":
+    if action == "edit_action_title" or action == "edit_action_all":
         await query.edit_message_text(text="Please send the new title for the proposal.")
         return EDIT_TITLE
-    elif action == "edit_prop_desc":
+    elif action == "edit_action_description":
         await query.edit_message_text(text="Please send the new description for the proposal.")
         return EDIT_DESCRIPTION
-    elif action == "edit_prop_opts":
+    elif action == "edit_action_options":
         original_proposal_type = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ORIGINAL, {}).get("proposal_type")
         if original_proposal_type == ProposalType.MULTIPLE_CHOICE.value:
             await query.edit_message_text(text="Please send the new options, separated by commas.")
@@ -336,12 +336,20 @@ async def handle_select_edit_action(update: Update, context: ContextTypes.DEFAUL
             # Let's just allow them to cancel or send another command.
             return ConversationHandler.END # Simplified for now
 
-    elif action == "edit_prop_finish_no_change":
-        await query.edit_message_text(text="No changes made to the proposal.")
-        return ConversationHandler.END
+    elif action == "edit_action_finish":
+        # This will now call prompt_confirm_edit_proposal, which handles the no-changes case.
+        return await prompt_confirm_edit_proposal(update, context)
+    # Removed the specific edit_prop_finish_no_change as prompt_confirm_edit_proposal handles no changes.
+    # The finish button should always lead to the confirmation/summary step.
+
+    # elif action == "edit_action_cancel": # This is handled by fallbacks
+    #     await query.edit_message_text(text="Proposal editing cancelled.")
+    #     return ConversationHandler.END
     
-    logger.warning(f"handle_select_edit_action: Unknown action '{action}'.")
-    await query.edit_message_text(text="Sorry, an unexpected error occurred.")
+    logger.warning(f"handle_select_edit_action: Unknown action '{action}'. This might be okay if it's 'edit_action_cancel' handled by fallback.")
+    # Don't send error message for cancel, as it might be a fallback race condition or normal flow.
+    # await query.edit_message_text(text="Sorry, an unexpected error occurred or unknown action.")
+    # Let fallbacks handle cancel. If it's truly unknown and not cancel, it will end via this path.
     return ConversationHandler.END
 
 async def handle_edit_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -354,7 +362,7 @@ async def handle_edit_title(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text(f"New title set to: '{new_title}'")
 
     current_edit_action = context.user_data.get('_current_edit_action')
-    if current_edit_action == "edit_prop_all":
+    if current_edit_action == "edit_action_all":
         await update.message.reply_text("Now, please send the new description for the proposal.")
         return EDIT_DESCRIPTION
     else:
@@ -374,7 +382,7 @@ async def handle_edit_description(update: Update, context: ContextTypes.DEFAULT_
     current_edit_action = context.user_data.get('_current_edit_action')
     original_proposal_type = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ORIGINAL, {}).get("proposal_type")
 
-    if current_edit_action == "edit_prop_all":
+    if current_edit_action == "edit_action_all":
         if original_proposal_type == ProposalType.MULTIPLE_CHOICE.value:
             await update.message.reply_text("Now, please send the new options, separated by commas.")
             return EDIT_OPTIONS
@@ -397,7 +405,7 @@ async def handle_edit_options(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data[USER_DATA_EDIT_CHANGES]['options'] = new_options_list
     await update.message.reply_text(f"New options set to: {', '.join(new_options_list)}")
     
-    # Whether coming from "edit_prop_all" or "edit_prop_opts", options are last for MC
+    # Whether coming from "edit_action_all" or "edit_action_opts", options are last for MC
     return await prompt_confirm_edit_proposal(update, context)
 
 async def prompt_confirm_edit_proposal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -405,8 +413,28 @@ async def prompt_confirm_edit_proposal(update: Update, context: ContextTypes.DEF
     original = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ORIGINAL, {})
     proposal_id = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ID)
 
-    if not changes:
-        await update.message.reply_text("No changes were made. Finishing edit process.")
+    query = update.callback_query
+    action = query.data if query else None
+
+    # If this function is called via a callback button (e.g., "Finish Editing")
+    # and no changes were made, notify the user and end.
+    if query and action == "edit_action_finish" and not changes:
+        await query.answer() # Answer callback query first
+        await query.edit_message_text("No changes were made. Finishing edit process.")
+        return ConversationHandler.END
+    # If somehow called without changes (e.g., directly after a single edit that was then cleared, though less likely now)
+    # or if called by a message update (not callback) and no changes exist.
+    elif not changes:
+        reply_method = None
+        if update.message:
+            reply_method = update.message.reply_text
+        elif query and query.message: # Fallback if called by callback but not 'edit_action_finish'
+            reply_method = query.message.reply_text
+        
+        if reply_method:
+            await reply_method("No changes were made. Finishing edit process.")
+        else:
+            logger.warning("prompt_confirm_edit_proposal: No changes and no clear way to reply.")
         return ConversationHandler.END
 
     summary_parts = [f"Summary of changes for proposal ID {proposal_id}:"]
@@ -423,8 +451,8 @@ async def prompt_confirm_edit_proposal(update: Update, context: ContextTypes.DEF
     summary_text += "\n\nDo you want to apply these changes?"
 
     keyboard = [
-        [InlineKeyboardButton("Yes, Apply Changes", callback_data="edit_prop_confirm_yes")],
-        [InlineKeyboardButton("No, Discard Changes", callback_data="edit_prop_confirm_no")]
+        [InlineKeyboardButton("Yes, Apply Changes", callback_data="confirm_edit_yes")],
+        [InlineKeyboardButton("No, Discard Changes", callback_data="confirm_edit_no")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -448,7 +476,7 @@ async def handle_confirm_edit_proposal(update: Update, context: ContextTypes.DEF
     proposal_id = context.user_data.get(USER_DATA_EDIT_PROPOSAL_ID)
     changes = context.user_data.get(USER_DATA_EDIT_CHANGES, {})
 
-    if decision == "edit_prop_confirm_yes":
+    if decision == "confirm_edit_yes":
         if not changes or not proposal_id:
             await query.edit_message_text("No changes to apply or proposal ID missing. Edit cancelled.")
             return ConversationHandler.END
@@ -516,12 +544,16 @@ async def handle_confirm_edit_proposal(update: Update, context: ContextTypes.DEF
                             logger.info(f"Updated message for proposal {updated_proposal.id} in channel {updated_proposal.target_channel_id}.")
                     except Exception as e:
                         logger.error(f"Failed to update message in channel for proposal {updated_proposal.id}: {e}", exc_info=True)
-                        await query.message.reply_text("Proposal details updated, but failed to update the message in the channel. Please check manually.")
+                        # If query.message is not available (e.g. message too old to edit for bot), send new message
+                        try:
+                            await query.message.reply_text("Proposal details updated, but failed to update the message in the channel. Please check manually.")
+                        except AttributeError: # If query.message is None
+                             await context.bot.send_message(chat_id=update.effective_chat.id, text="Proposal details updated, but failed to update the message in the channel. Please check manually.")
             else:
                 # This case is theoretically covered by error_msg from edit_proposal_details
                 await query.edit_message_text("Failed to update proposal for an unknown reason.")
         
-    elif decision == "edit_prop_confirm_no":
+    elif decision == "confirm_edit_no":
         await query.edit_message_text("Changes discarded. Proposal not modified.")
     else:
         logger.warning(f"handle_confirm_edit_proposal: Unknown decision '{decision}'.")
