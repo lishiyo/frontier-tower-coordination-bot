@@ -15,6 +15,9 @@ from telegram.ext import Application
 from collections import Counter
 
 from app.core.user_service import UserService
+from app.persistence.models.user_model import User
+from app.utils.telegram_utils import escape_markdown_v2
+from telegram.constants import ParseMode
 
 import logging
 logger = logging.getLogger(__name__)
@@ -242,6 +245,68 @@ class ProposalService:
                 logger.error(f"Error during re-indexing proposal {updated_proposal.id} after edit: {e}", exc_info=True)
 
         return updated_proposal, None
+
+    async def cancel_proposal_by_proposer(self, proposal_id: int, user_telegram_id: int) -> tuple[bool, str]:
+        """
+        Cancels a proposal if the user is the proposer and the proposal is open.
+        Updates the proposal status and edits the channel message.
+        Returns a tuple (success_status, message_to_user).
+        """
+        proposal = await self.proposal_repository.get_proposal_by_id(proposal_id)
+
+        if not proposal:
+            return False, "Proposal not found."
+
+        if proposal.proposer_telegram_id != user_telegram_id:
+            return False, "You are not authorized to cancel this proposal."
+
+        if proposal.status != ProposalStatus.OPEN.value:
+            return False, f"This proposal cannot be cancelled. Its current status is: {proposal.status}"
+
+        updated_proposal = await self.proposal_repository.update_proposal_status(
+            proposal_id, ProposalStatus.CANCELLED
+        )
+
+        if not updated_proposal:
+            return False, "Failed to update proposal status to cancelled."
+
+        # Commit the session after successful status update and before trying to send messages
+        await self.db_session.commit()
+        logger.info(f"Proposal {proposal_id} cancelled by user {user_telegram_id}. Status updated and committed.")
+
+        # Edit the original message in the channel to indicate cancellation
+        if self.bot_app and updated_proposal.target_channel_id and updated_proposal.channel_message_id:
+            try:
+                if not proposal.proposer: # Should not happen due to eager loading
+                    logger.error(f"Proposer not loaded for proposal {proposal_id} during cancellation message update.")
+                    # Avoid raising an error that might rollback the successful cancellation,
+                    # just log and proceed with user message. Channel message edit will fail gracefully.
+                else:
+                    # To ensure the formatted message reflects the "cancelled" status,
+                    # we should pass the `updated_proposal` object, as its status field is current.
+                    # The `proposer` information comes from the original `proposal` object which had it eager-loaded.
+                    channel_message_text = telegram_utils.format_proposal_message(
+                        proposal=updated_proposal, # This has the updated 'cancelled' status
+                        proposer=proposal.proposer # This is the eagerly loaded User object
+                    )
+                    
+                    # Add a clear "CANCELLED" prefix or suffix to the message
+                    cancelled_prefix = escape_markdown_v2("--- CANCELLED ---\n\n")
+                    final_channel_text = cancelled_prefix + channel_message_text
+
+                    await self.bot_app.bot.edit_message_text(
+                        chat_id=updated_proposal.target_channel_id,
+                        message_id=updated_proposal.channel_message_id,
+                        text=final_channel_text,
+                        reply_markup=None, # Remove voting buttons
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
+                    logger.info(f"Edited channel message for cancelled proposal ID {proposal_id}.")
+            except Exception as e:
+                logger.error(f"Failed to edit channel message for cancelled proposal ID {proposal_id}: {e}", exc_info=True)
+                # Don't return error to user here, proposal is already cancelled. This is a secondary effect.
+
+        return True, f"Proposal ID {proposal_id} has been successfully cancelled."
 
     async def process_expired_proposals(self) -> List[Proposal]:
         """

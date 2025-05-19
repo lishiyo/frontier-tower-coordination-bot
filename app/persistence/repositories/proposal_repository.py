@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any, Sequence
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from app.persistence.models.proposal_model import Proposal, ProposalStatus, ProposalType
 from datetime import datetime
 
@@ -40,7 +41,7 @@ class ProposalRepository:
 
     async def get_proposal_by_id(self, proposal_id: int) -> Optional[Proposal]:
         result = await self.db_session.execute(
-            select(Proposal).where(Proposal.id == proposal_id)
+            select(Proposal).where(Proposal.id == proposal_id).options(selectinload(Proposal.proposer))
         )
         return result.scalar_one_or_none()
 

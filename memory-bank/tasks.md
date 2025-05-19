@@ -440,15 +440,15 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details). 
     *   [x] Write unit tests, verify passing.
     *   [x] Test this is working manually.
-    *   [ ] Move to Subtask 9.5.1 (indexing proposals on create/edit) now that we have edit functionality.
+    *   [x] Move to Subtask 9.5.1 (indexing proposals on create/edit) now that we have edit functionality.
 
 5.  **Task 7.5: Implement `/cancel_proposal` Command (Proposer Only)**
-    *   [ ] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`"; then show the button `/my_proposals` to open the user's proposals.
-    *   [ ] In `ProposalService`, implement `cancel_proposal_by_proposer(proposal_id, proposer_id)`:
-        *   [ ] Fetch proposal. Verify `proposer_id` matches and status is "open".
-        *   [ ] Update status to "cancelled" via `ProposalRepository`.
-        *   [ ] Update channel message (e.g., "Proposal cancelled").
-    *   [ ] Implement `cancel_proposal_command` in `proposal_command_handlers.py`.
+    *   [x] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`"; then show the button for `/my_proposals` to open the user's proposals.
+    *   [x] In `ProposalService`, implement `cancel_proposal_by_proposer(proposal_id, proposer_id)`:
+        *   [x] Fetch proposal. Verify `proposer_id` matches and status is "open".
+        *   [x] Update status to "cancelled" via `ProposalRepository`.
+        *   [x] Update channel message (e.g., "Proposal cancelled").
+    *   [x] Implement `cancel_proposal_command` in `proposal_command_handlers.py`.
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 

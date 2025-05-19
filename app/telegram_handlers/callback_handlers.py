@@ -346,8 +346,9 @@ async def handle_my_proposals_for_edit_prompt(update: Update, context: ContextTy
             parse_mode=ParseMode.MARKDOWN_V2
         )
         # Then edit the original message (that had the button)
+        edited_text = "Your proposals are listed below\\. Please use the relevant command \\(e\\.g\\., `/edit_proposal <ID>` or `/cancel_proposal <ID>`\\) with the appropriate ID\\."
         await query.edit_message_text(
-            text="Please use `/edit_proposal <ID>` with an ID from the list below to edit a proposal\.",
+            text=edited_text,
             parse_mode=ParseMode.MARKDOWN_V2
             # No reply_markup needed here, as we're removing the button implicitly by not providing it.
         )
