@@ -121,6 +121,7 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     proposal_exists = await proposal_service.proposal_repository.get_proposal_by_id(potential_id)
                     if proposal_exists:
                         await update.message.reply_text(f"No documents found for Proposal ID {potential_id}.")
+                        return
                     else:
                         # Positive int, but not a proposal ID. It might be an invalid ID or a numeric channel string.
                         # Fall through to treat as channel_id string.
