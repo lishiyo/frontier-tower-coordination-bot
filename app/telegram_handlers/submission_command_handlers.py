@@ -76,7 +76,7 @@ async def handle_prefilled_submit(update: Update, context: ContextTypes.DEFAULT_
     pattern_string = rf"^\s*@(\w+)\s+submit\s+(\d+)\s+(.*)$"
     match = re.match(pattern_string, text, re.IGNORECASE | re.DOTALL)
 
-    if match and match.group(1) == bot_username:
+    if match and match.group(1).lower() == bot_username.lower():
         proposal_id_str = match.group(2) # Group 2 is now proposal_id
         submission_text = match.group(3).strip() # Group 3 is now submission_text
 

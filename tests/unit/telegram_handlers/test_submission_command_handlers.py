@@ -15,7 +15,7 @@ def mock_update_submission():
     update.effective_user.id = 12345
     update.message = MagicMock(spec=Message)
     update.message.reply_text = AsyncMock()
-    update.message.text = ""
+    update.message.text = "/submit command text"
     return update
 
 @pytest.fixture
