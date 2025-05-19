@@ -426,8 +426,8 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [x] Fetch proposals from repository.
         *   [x] Format list of (title, deadline/outcome).
     *   [x] Implement `proposals_open_command` and `proposals_closed_command` in `proposal_command_handlers.py`, calling the service and DMing results.
-    *   [ ] Write unit tests, verify passing.
-    *   [ ] Test this is working manually.
+    *   [x] Write unit tests, verify passing.
+    *   [x] Test this is working manually.
 
 4.  **Task 7.4: Implement `/edit_proposal` Command (Proposer Only)**
     *   [ ] If the user just says `/edit_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`".

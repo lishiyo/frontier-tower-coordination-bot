@@ -1,5 +1,23 @@
 # Progress Log
 
+## Sun May 18 19:18:18 PDT 2025
+
+**Completed:**
+- Task 7.3: `/proposals` command (with inline buttons for open/closed filtering) and its associated callback handler (`handle_proposal_filter_callback`) are now fully functional and unit tested.
+- Resolved unit test failures in `tests/unit/telegram_handlers/test_proposal_command_handlers.py` by correcting expected MarkdownV2 string formatting in assertions.
+- Resolved unit test failures in `tests/unit/telegram_handlers/test_callback_handlers.py` by correcting expected MarkdownV2 string formatting and logger message assertions.
+- Resolved unit test failures in `tests/unit/telegram_handlers/test_submission_command_handlers.py` by:
+    - Adjusting the `mock_update_submission` fixture to provide a non-empty `update.message.text` to satisfy handler guard clauses.
+    - Correcting the bot username comparison in `handle_prefilled_submit` to be case-insensitive.
+
+**Learnings & Fixes:**
+- Reinforced the importance of precise string literal representation for MarkdownV2 escaping when writing `pytest` assertions against Telegram message content.
+- Unit tests for handlers with initial guard clauses (e.g., checking `update.message.text`) require mock inputs that satisfy these conditions to ensure the main logic is reached and tested.
+- Regex matching for case-insensitivity (`re.IGNORECASE`) must be complemented by case-insensitive comparisons if captured groups are subsequently compared against known strings (e.g., `match.group(1).lower() == bot_username.lower()`).
+
+**Next Steps:**
+- Proceed with Phase 7, Task 7.4: Implement `/edit_proposal` Command.
+
 ## Sun May 18 18:37:21 PDT 2025
 
 **Completed:**
