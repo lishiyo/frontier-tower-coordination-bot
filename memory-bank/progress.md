@@ -1,5 +1,22 @@
 # Progress Log
 
+## Sun May 18 17:57:02 PDT 2025
+
+**Completed:**
+- Added comprehensive unit tests for the remaining `app/telegram_handlers`:
+    - `tests/unit/telegram_handlers/test_error_handler.py` for `app/telegram_handlers/error_handler.py`
+    - `tests/unit/telegram_handlers/test_message_handlers.py` for `app/telegram_handlers/message_handlers.py`
+    - `tests/unit/telegram_handlers/test_submission_command_handlers.py` for `app/telegram_handlers/submission_command_handlers.py`
+- Successfully debugged and fixed all identified issues in these new unit tests, ensuring they pass.
+
+**Learnings & Fixes (Unit Testing - Telegram Handlers):**
+- **`error_handler.py` Test (`test_error_handler_no_update_object`):** When testing the `error_handler` with a mock update object that is *not* an instance of `telegram.Update`, the handler internally calls `str()` on the object, then `json.dumps()` on that string. This results in the string being wrapped in quotes (e.g., `"string_content"`) which are then HTML-escaped (e.g., `&quot;string_content&quot;`). Assertions for the logged output must account for this double processing.
+- **`message_handlers.py` Test (`test_handle_ask_context_no_context_success`):** A `NameError` for `InlineKeyboardButton` occurred because it was used in a mock setup (`mock_telegram_utils.get_free_form_submit_button.return_value`) but was not imported in the test file. Ensured all necessary `telegram` library components are imported in test files where they are referenced, even if only within mock setups.
+
+**Next Steps:**
+- Begin Phase 7, Task 7.3: Implement `/proposals <proposal_id>` command.
+
+
 ## Sun May 18 17:20:11 PDT 2025
 
 **Completed:**
