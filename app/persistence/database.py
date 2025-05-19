@@ -1,10 +1,13 @@
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from app.config import ConfigService
+
+logger = logging.getLogger(__name__)
 
 # Create async engine using the database URL from ConfigService
 engine = create_async_engine(
@@ -23,7 +26,9 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 # Create a base class for declarative models
-Base = declarative_base()
+Base = sa_declarative_base()
+
+POOL_RECYCLE_SECONDS = 3600  # Recycle connections every hour, e.g.
 
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

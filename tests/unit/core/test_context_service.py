@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, CrawlResult
 
 from app.core.context_service import ContextService
 from app.services.llm_service import LLMService
@@ -10,273 +11,532 @@ from app.persistence.repositories.document_repository import DocumentRepository
 from app.persistence.models.document_model import Document # For type hinting and asserting
 
 @pytest.fixture
-def mock_db_session_for_context():
-    session = AsyncMock(spec=AsyncSession)
-    session.commit = AsyncMock()
-    session.refresh = AsyncMock()
-    # Add other methods if DocumentRepository starts using them directly in ContextService context
-    return session
+def mock_db_session():
+    return AsyncMock(spec=AsyncSession)
 
 @pytest.fixture
 def mock_llm_service():
-    service = AsyncMock(spec=LLMService)
-    service.generate_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3]) # Default mock embedding
-    return service
+    return AsyncMock(spec=LLMService)
 
 @pytest.fixture
 def mock_vector_db_service():
-    service = AsyncMock(spec=VectorDBService)
-    service.store_embeddings = AsyncMock(return_value=["chroma_id_1", "chroma_id_2"])
-    return service
+    return AsyncMock(spec=VectorDBService)
 
 @pytest.fixture
-def mock_document_repository(mock_db_session_for_context):
-    # This mock is for the repository instance *within* ContextService
-    repo = AsyncMock(spec=DocumentRepository)
-    
-    # Mock the add_document method to return a Document-like object with an ID
-    mock_sql_doc = Document(id=123, title="Mocked SQL Doc") # Create a real Document for structure
-    mock_sql_doc.vector_ids = [] # Initialize as it would be before update
-    repo.add_document = AsyncMock(return_value=mock_sql_doc)
-    return repo
-
-@pytest.fixture
-def context_service(
-    mock_db_session_for_context, 
-    mock_llm_service, 
-    mock_vector_db_service, 
-    mock_document_repository
-):
-    # Patch the DocumentRepository instantiation within ContextService
-    with patch('app.core.context_service.DocumentRepository', return_value=mock_document_repository):
-        service = ContextService(
-            db_session=mock_db_session_for_context,
-            llm_service=mock_llm_service,
-            vector_db_service=mock_vector_db_service
-        )
-    return service
+def context_service(mock_db_session, mock_llm_service, mock_vector_db_service):
+    # Patch DocumentRepository within the service's __init__ if it's instantiated there
+    with patch('app.core.context_service.DocumentRepository', autospec=True) as MockDocRepo:
+        service = ContextService(mock_db_session, mock_llm_service, mock_vector_db_service)
+        service.document_repository = MockDocRepo.return_value # Ensure the service uses the mocked repo
+        return service
 
 @pytest.mark.asyncio
 async def test_fetch_content_from_url_success(context_service: ContextService):
-    # 1. Mock for the actual response object
-    mock_response = MagicMock(spec=httpx.Response)
-    mock_response.text = "<html><body>Hello World</body></html>"
-    mock_response.status_code = 200
-    mock_response.raise_for_status = MagicMock() # This is a synchronous method
+    mock_crawl_result = MagicMock(spec=CrawlResult)
+    mock_crawl_result.success = True
+    mock_crawl_result.markdown = MagicMock()
+    mock_crawl_result.markdown.fit_markdown = "Hello World Markdown"
+    mock_crawl_result.markdown.raw_markdown = "Raw Hello World Markdown"
 
-    # 2. Mock for the client object that is yielded by the async context manager's __aenter__
-    mock_client_in_context = MagicMock(spec=httpx.AsyncClient)
-    mock_client_in_context.get = AsyncMock(return_value=mock_response)
+    # Patch AsyncWebCrawler's __aenter__ to return a mock crawler instance
+    mock_crawler_instance = AsyncMock(spec=AsyncWebCrawler)
+    mock_crawler_instance.arun = AsyncMock(return_value=mock_crawl_result)
 
-    # 3. Mock for the AsyncClient instance returned by httpx.AsyncClient()
-    # This mock needs to implement the async context manager protocol (__aenter__, __aexit__)
-    mock_async_client_instance = MagicMock(spec=httpx.AsyncClient)
-    mock_async_client_instance.__aenter__ = AsyncMock(return_value=mock_client_in_context)
-    mock_async_client_instance.__aexit__ = AsyncMock(return_value=False) # Or None
+    with patch('app.core.context_service.AsyncWebCrawler') as MockAsyncWebCrawler:
+        MockAsyncWebCrawler.return_value.__aenter__.return_value = mock_crawler_instance
+        MockAsyncWebCrawler.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    # Patch httpx.AsyncClient class to return our mock_async_client_instance
-    with patch('httpx.AsyncClient', return_value=mock_async_client_instance) as mock_async_client_constructor:
         content = await context_service._fetch_content_from_url("http://example.com")
-        
-        assert content == "<html><body>Hello World</body></html>"
-        mock_async_client_constructor.assert_called_once() # Checks if httpx.AsyncClient() was called
-        mock_async_client_instance.__aenter__.assert_awaited_once() # Check context manager entry
-        mock_client_in_context.get.assert_awaited_once_with("http://example.com", timeout=10.0)
-        mock_response.raise_for_status.assert_called_once()
-        mock_async_client_instance.__aexit__.assert_awaited_once() # Check context manager exit
+
+        assert content == "Hello World Markdown"
+        mock_crawler_instance.arun.assert_called_once()
+        # You can add more specific assertions about how arun was called if needed
+        # e.g., mock_crawler_instance.arun.assert_called_once_with(url="http://example.com", config=ANY)
 
 @pytest.mark.asyncio
-async def test_fetch_content_from_url_http_error(context_service: ContextService, caplog):
-    # 1. Mock for the 'response' attribute of the HTTPStatusError
-    mock_error_detail_response = MagicMock(spec=httpx.Response)
-    mock_error_detail_response.status_code = 404
-    mock_error_detail_response.text = "Detailed error from server"
+async def test_fetch_content_from_url_success_fallback_to_raw(context_service: ContextService):
+    mock_crawl_result = MagicMock(spec=CrawlResult)
+    mock_crawl_result.success = True
+    mock_crawl_result.markdown = MagicMock()
+    mock_crawl_result.markdown.fit_markdown = ""  # Empty fit_markdown to trigger fallback
+    mock_crawl_result.markdown.raw_markdown = "Raw Hello World Markdown"
 
-    # 2. The HTTPStatusError that will be raised
-    http_error = httpx.HTTPStatusError(
-        message="404 Client Error: Not Found for url", 
-        request=MagicMock(spec=httpx.Request),
-        response=mock_error_detail_response
-    )
+    mock_crawler_instance = AsyncMock(spec=AsyncWebCrawler)
+    mock_crawler_instance.arun = AsyncMock(return_value=mock_crawl_result)
 
-    # 3. Mock for the actual response object whose raise_for_status will raise the error
-    mock_response_that_raises = MagicMock(spec=httpx.Response)
-    # Configure text and status_code as if it was a real response before erroring
-    mock_response_that_raises.text = "Error content" 
-    mock_response_that_raises.status_code = 404
-    mock_response_that_raises.raise_for_status = MagicMock(side_effect=http_error)
+    with patch('app.core.context_service.AsyncWebCrawler') as MockAsyncWebCrawler:
+        MockAsyncWebCrawler.return_value.__aenter__.return_value = mock_crawler_instance
+        MockAsyncWebCrawler.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    # 4. Mock for the client object that is yielded by __aenter__
-    mock_client_in_context = MagicMock(spec=httpx.AsyncClient)
-    mock_client_in_context.get = AsyncMock(return_value=mock_response_that_raises)
+        content = await context_service._fetch_content_from_url("http://example.com")
+        assert content == "Raw Hello World Markdown"
 
-    # 5. Mock for the AsyncClient instance
-    mock_async_client_instance = MagicMock(spec=httpx.AsyncClient)
-    mock_async_client_instance.__aenter__ = AsyncMock(return_value=mock_client_in_context)
-    mock_async_client_instance.__aexit__ = AsyncMock(return_value=False)
+@pytest.mark.asyncio
+async def test_fetch_content_from_url_crawl_fail(context_service: ContextService, caplog):
+    mock_crawl_result = MagicMock(spec=CrawlResult)
+    mock_crawl_result.success = False
+    mock_crawl_result.error_message = "Test crawl error"
+    mock_crawl_result.markdown = None # Or an empty MarkdownResult
 
-    with patch('httpx.AsyncClient', return_value=mock_async_client_instance) as mock_async_client_constructor:
+    mock_crawler_instance = AsyncMock(spec=AsyncWebCrawler)
+    mock_crawler_instance.arun = AsyncMock(return_value=mock_crawl_result)
+
+    with patch('app.core.context_service.AsyncWebCrawler') as MockAsyncWebCrawler:
+        MockAsyncWebCrawler.return_value.__aenter__.return_value = mock_crawler_instance
+        MockAsyncWebCrawler.return_value.__aexit__ = AsyncMock(return_value=False)
+
         content = await context_service._fetch_content_from_url("http://example.com/notfound")
-        
+
         assert content is None
-        assert "HTTP error fetching URL http://example.com/notfound: 404" in caplog.text
-        
-        mock_async_client_constructor.assert_called_once()
-        mock_async_client_instance.__aenter__.assert_awaited_once()
-        mock_client_in_context.get.assert_awaited_once_with("http://example.com/notfound", timeout=10.0)
-        mock_response_that_raises.raise_for_status.assert_called_once()
-        mock_async_client_instance.__aexit__.assert_awaited_once()
+        assert "Crawl4AI failed to fetch URL http://example.com/notfound. Error: Test crawl error" in caplog.text
 
 @pytest.mark.asyncio
-@patch('app.core.context_service.simple_chunk_text', return_value=["chunk1", "chunk2"]) # Mock chunker
-async def test_process_and_store_document_text_success(
-    mock_simple_chunk_text, 
-    context_service: ContextService, 
-    mock_llm_service: LLMService, 
-    mock_vector_db_service: VectorDBService, 
-    mock_document_repository: DocumentRepository,
-    mock_db_session_for_context: AsyncSession
-):
-    content_source = "This is a test document content."
-    source_type = "user_text"
-    title = "Test Doc Title"
-    proposal_id = 1
+async def test_fetch_content_from_url_no_markdown(context_service: ContextService, caplog):
+    mock_crawl_result = MagicMock(spec=CrawlResult)
+    mock_crawl_result.success = True
+    mock_crawl_result.markdown = MagicMock()
+    mock_crawl_result.markdown.fit_markdown = None # No markdown content
+    mock_crawl_result.markdown.raw_markdown = None # No markdown content
 
-    # The mock_document_repository.add_document already returns a mock_sql_doc with id=123
-    # and mock_vector_db_service.store_embeddings returns ["chroma_id_1", "chroma_id_2"]
 
-    doc_id = await context_service.process_and_store_document(
-        content_source, source_type, title, proposal_id
-    )
+    mock_crawler_instance = AsyncMock(spec=AsyncWebCrawler)
+    mock_crawler_instance.arun = AsyncMock(return_value=mock_crawl_result)
 
-    assert doc_id == 123 # from mock_document_repository
-    mock_simple_chunk_text.assert_called_once_with(content_source, chunk_size=1000, overlap=100)
+    with patch('app.core.context_service.AsyncWebCrawler') as MockAsyncWebCrawler:
+        MockAsyncWebCrawler.return_value.__aenter__.return_value = mock_crawler_instance
+        MockAsyncWebCrawler.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        content = await context_service._fetch_content_from_url("http://example.com/nomarkdown")
+
+        assert content is None
+        assert "Crawl4AI fetched URL http://example.com/nomarkdown successfully, but no usable markdown content was generated from fit_markdown or raw_markdown." in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_fetch_content_from_url_exception_in_crawl(context_service: ContextService, caplog):
+    mock_crawler_instance = AsyncMock(spec=AsyncWebCrawler)
+    mock_crawler_instance.arun = AsyncMock(side_effect=Exception("Network issue"))
+
+    with patch('app.core.context_service.AsyncWebCrawler') as MockAsyncWebCrawler:
+        MockAsyncWebCrawler.return_value.__aenter__.return_value = mock_crawler_instance
+        MockAsyncWebCrawler.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        content = await context_service._fetch_content_from_url("http://example.com/exception")
+
+        assert content is None
+        assert "Unexpected error fetching URL http://example.com/exception with Crawl4AI: Network issue" in caplog.text
+
+@pytest.mark.asyncio
+async def test_process_and_store_document_url_success(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    test_url = "http://example.com/doc"
+    fetched_content = "This is fetched content from the URL. It needs to be long enough for chunking."
+    title = "Test Document from URL"
+    document_sql_id = 123
+    chroma_ids = ["chroma1", "chroma2"]
+
+    # Mock _fetch_content_from_url
+    context_service._fetch_content_from_url = AsyncMock(return_value=fetched_content)
+
+    # Mock LLMService methods
+    mock_llm_service.generate_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
+
+    # Mock DocumentRepository methods (via the instance on context_service)
+    mock_sql_document = MagicMock(spec=Document)
+    mock_sql_document.id = document_sql_id
+    mock_sql_document.vector_ids = [] # Initial state
+    context_service.document_repository.add_document = AsyncMock(return_value=mock_sql_document)
+
+    # Mock VectorDBService methods
+    mock_vector_db_service.store_embeddings = AsyncMock(return_value=chroma_ids)
+
+    # Mock db_session commit and refresh
+    context_service.db_session.commit = AsyncMock()
+    context_service.db_session.refresh = AsyncMock()
     
-    # Check LLMService calls (one per chunk)
-    assert mock_llm_service.generate_embedding.call_count == 2
-    mock_llm_service.generate_embedding.assert_any_call("chunk1")
-    mock_llm_service.generate_embedding.assert_any_call("chunk2")
+    # Patch simple_chunk_text
+    with patch('app.core.context_service.simple_chunk_text', return_value=["chunk1", "chunk2"]) as mock_chunk_text:
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source=test_url,
+            source_type="user_url",
+            title=title
+        )
 
-    # Check DocumentRepository call
-    # The actual call to add_document is inside the patched DocumentRepository instance
-    # So mock_document_repository.add_document is what we check
-    mock_document_repository.add_document.assert_awaited_once()
-    # Get the args from the call to add_document
-    add_doc_args = mock_document_repository.add_document.call_args[1]
-    assert add_doc_args['title'] == title
-    assert add_doc_args['proposal_id'] == proposal_id
-    assert add_doc_args['vector_ids'] is None # Initially called with None
+    assert stored_doc_id == document_sql_id
+    context_service._fetch_content_from_url.assert_called_once_with(test_url)
+    mock_chunk_text.assert_called_once_with(fetched_content, chunk_size=1000, overlap=100)
+    assert mock_llm_service.generate_embedding.call_count == 2 # For two chunks
+    context_service.document_repository.add_document.assert_called_once()
+    # Verify call to add_document
+    args, kwargs = context_service.document_repository.add_document.call_args
+    assert kwargs['title'] == title
+    assert kwargs['source_url'] == test_url
+    assert kwargs['raw_content'] == fetched_content
+    assert kwargs['vector_ids'] is None # Initially None
 
-    # Check VectorDBService call
-    mock_vector_db_service.store_embeddings.assert_awaited_once()
-    store_embed_args = mock_vector_db_service.store_embeddings.call_args[1]
-    assert store_embed_args['doc_id'] == 123
-    assert store_embed_args['text_chunks'] == ["chunk1", "chunk2"]
-    assert len(store_embed_args['embeddings']) == 2
-    assert store_embed_args['chunk_metadatas'][0]['document_sql_id'] == "123"
+    mock_vector_db_service.store_embeddings.assert_called_once()
+    args_store_emb, kwargs_store_emb = mock_vector_db_service.store_embeddings.call_args
+    assert kwargs_store_emb['doc_id'] == document_sql_id
+    assert kwargs_store_emb['text_chunks'] == ["chunk1", "chunk2"]
+    assert len(kwargs_store_emb['embeddings']) == 2
+    assert len(kwargs_store_emb['chunk_metadatas']) == 2
+    assert kwargs_store_emb['chunk_metadatas'][0]['document_sql_id'] == str(document_sql_id)
 
-    # Check that the db session commit was called (for the final update of vector_ids)
-    mock_db_session_for_context.commit.assert_awaited_once()
-    # And refresh was called on the sql_document instance
-    # The instance is the one returned by mock_document_repository.add_document
-    returned_sql_doc = await mock_document_repository.add_document() # get the instance again for assertion
-    mock_db_session_for_context.refresh.assert_awaited_once_with(returned_sql_doc)
-    assert returned_sql_doc.vector_ids == ["chroma_id_1", "chroma_id_2"] # Check if updated
+
+    context_service.db_session.commit.assert_awaited_once()
+    context_service.db_session.refresh.assert_awaited_once_with(mock_sql_document)
+    assert mock_sql_document.vector_ids == chroma_ids
+
 
 @pytest.mark.asyncio
-@patch('app.core.context_service.simple_chunk_text', return_value=["url chunk1"]) # Mock chunker
-@patch('app.core.context_service.ContextService._fetch_content_from_url', new_callable=AsyncMock, return_value="URL fetched content")
-async def test_process_and_store_document_url_success(
-    mock_fetch_url, 
-    mock_simple_chunk_text, 
-    context_service: ContextService, 
-    mock_llm_service: LLMService, 
-    mock_vector_db_service: VectorDBService, 
-    mock_document_repository: DocumentRepository,
-    mock_db_session_for_context: AsyncSession
-):
-    content_source_url = "http://example.com/docpage"
-    source_type = "user_url"
-    # Title should be auto-generated if None
+async def test_process_and_store_document_text_success(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    text_content = "This is direct text content. It also needs to be long enough for proper chunking to test."
+    title = "Test Document from Text"
+    document_sql_id = 456
+    chroma_ids = ["chroma3", "chroma4"]
 
-    doc_id = await context_service.process_and_store_document(content_source_url, source_type, title=None)
+    # Mock LLMService methods
+    mock_llm_service.generate_embedding = AsyncMock(return_value=[0.4, 0.5, 0.6])
 
-    assert doc_id == 123
-    mock_fetch_url.assert_awaited_once_with(content_source_url)
-    mock_simple_chunk_text.assert_called_once_with("URL fetched content", chunk_size=1000, overlap=100)
-    mock_llm_service.generate_embedding.assert_awaited_once_with("url chunk1")
-    mock_document_repository.add_document.assert_awaited_once()
-    add_doc_args = mock_document_repository.add_document.call_args[1]
-    assert add_doc_args['title'] == "docpage" # Auto-generated from URL
-    assert add_doc_args['source_url'] == content_source_url
+    # Mock DocumentRepository methods
+    mock_sql_document = MagicMock(spec=Document)
+    mock_sql_document.id = document_sql_id
+    mock_sql_document.vector_ids = []
+    context_service.document_repository.add_document = AsyncMock(return_value=mock_sql_document)
 
-    mock_vector_db_service.store_embeddings.assert_awaited_once()
-    mock_db_session_for_context.commit.assert_awaited_once()
+    # Mock VectorDBService methods
+    mock_vector_db_service.store_embeddings = AsyncMock(return_value=chroma_ids)
+
+    # Mock db_session commit and refresh
+    context_service.db_session.commit = AsyncMock()
+    context_service.db_session.refresh = AsyncMock()
+
+    with patch('app.core.context_service.simple_chunk_text', return_value=["text_chunk1", "text_chunk2"]) as mock_chunk_text:
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source=text_content,
+            source_type="user_text",
+            title=title
+        )
+
+    assert stored_doc_id == document_sql_id
+    mock_chunk_text.assert_called_once_with(text_content, chunk_size=1000, overlap=100)
+    assert mock_llm_service.generate_embedding.call_count == 2
+    context_service.document_repository.add_document.assert_called_once()
+    args, kwargs = context_service.document_repository.add_document.call_args
+    assert kwargs['title'] == title
+    assert kwargs['source_url'] is None
+    assert kwargs['raw_content'] == text_content
+    assert kwargs['vector_ids'] is None
+
+    mock_vector_db_service.store_embeddings.assert_called_once()
+    args_store_emb, kwargs_store_emb = mock_vector_db_service.store_embeddings.call_args
+    assert kwargs_store_emb['doc_id'] == document_sql_id
+
+    context_service.db_session.commit.assert_awaited_once()
+    context_service.db_session.refresh.assert_awaited_once_with(mock_sql_document)
+    assert mock_sql_document.vector_ids == chroma_ids
 
 @pytest.mark.asyncio
 async def test_process_and_store_document_fetch_url_fails(context_service: ContextService, caplog):
-    with patch('app.core.context_service.ContextService._fetch_content_from_url', new_callable=AsyncMock, return_value=None) as mock_fetch:
-        doc_id = await context_service.process_and_store_document("http://badurl.com", "user_url", "Bad URL Doc")
-        assert doc_id is None
-        mock_fetch.assert_awaited_once_with("http://badurl.com")
-        assert "Failed to fetch content from URL: http://badurl.com" in caplog.text
+    test_url = "http://example.com/doc_fails"
+    context_service._fetch_content_from_url = AsyncMock(return_value=None)
+
+    stored_doc_id = await context_service.process_and_store_document(
+        content_source=test_url,
+        source_type="user_url",
+        title="Failed URL Doc"
+    )
+    assert stored_doc_id is None
+    assert f"Failed to fetch content from URL: {test_url}" in caplog.text
+    context_service.document_repository.add_document.assert_not_called()
 
 @pytest.mark.asyncio
-@patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"])
-async def test_process_and_store_document_embedding_fails(
-    mock_simple_chunk_text,
-    context_service: ContextService, 
-    mock_llm_service: LLMService, 
-    caplog
-):
-    mock_llm_service.generate_embedding = AsyncMock(return_value=None) # Simulate embedding failure
-    doc_id = await context_service.process_and_store_document("Test content", "user_text", "Embedding Fail Doc")
-    assert doc_id is None
+async def test_process_and_store_document_no_text_content(context_service: ContextService, caplog):
+    stored_doc_id = await context_service.process_and_store_document(
+        content_source="", # Empty text
+        source_type="user_text",
+        title="Empty Text Doc"
+    )
+    assert stored_doc_id is None
+    assert "No text content to process." in caplog.text
+    context_service.document_repository.add_document.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_process_and_store_document_no_chunks(context_service: ContextService, caplog):
+    with patch('app.core.context_service.simple_chunk_text', return_value=[]): # No chunks
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source="Some text",
+            source_type="user_text",
+            title="No Chunks Doc"
+        )
+    assert stored_doc_id is None
+    assert "Text content resulted in no chunks." in caplog.text
+    context_service.document_repository.add_document.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_and_store_document_embedding_fails(context_service: ContextService, mock_llm_service, caplog):
+    mock_llm_service.generate_embedding = AsyncMock(return_value=None) # Embedding generation fails
+
+    with patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"]):
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source="Some text",
+            source_type="user_text",
+            title="Embedding Fail Doc"
+        )
+    assert stored_doc_id is None
     assert "Failed to generate embedding for chunk 0" in caplog.text
+    context_service.document_repository.add_document.assert_not_called() # Should not proceed to DB if embedding fails early
 
 @pytest.mark.asyncio
-@patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"])
-async def test_process_and_store_document_sql_storage_fails(
-    mock_simple_chunk_text,
-    context_service: ContextService, 
-    mock_document_repository: DocumentRepository,
-    caplog
-):
-    mock_document_repository.add_document = AsyncMock(return_value=None) # Simulate SQL storage failure
-    doc_id = await context_service.process_and_store_document("Test content", "user_text", "SQL Fail Doc")
-    assert doc_id is None
+async def test_process_and_store_document_sql_storage_fails(context_service: ContextService, mock_llm_service, mock_vector_db_service, caplog):
+    context_service.document_repository.add_document = AsyncMock(return_value=None) # SQL storage fails
+    mock_llm_service.generate_embedding = AsyncMock(return_value=[0.1,0.2])
+
+    with patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"]):
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source="Some text",
+            source_type="user_text",
+            title="SQL Fail Doc"
+        )
+    assert stored_doc_id is None
     assert "Failed to store document metadata in SQL DB" in caplog.text
+    mock_vector_db_service.store_embeddings.assert_not_called()
 
 @pytest.mark.asyncio
-@patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"])
-async def test_process_and_store_document_vector_storage_fails(
-    mock_simple_chunk_text,
-    context_service: ContextService, 
-    mock_vector_db_service: VectorDBService,
-    mock_document_repository: DocumentRepository, # For the initial successful SQL add
-    caplog
-):
-    # Initial SQL add succeeds (mock_document_repository.add_document returns a doc with id=123 by default)
-    mock_vector_db_service.store_embeddings = AsyncMock(return_value=None) # Simulate vector storage failure
+async def test_process_and_store_document_vector_storage_fails(context_service: ContextService, mock_llm_service, mock_vector_db_service, caplog):
+    document_sql_id = 789
+    mock_sql_doc = MagicMock(spec=Document); mock_sql_doc.id = document_sql_id; mock_sql_doc.vector_ids = []
+    context_service.document_repository.add_document = AsyncMock(return_value=mock_sql_doc)
+    mock_llm_service.generate_embedding = AsyncMock(return_value=[0.1,0.2])
+    mock_vector_db_service.store_embeddings = AsyncMock(return_value=None) # Vector storage fails
+
+    context_service.db_session.commit = AsyncMock() # Mock commit for the final update
+    context_service.db_session.refresh = AsyncMock()
+
+    with patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"]):
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source="Some text",
+            source_type="user_text",
+            title="Vector Fail Doc"
+        )
     
-    doc_id = await context_service.process_and_store_document("Test content", "user_text", "Vector Fail Doc")
+    assert stored_doc_id == document_sql_id # SQL doc is created, but vector linking might be empty
+    assert f"Failed to store embeddings in VectorDB for SQL document ID {document_sql_id}" in caplog.text
+    context_service.db_session.commit.assert_awaited_once() # Commit is still called to save the document with (now empty) vector_ids
+    assert mock_sql_doc.vector_ids == [] # Ensure vector_ids is empty list on the SQL object after failure
+
+@pytest.mark.asyncio
+async def test_process_and_store_document_vector_id_commit_fails(context_service: ContextService, mock_llm_service, mock_vector_db_service, caplog):
+    document_sql_id = 101112
+    chroma_ids = ["chroma_final_fail1"]
+    mock_sql_doc = MagicMock(spec=Document); mock_sql_doc.id = document_sql_id; mock_sql_doc.vector_ids = []
+    context_service.document_repository.add_document = AsyncMock(return_value=mock_sql_doc)
+    mock_llm_service.generate_embedding = AsyncMock(return_value=[0.1,0.2])
+    mock_vector_db_service.store_embeddings = AsyncMock(return_value=chroma_ids) # Vector storage succeeds
+
+    context_service.db_session.commit = AsyncMock(side_effect=Exception("DB commit error")) # Final commit fails
+    context_service.db_session.refresh = AsyncMock() # Won't be called if commit fails
+
+    with patch('app.core.context_service.simple_chunk_text', return_value=["chunk1"]):
+        stored_doc_id = await context_service.process_and_store_document(
+            content_source="Some text",
+            source_type="user_text",
+            title="Final Commit Fail Doc"
+        )
     
-    # The current logic returns the SQL doc_id even if vector storage fails, but updates vector_ids to []
-    # Let's adjust the test based on the current implementation which does NOT return None here.
-    # It will attempt to commit the empty vector_ids list.
-    # If the design is that it *should* return None, then the code in ContextService needs to change.
-    # Based on current ContextService: it logs error, sets sql_document.vector_ids = [], then tries to commit.
-    # If that commit succeeds, it returns sql_document.id
-    
-    assert doc_id == 123 # It still returns the SQL ID
-    assert "Failed to store embeddings in VectorDB for SQL document ID 123" in caplog.text
-    # Check that the sql_document.vector_ids was indeed set to [] before the commit
-    returned_sql_doc = await mock_document_repository.add_document() # get the instance again for assertion
-    assert returned_sql_doc.vector_ids == [] # This is checked after it's set due to failure
+    assert stored_doc_id is None # If final commit fails, we treat it as overall failure for returning ID
+    assert f"Error committing vector_ids to SQL document ID {document_sql_id}" in caplog.text
+    assert mock_sql_doc.vector_ids == chroma_ids # vector_ids were set on the object, but commit failed
+
+@pytest.mark.asyncio
+async def test_get_document_content_success(context_service: ContextService):
+    doc_id = 1
+    expected_content = "This is the document's raw content."
+    mock_document = Document(id=doc_id, title="Test Doc", raw_content=expected_content)
+    context_service.document_repository.get_document_by_id = AsyncMock(return_value=mock_document)
+
+    content = await context_service.get_document_content(doc_id)
+
+    assert content == expected_content
+    context_service.document_repository.get_document_by_id.assert_called_once_with(doc_id)
+
+@pytest.mark.asyncio
+async def test_get_document_content_no_content(context_service: ContextService, caplog):
+    doc_id = 2
+    mock_document = Document(id=doc_id, title="Test Doc No Content", raw_content=None)
+    context_service.document_repository.get_document_by_id = AsyncMock(return_value=mock_document)
+
+    content = await context_service.get_document_content(doc_id)
+
+    assert content is None
+    assert f"Document ID {doc_id} found, but it has no raw_content." in caplog.text
+
+@pytest.mark.asyncio
+async def test_get_document_content_not_found(context_service: ContextService, caplog):
+    doc_id = 3
+    context_service.document_repository.get_document_by_id = AsyncMock(return_value=None)
+
+    content = await context_service.get_document_content(doc_id)
+
+    assert content is None
+    assert f"Document ID {doc_id} not found." in caplog.text
+
+@pytest.mark.asyncio
+async def test_list_documents_for_proposal_found(context_service: ContextService):
+    proposal_id = 10
+    mock_docs = [
+        Document(id=1, title="Doc A", proposal_id=proposal_id),
+        Document(id=2, title="Doc B", proposal_id=proposal_id)
+    ]
+    context_service.document_repository.get_documents_by_proposal_id = AsyncMock(return_value=mock_docs)
+
+    documents = await context_service.list_documents_for_proposal(proposal_id)
+
+    assert documents == mock_docs
+    context_service.document_repository.get_documents_by_proposal_id.assert_called_once_with(proposal_id)
+
+@pytest.mark.asyncio
+async def test_list_documents_for_proposal_none_found(context_service: ContextService):
+    proposal_id = 11
+    context_service.document_repository.get_documents_by_proposal_id = AsyncMock(return_value=[])
+
+    documents = await context_service.list_documents_for_proposal(proposal_id)
+
+    assert documents == []
+    context_service.document_repository.get_documents_by_proposal_id.assert_called_once_with(proposal_id)
+
+@pytest.mark.asyncio
+async def test_get_answer_for_question_success(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    question = "What is the capital of France?"
+    query_embedding = [0.1, 0.2]
+    # Updated to match the structure used in ContextService
+    # The actual text chunk is 'document_content'
+    # 'title' comes from metadata.title
+    # 'document_sql_id' comes from metadata.document_sql_id
+    # 'proposal_id' (optional) comes from metadata.proposal_id
+    similar_chunks = [
+        {
+            "document_content": "Paris is the capital and most populous city of France.",
+            "metadata": {"document_sql_id": "doc1", "title": "France Info", "chunk_text_preview": "Paris is..."}
+        }
+    ]
+    expected_answer_from_llm = "The capital of France is Paris."
+    expected_final_answer = expected_answer_from_llm + "\n\nSources: 'France Info' (Doc ID: doc1)."
+
+    mock_llm_service.generate_embedding = AsyncMock(return_value=query_embedding)
+    mock_vector_db_service.search_similar_chunks = AsyncMock(return_value=similar_chunks)
+    mock_llm_service.get_completion = AsyncMock(return_value=expected_answer_from_llm)
+
+    answer = await context_service.get_answer_for_question(question)
+
+    assert answer == expected_final_answer
+    mock_llm_service.generate_embedding.assert_called_once_with(question)
+    mock_vector_db_service.search_similar_chunks.assert_called_once_with(
+        query_embedding=query_embedding, proposal_id_filter=None, top_n=3
+    )
+    mock_llm_service.get_completion.assert_called_once()
+    # Optionally, inspect the prompt sent to get_completion
+
+@pytest.mark.asyncio
+async def test_get_answer_for_question_with_proposal_filter(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    question = "Details about project X?"
+    proposal_id = 123
+    query_embedding = [0.3, 0.4]
+    similar_chunks_proposal = [
+        {
+            "document_content": "Project X is about coding.",
+            "metadata": {"document_sql_id": "doc_propX", "title": "Proposal 123 context: Project X is...", "proposal_id": str(proposal_id), "chunk_text_preview": "Project X is..."}
+        }
+    ]
+    expected_answer_from_llm = "Project X is about coding."
+    # Note: The source citation format for proposal-linked docs is different
+    # The code generates: f"Proposal {linked_proposal_id} context: {preview_text[:30]}..."
+    # If chunk_text_preview is "Project X is...", then preview_text[:30] is "Project X is..."
+    # So doc_title_display becomes "Proposal 123 context: Project X is......"
+    expected_final_answer = expected_answer_from_llm + "\n\nSources: 'Proposal 123 context: Project X is......' (Doc ID: doc_propX)."
 
 
-# Need to import httpx for the side_effect in test_fetch_content_from_url_http_error
-# import httpx # This is now at the top
+    mock_llm_service.generate_embedding = AsyncMock(return_value=query_embedding)
+    mock_vector_db_service.search_similar_chunks = AsyncMock(return_value=similar_chunks_proposal)
+    mock_llm_service.get_completion = AsyncMock(return_value=expected_answer_from_llm)
 
-# # Need to import simple_chunk_text for the mock in test_process_and_store_document_text_success
-# from app.core.context_service import simple_chunk_text # This import is not needed here as simple_chunk_text is mocked by @patch 
+    answer = await context_service.get_answer_for_question(question, proposal_id_filter=proposal_id)
+
+    assert answer == expected_final_answer
+    mock_vector_db_service.search_similar_chunks.assert_called_once_with(
+        query_embedding=query_embedding, proposal_id_filter=proposal_id, top_n=3
+    )
+
+@pytest.mark.asyncio
+async def test_get_answer_for_question_no_chunks_found_initially_then_found_globally(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    question = "Obscure data point?"
+    proposal_id = 777
+    query_embedding = [0.5, 0.6]
+    global_chunks = [
+        {"document_content": "Global data point found.", "metadata": {"document_sql_id": "global_doc1", "title": "Global Data Doc"}}
+    ]
+    expected_answer_from_llm = "Global data point found."
+    expected_final_answer = expected_answer_from_llm + "\n\nSources: 'Global Data Doc' (Doc ID: global_doc1)."
+
+    mock_llm_service.generate_embedding = AsyncMock(return_value=query_embedding)
+    # First call (with proposal filter) returns no chunks
+    # Second call (global) returns chunks
+    mock_vector_db_service.search_similar_chunks.side_effect = [
+        [],  # No proposal-specific chunks
+        global_chunks # Global chunks found on retry
+    ]
+    mock_llm_service.get_completion = AsyncMock(return_value=expected_answer_from_llm)
+
+    answer = await context_service.get_answer_for_question(question, proposal_id_filter=proposal_id)
+
+    assert answer == expected_final_answer
+    assert mock_vector_db_service.search_similar_chunks.call_count == 2
+    mock_vector_db_service.search_similar_chunks.assert_any_call(
+        query_embedding=query_embedding, proposal_id_filter=proposal_id, top_n=3
+    )
+    mock_vector_db_service.search_similar_chunks.assert_any_call(
+        query_embedding=query_embedding, proposal_id_filter=None, top_n=3
+    )
+
+@pytest.mark.asyncio
+async def test_get_answer_for_question_no_chunks_found_at_all(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    question = "Data not in DB?"
+    query_embedding = [0.7, 0.8]
+
+    mock_llm_service.generate_embedding = AsyncMock(return_value=query_embedding)
+    mock_vector_db_service.search_similar_chunks = AsyncMock(return_value=[]) # No chunks found at all
+
+    answer = await context_service.get_answer_for_question(question)
+
+    assert answer == "I couldn't find any relevant information for your question."
+    mock_llm_service.get_completion.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_get_answer_for_question_embedding_failure_for_question(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    question = "A question"
+    mock_llm_service.generate_embedding = AsyncMock(return_value=None) # Embedding fails
+
+    answer = await context_service.get_answer_for_question(question)
+
+    assert answer == "I couldn't process your question at the moment. Please try again later."
+    mock_vector_db_service.search_similar_chunks.assert_not_called()
+    mock_llm_service.get_completion.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_get_answer_for_question_empty_text_in_chunks(context_service: ContextService, mock_llm_service, mock_vector_db_service):
+    question = "Question about empty context"
+    query_embedding = [0.1, 0.2]
+    similar_chunks_empty_text = [
+        {"document_content": "", "metadata": {"document_sql_id": "doc_empty", "title": "Empty Doc Content"}}
+    ]
+    mock_llm_service.generate_embedding = AsyncMock(return_value=query_embedding)
+    mock_vector_db_service.search_similar_chunks = AsyncMock(return_value=similar_chunks_empty_text)
+
+    answer = await context_service.get_answer_for_question(question)
+    assert answer == "I found some documents that might be related, but I couldn't extract specific text to answer your question."
+    mock_llm_service.get_completion.assert_not_called()
+
+# Placeholder for get_intelligent_help tests - to be implemented when method is fully defined
+# @pytest.mark.asyncio
+# async def test_get_intelligent_help_success(context_service: ContextService, mock_llm_service):
+#     pass

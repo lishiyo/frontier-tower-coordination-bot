@@ -52,14 +52,24 @@ class ContextService:
                 # Try fit_markdown first, then raw_markdown as a fallback
                 content_to_return = result.markdown.fit_markdown
                 source_of_content = "fit_markdown"
-                if not content_to_return or len(content_to_return) <= 1: # Check if fit_markdown is empty or just a newline
-                    logger.info(f"fit_markdown for {url} was empty or minimal. Falling back to raw_markdown.")
+                # Check if fit_markdown is None or empty/minimal before trying len()
+                if content_to_return is None or len(content_to_return.strip()) <= 1:
+                    logger.info(f"fit_markdown for {url} was empty or minimal (Content: '{content_to_return}'). Falling back to raw_markdown.")
                     content_to_return = result.markdown.raw_markdown
                     source_of_content = "raw_markdown"
+                    # Check raw_markdown as well
+                    if content_to_return is None or len(content_to_return.strip()) <=1:
+                        logger.warning(f"Both fit_markdown and raw_markdown for {url} are None or empty/minimal. Content: '{content_to_return}'")
+                        # content_to_return remains None or empty here which is handled by the next block
 
-                logger.info(f"Successfully fetched and processed URL {url} with Crawl4AI using {source_of_content}. Markdown length: {len(content_to_return)}")
-                logger.info(f"Crawl4AI {source_of_content} content (first 100 chars): '{content_to_return[:100]}'")
-                return content_to_return
+                # Only log length if content_to_return is not None
+                if content_to_return is not None:
+                    logger.info(f"Successfully fetched and processed URL {url} with Crawl4AI using {source_of_content}. Markdown length: {len(content_to_return)}")
+                    logger.info(f"Crawl4AI {source_of_content} content (first 100 chars): '{content_to_return[:100]}'")
+                else:
+                    # This case implies both fit_markdown and raw_markdown were None or empty
+                    logger.warning(f"Crawl4AI fetched URL {url} successfully, but no usable markdown content was generated from fit_markdown or raw_markdown.")
+                return content_to_return # This can be None if both are None/empty
             elif not result.success:
                 logger.error(f"Crawl4AI failed to fetch URL {url}. Error: {result.error_message}")
                 return None

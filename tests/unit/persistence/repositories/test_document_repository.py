@@ -51,12 +51,12 @@ async def test_add_document(mock_db_session):
     # but we can check it's a datetime if it were set by the constructor directly
 
     # Assert that commit and refresh were called
-    mock_db_session.commit.assert_awaited_once()
+    # mock_db_session.commit.assert_awaited_once() # No longer asserting commit here
+    mock_db_session.flush.assert_awaited_once()
     mock_db_session.refresh.assert_awaited_once_with(added_instance)
 
-    # Assert that the returned document is the one that was processed
-    # (refresh is mocked, so added_document is the same instance as added_instance before refresh)
-    assert added_document == added_instance
+    # The method returns the instance, so we can also check that
+    assert added_document is added_instance
 
 @pytest.mark.asyncio
 async def test_add_document_minimal_args(mock_db_session):
@@ -82,6 +82,7 @@ async def test_add_document_minimal_args(mock_db_session):
     assert added_instance.vector_ids is None
     assert added_instance.proposal_id is None
 
-    mock_db_session.commit.assert_awaited_once()
+    # mock_db_session.commit.assert_awaited_once() # No longer asserting commit here
+    mock_db_session.flush.assert_awaited_once()
     mock_db_session.refresh.assert_awaited_once_with(added_instance)
-    assert added_document == added_instance 
+    assert added_document is added_instance 

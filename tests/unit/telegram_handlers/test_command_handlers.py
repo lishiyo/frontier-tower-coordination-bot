@@ -84,10 +84,11 @@ async def test_help_command_with_user(mock_update, mock_context):
     assert "/start" in called_args
     assert "/help" in called_args
     assert "/privacy" in called_args
-    assert "Proposals & Voting:" in called_args
+    assert "Proposals &amp; Voting:" in called_args
     assert "/propose" in called_args
     assert "Information:" in called_args
     assert "/ask" in called_args
+    # Not checking Admin section for now as it might change
 
 
 @pytest.mark.asyncio
