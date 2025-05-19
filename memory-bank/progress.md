@@ -1,5 +1,23 @@
 # Progress Log
 
+## Mon May 19 00:06:26 PDT 2025
+
+**Completed:**
+- Task 9.5.1: Implement Proposal Content Indexing.
+    - Updated `app/core/proposal_service.py` (`create_proposal` and `edit_proposal_details`) to concatenate proposal title and description, generate an embedding via `LLMService`, and store it in a new `proposals_content` collection in ChromaDB using `VectorDBService.add_proposal_embedding`.
+    - Relevant metadata (proposal ID, status, dates, type, channel ID) is stored alongside the embedding.
+    - Ensured that `LLMService.generate_embedding` is correctly awaited in `ProposalService`.
+    - Fixed unit tests in `tests/unit/core/test_proposal_service.py` by correctly mocking `AsyncMock` return values for `LLMService.generate_embedding`.
+    - Fixed unit tests in `tests/unit/services/test_vector_db_service.py` by ensuring mock call assertions matched the actual call signatures (positional vs. keyword arguments) and mock setup order.
+
+**Learnings & Fixes:**
+- Correctly mocking asynchronous methods that are awaited (like `LLMService.generate_embedding`) requires the mock itself (or its `return_value` if it's a deeper method call) to be an `AsyncMock` instance, which returns a coroutine. The final `return_value` of this `AsyncMock` is what the `await` expression will yield.
+- Assertion mismatches for mock calls (e.g., `Expected: mock(name='arg')` vs. `Actual: mock('arg')`) often stem from differences in how arguments are passed (keyword vs. positional) between the actual code and the test assertion.
+- The order of mocking can be important; a method should be mocked *before* it is called by the system under test if the mock is intended to influence that call.
+
+**Next Steps:**
+- Create a new script `app/scripts/test_proposal_embeddings.py` to manually test adding and searching proposal embeddings, similar to `app/scripts/view_document_chunks.py`.
+
 ## Sun May 18 21:43:14 PDT 2025
 
 **Completed:**

@@ -1,39 +1,34 @@
-# Active Context - Sun May 18 21:43:14 PDT 2025
+# Active Context - Mon May 19 00:06:26 PDT 2025
 
 ## Current Work Focus
-- Completed the implementation of Task 7.4: `/edit_proposal` command.
-  - Implemented conversational flow for editing proposal details (title, description, options).
-  - Ensured only the proposer can edit.
-  - Prevented edits if submissions already exist.
-  - Updated proposal data in the database.
-  - Updated the proposal message in the channel.
-- Manually tested the `/edit_proposal` functionality.
+- Completed Task 9.5.1: Proposal Content Indexing.
+  - Implemented functionality in `ProposalService` to generate embeddings for proposal title and description (via `LLMService`) upon creation and edit.
+  - Embeddings are stored in a dedicated `proposals_content` collection in ChromaDB via `VectorDBService`.
+  - Ensured relevant unit tests for `VectorDBService` and `ProposalService` are passing.
 
 ## What's Working
-- `/edit_proposal` command is functioning as per Task 7.4 requirements.
-- Existing functionalities remain operational.
+- Proposal creation and editing now correctly index content for semantic search.
+- Unit tests for `VectorDBService.add_proposal_embedding`, `VectorDBService.search_proposal_embeddings`, and the indexing logic within `ProposalService.create_proposal` and `ProposalService.edit_proposal_details` are passing.
 
 ## What's Broken or Pending
-- Unit tests for Task 7.4 (`/edit_proposal` command and its related service/repository methods) are pending.
+- Manual testing script for proposal embeddings (to create/query sample proposal embeddings).
 - **Task 5.2 Follow-ups (Still Pending from previous context):**
     - **Timezone Consistency:** Review and ensure all *other* user-facing datetimes are consistently displayed in PST.
     - **Results Message Copy:** Tweak results message copy in `ProposalService` for channel announcements from "(DM the bot)" to "(DM @botname)".
-- The `PTBUserWarning` regarding `per_message=False` in the `ConversationHandler` for `/propose` persists (accepted behavior for now).
 
 ## Active Decisions and Considerations
-- Prioritize writing unit tests for the newly implemented `/edit_proposal` functionality.
+- How to best structure the manual test script for proposal embeddings.
 
 ## Important Patterns and Preferences
-- ConversationHandlers are useful for multi-step interactions like editing.
-- Service layer methods should encapsulate business logic (e.g., checking edit permissions, updating channel messages).
+- N/A for this update.
 
 ## Learnings and Project Insights
-- Implementing edit functionality requires careful coordination between command handlers, conversation states, service logic, and repository interactions.
-- Updating messages in Telegram channels after an edit requires storing and retrieving `channel_message_id`.
+- Importance of correct mock setup for `async` methods, especially ensuring `AsyncMock` is used for methods that are awaited and that `return_value` for these mocks are themselves awaitables if the underlying method returns a coroutine.
+- Correctly matching positional vs. keyword arguments in mock assertions is crucial for test accuracy.
 
 ## Current Database/Model State
-- No schema changes for Task 7.4. `SubmissionRepository.count_submissions_for_proposal` was added as a method.
+- No SQL schema changes for Task 9.5.1.
+- New ChromaDB collection `proposals_content` is now in use.
 
 ## Next Steps
-- Write and pass unit tests for the `/edit_proposal` command (Task 7.4).
-- Proceed to the next task in `tasks.md` (Task 7.5: `/cancel_proposal`).
+- Create a script to manually test proposal embedding and search functionality (similar to `view_document_chunks.py`).
