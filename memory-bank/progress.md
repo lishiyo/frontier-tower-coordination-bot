@@ -1,5 +1,30 @@
 # Progress Log
 
+## Sun May 18 21:43:14 PDT 2025
+
+**Completed:**
+- Task 7.4: Implement `/edit_proposal` Command (Proposer Only).
+    - Implemented a conversation handler (`edit_proposal_command` in `proposal_command_handlers.py`) to guide the proposer through editing the title, description, and options of their proposal.
+    - Added logic to prompt with `/my_proposals` if `/edit_proposal` is called without a proposal ID.
+    - Added `SubmissionRepository.count_submissions_for_proposal(proposal_id)`.
+    - Enhanced `ProposalService.edit_proposal_details` to:
+        - Verify that the user attempting the edit is the original proposer.
+        - Prevent edits if the proposal has already received submissions, instructing the user to cancel and recreate instead.
+        - Update the proposal's fields (title, description, options) in the database via `ProposalRepository`.
+        - Edit the original proposal message in the target channel to reflect the changes, using `telegram_utils` for formatting and `bot.edit_message_text`.
+    - Marked all sub-tasks for 7.4 in `tasks.md` as complete, except for unit tests.
+    - Manually tested the full edit flow.
+
+**Learnings & Fixes:**
+- Confirmed the approach for handling multi-step user interactions via `ConversationHandler` for editing tasks.
+- Ensured robust checks are in place (proposer identity, existing submissions) before allowing modifications to proposals.
+- Proper handling of `channel_message_id` is crucial for updating existing Telegram messages.
+
+**Next Steps:**
+- Write and pass unit tests for Task 7.4 (`/edit_proposal` command, `ProposalService.edit_proposal_details`, and `SubmissionRepository.count_submissions_for_proposal`).
+- Proceed with Task 7.5: Implement `/cancel_proposal` Command.
+
+
 ## Sun May 18 20:27:16 PDT 2025
 
 **Completed:**

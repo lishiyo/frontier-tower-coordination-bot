@@ -430,20 +430,20 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] Test this is working manually.
 
 4.  **Task 7.4: Implement `/edit_proposal` Command (Proposer Only)**
-    *   [ ] If the user just says `/edit_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`"; then show the button `/my_proposals`.
-    *   [ ] In `SubmissionRepository`, add `count_submissions_for_proposal(proposal_id)`.
-    *   [ ] In `ProposalService`, implement `edit_proposal_details(proposal_id, proposer_id, new_title, new_description, new_options)`:
-        *   [ ] Fetch proposal. Verify `proposer_id` matches.
-        *   [ ] Check `SubmissionRepository.count_submissions_for_proposal()`. If > 0, reject edit. Tell the user it is not possible to edit an already-created proposal, they have to cancel and make a new one.
-        *   [ ] Update proposal fields in `ProposalRepository`.
-        *   [ ] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
-    *   [ ] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details). 
+    *   [x] If the user just says `/edit_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`"; then show the button `/my_proposals`.
+    *   [x] In `SubmissionRepository`, add `count_submissions_for_proposal(proposal_id)`.
+    *   [x] In `ProposalService`, implement `edit_proposal_details(proposal_id, proposer_id, new_title, new_description, new_options)`:
+        *   [x] Fetch proposal. Verify `proposer_id` matches.
+        *   [x] Check `SubmissionRepository.count_submissions_for_proposal()`. If > 0, reject edit. Tell the user it is not possible to edit an already-created proposal, they have to cancel and make a new one.
+        *   [x] Update proposal fields in `ProposalRepository`.
+        *   [x] If proposal message exists in channel, update it (using `TelegramUtils` and `bot.edit_message_text`).
+    *   [x] Implement `edit_proposal_command` in `proposal_command_handlers.py` (likely needs a conversation to get new details). 
     *   [ ] Write unit tests, verify passing.
-    *   [ ] Test this is working manually.
+    *   [x] Test this is working manually.
     *   [ ] Move to Subtask 9.5.1 (indexing proposals on create/edit) now that we have edit functionality.
 
 5.  **Task 7.5: Implement `/cancel_proposal` Command (Proposer Only)**
-    *   [ ] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`"; then show the button `/my_proposals`.
+    *   [ ] If the user just says `/cancel_proposal`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/cancel_proposal <proposal_id>`"; then show the button `/my_proposals` to open the user's proposals.
     *   [ ] In `ProposalService`, implement `cancel_proposal_by_proposer(proposal_id, proposer_id)`:
         *   [ ] Fetch proposal. Verify `proposer_id` matches and status is "open".
         *   [ ] Update status to "cancelled" via `ProposalRepository`.

@@ -1,34 +1,39 @@
-# Active Context - Sun May 18 20:27:16 PDT 2025
+# Active Context - Sun May 18 21:43:14 PDT 2025
 
 ## Current Work Focus
-- Successfully refactored `my_proposals_command` from `proposal_command_handlers.py` to `user_command_handlers.py`.
-- Moved and updated all associated unit tests for `my_proposals_command` to `test_user_command_handlers.py`.
-- Updated `main.py` to reflect the new handler location.
-- All relevant unit tests are passing.
+- Completed the implementation of Task 7.4: `/edit_proposal` command.
+  - Implemented conversational flow for editing proposal details (title, description, options).
+  - Ensured only the proposer can edit.
+  - Prevented edits if submissions already exist.
+  - Updated proposal data in the database.
+  - Updated the proposal message in the channel.
+- Manually tested the `/edit_proposal` functionality.
 
 ## What's Working
-- `my_proposals_command` is functioning correctly from its new location in `user_command_handlers.py`.
-- Unit tests for `my_proposals_command` in `test_user_command_handlers.py` are passing.
-- All previously completed functionalities and their tests remain operational.
+- `/edit_proposal` command is functioning as per Task 7.4 requirements.
+- Existing functionalities remain operational.
 
 ## What's Broken or Pending
+- Unit tests for Task 7.4 (`/edit_proposal` command and its related service/repository methods) are pending.
 - **Task 5.2 Follow-ups (Still Pending from previous context):**
     - **Timezone Consistency:** Review and ensure all *other* user-facing datetimes are consistently displayed in PST.
     - **Results Message Copy:** Tweak results message copy in `ProposalService` for channel announcements from "(DM the bot)" to "(DM @botname)".
 - The `PTBUserWarning` regarding `per_message=False` in the `ConversationHandler` for `/propose` persists (accepted behavior for now).
 
 ## Active Decisions and Considerations
-- Continue maintaining high unit test coverage for all new features, critical bug fixes, and refactoring efforts.
+- Prioritize writing unit tests for the newly implemented `/edit_proposal` functionality.
 
 ## Important Patterns and Preferences
-- When refactoring, ensure all related components (handlers, tests, main application registration) are updated consistently.
-- Test files should clearly import the specific units they are testing.
+- ConversationHandlers are useful for multi-step interactions like editing.
+- Service layer methods should encapsulate business logic (e.g., checking edit permissions, updating channel messages).
 
 ## Learnings and Project Insights
-- Moving command handlers and their tests between modules requires careful attention to import paths in both the application code and the test files, especially for mock patches.
+- Implementing edit functionality requires careful coordination between command handlers, conversation states, service logic, and repository interactions.
+- Updating messages in Telegram channels after an edit requires storing and retrieving `channel_message_id`.
 
 ## Current Database/Model State
-- No schema changes during this refactoring.
+- No schema changes for Task 7.4. `SubmissionRepository.count_submissions_for_proposal` was added as a method.
 
 ## Next Steps
-- Review `tasks.md` for the next prioritized task.
+- Write and pass unit tests for the `/edit_proposal` command (Task 7.4).
+- Proceed to the next task in `tasks.md` (Task 7.5: `/cancel_proposal`).

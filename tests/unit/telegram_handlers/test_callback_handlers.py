@@ -325,10 +325,10 @@ async def test_handle_proposal_filter_callback_open():
     expected_formatted_list = (
         '*Open Proposals:*\n\n'
         '\- *ID:* `1` *Title:* Open Prop 1\n'
-        '  [Channel: \-1001](https://t\.me/c/1/11)\n'
+        '  [Channel: \-1001](https://t.me/c/1/11)\n'
         '  *Voting ends:* 2024\-01\-01 PST\n\n'
         '\- *ID:* `2` *Title:* Open Prop 2\n'
-        '  [Channel: \-1002](https://t\.me/c/2/22)\n'
+        '  [Channel: \-1002](https://t.me/c/2/22)\n'
         '  *Voting ends:* 2024\-02\-01 PST\n'
     )
 
@@ -379,7 +379,7 @@ async def test_handle_proposal_filter_callback_closed():
     expected_formatted_list = (
         '*Closed Proposals:*\n\n'
         '\- *ID:* `3` *Title:* Closed Prop 1\n'
-        '  [Channel: \-1003](https://t\.me/c/3/33)\n'
+        '  [Channel: \-1003](https://t.me/c/3/33)\n'
         '  *Closed on:* 2023\-12\-01 PST\n'
         '  *Outcome:* Result A\n'
     )

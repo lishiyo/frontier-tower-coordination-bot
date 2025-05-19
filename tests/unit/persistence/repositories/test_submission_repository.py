@@ -72,3 +72,86 @@ async def test_get_submissions_by_user_not_found():
     # Assert
     assert len(submissions) == 0
     mock_session.execute.assert_called_once() 
+
+# Tests for count_submissions_for_proposal
+
+@pytest.mark.asyncio
+async def test_count_submissions_for_proposal_zero_submissions():
+    # Arrange
+    mock_session = AsyncMock(spec=AsyncSession)
+    proposal_id = 1
+
+    # Mock the execute method to return a result that has scalar_one_or_none()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = 0  # No submissions
+    mock_session.execute.return_value = mock_result
+    
+    repo = SubmissionRepository(mock_session)
+
+    # Act
+    count = await repo.count_submissions_for_proposal(proposal_id)
+
+    # Assert
+    assert count == 0
+    mock_session.execute.assert_called_once()
+    # Verify the SQL query if possible (optional, but good for complex queries)
+    # Example: check that func.count was used and filtered by proposal_id
+
+@pytest.mark.asyncio
+async def test_count_submissions_for_proposal_one_submission():
+    # Arrange
+    mock_session = AsyncMock(spec=AsyncSession)
+    proposal_id = 2
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = 1  # One submission
+    mock_session.execute.return_value = mock_result
+    
+    repo = SubmissionRepository(mock_session)
+
+    # Act
+    count = await repo.count_submissions_for_proposal(proposal_id)
+
+    # Assert
+    assert count == 1
+    mock_session.execute.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_count_submissions_for_proposal_multiple_submissions():
+    # Arrange
+    mock_session = AsyncMock(spec=AsyncSession)
+    proposal_id = 3
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = 5  # Five submissions
+    mock_session.execute.return_value = mock_result
+    
+    repo = SubmissionRepository(mock_session)
+
+    # Act
+    count = await repo.count_submissions_for_proposal(proposal_id)
+
+    # Assert
+    assert count == 5
+    mock_session.execute.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_count_submissions_for_proposal_proposal_not_exist():
+    # Arrange
+    # This case is essentially the same as zero submissions from the repository's perspective
+    # if the query for count returns 0 when a proposal_id doesn't match any submissions.
+    mock_session = AsyncMock(spec=AsyncSession)
+    proposal_id = 999 # Non-existent proposal
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = 0 
+    mock_session.execute.return_value = mock_result
+    
+    repo = SubmissionRepository(mock_session)
+
+    # Act
+    count = await repo.count_submissions_for_proposal(proposal_id)
+
+    # Assert
+    assert count == 0
+    mock_session.execute.assert_called_once() 
