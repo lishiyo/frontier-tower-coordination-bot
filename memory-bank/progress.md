@@ -578,3 +578,25 @@
 
 **Next Steps:**
 - Proceed to Phase 7 tasks, starting with Task 7.1: Implement `/my_votes` Command.
+
+## Mon May 19 16:36:24 PDT 2025
+
+**Completed:**
+- Debugged and resolved an issue where `proposal_id` metadata was not being correctly associated with document chunks in ChromaDB when documents were processed *before* their corresponding proposal was created. This led to failures when trying to retrieve document context filtered by `proposal_id`.
+- Implemented a robust solution:
+    - Added `VectorDBService.assign_proposal_id_to_document_chunks` to find existing document chunks by their SQL document ID and update their metadata in ChromaDB to include a `proposal_id`.
+    - Added `ContextService.link_document_to_proposal_in_vector_store` to orchestrate this metadata update process.
+    - Integrated this new linking mechanism into `app/telegram_handlers/message_handlers.py` (specifically in `handle_ask_context`) to be called immediately after a document (that was added during proposal creation) is successfully linked to a newly created proposal in the SQL database.
+- Further refined `VectorDBService.assign_proposal_id_to_document_chunks`:
+    - Corrected the processing of results from ChromaDB's `collection.get()` method (fixed `KeyError: 0` by removing incorrect `[0]` indexing for `ids` and `metadatas`).
+    - Made the method more resilient to potential mismatches where ChromaDB might return a different number of chunk IDs versus metadata entries for a given document, ensuring it attempts to update all found chunks.
+
+**Learnings & Fixes:**
+- Underscored the importance of synchronizing metadata between primary (SQL) and secondary (vector) datastores, especially when denormalized fields in the secondary store are used for filtering.
+- Clarified the difference in data structures returned by ChromaDB's `collection.get()` versus `collection.query()` methods.
+- Reinforced the need for services performing database operations to use the correct, active database session, particularly when instantiating them within specific scopes (like an `async with AsyncSessionLocal():` block).
+- Robust error handling and logging are key when dealing with multi-step data ingestion and update processes across different data stores.
+
+**Next Steps:**
+- Continue testing the proposal creation flow with associated documents to ensure end-to-end reliability of the RAG context retrieval, especially for the `/ask` command when filtered by proposal.
+- Proceed with other pending tasks as per `tasks.md`.
