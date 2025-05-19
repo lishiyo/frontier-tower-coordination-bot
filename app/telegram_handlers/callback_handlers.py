@@ -214,19 +214,14 @@ async def handle_proposal_filter_callback(update: Update, context: ContextTypes.
                     channel_message_id = prop_data.get('channel_message_id')
                     
                     channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}`"
-                    if channel_message_id and channel_id_str.startswith("-100"):
-                        # Attempt to create a direct link if it's a supergroup/channel
-                        try:
-                            numeric_channel_id = channel_id_str[4:] # Remove leading -100
-                            link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
-                            escaped_link = telegram_utils.escape_markdown_v2(link)
-                            channel_display = f"[Channel: {telegram_utils.escape_markdown_v2(channel_id_str)}]({escaped_link})"
-                        except Exception as e:
-                            logger.error(f"Error creating channel link for {channel_id_str}, {channel_message_id}: {e}")
-                            # Fallback to simple display if link creation fails
+                    if channel_message_id:
+                        link = telegram_utils.create_telegram_message_link(channel_id_str, channel_message_id)
+                        if link:
+                            escaped_link_text = telegram_utils.escape_markdown_v2(f"Channel: {channel_id_str}")
+                            # Link itself should not be Markdown escaped
+                            channel_display = f"[{escaped_link_text}]({link})" # Corrected: use link variable
+                        else: # Fallback if link couldn't be formed, but message_id exists
                             channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
-                    elif channel_message_id: # For other chat types with message ID
-                         channel_display = f"Chat ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
 
                     part = f"\\- *ID:* `{prop_data['id']}` *Title:* {title_escaped}\n"
                     part += f"  {channel_display}\n"

@@ -120,4 +120,32 @@ async def send_message_in_chunks(context: CallbackContext, chat_id: int, text: s
 
     for i in range(0, len(text), max_len):
         chunk = text[i:i + max_len]
-        await context.bot.send_message(chat_id=chat_id, text=chunk, **kwargs) 
+        await context.bot.send_message(chat_id=chat_id, text=chunk, **kwargs)
+
+def create_telegram_message_link(target_channel_id: Union[str, int], message_id: int) -> Optional[str]:
+    """
+    Creates a direct t.me link to a message in a channel or supergroup.
+
+    Args:
+        target_channel_id: The ID of the channel/supergroup (e.g., -1001234567890 or "@publicchannel").
+        message_id: The ID of the message.
+
+    Returns:
+        A string URL if a link can be formed, otherwise None.
+    """
+    if not target_channel_id or not message_id:
+        return None
+
+    tc_id_str = str(target_channel_id)
+
+    if tc_id_str.startswith("-100"):  # Private supergroup/channel
+        numeric_id_part = tc_id_str[4:]
+        return f"https://t.me/c/{numeric_id_part}/{message_id}"
+    elif tc_id_str.startswith("@"):  # Public channel with @username
+        username_part = tc_id_str[1:]  # Remove "@"
+        return f"https://t.me/{username_part}/{message_id}"
+    # Optional: Handle public channel username without '@' if it's a possible format
+    # elif not tc_id_str.startswith("-") and not tc_id_str.isdigit(): 
+    #     return f"https://t.me/{tc_id_str}/{message_id}"
+    
+    return None 

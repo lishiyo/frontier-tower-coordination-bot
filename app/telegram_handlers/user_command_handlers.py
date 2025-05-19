@@ -128,17 +128,14 @@ async def my_proposals_command(update: Update, context: ContextTypes.DEFAULT_TYP
             channel_message_id = prop_data.get('channel_message_id')
             
             channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}`"
-            if channel_message_id and channel_id_str.startswith("-100"):
-                try:
-                    numeric_channel_id = channel_id_str[4:]
-                    link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
+            if channel_message_id:
+                link = telegram_utils.create_telegram_message_link(channel_id_str, channel_message_id)
+                if link:
                     escaped_link_text = telegram_utils.escape_markdown_v2(f"Channel: {channel_id_str}")
+                    # Link itself should not be Markdown escaped
                     channel_display = f"[{escaped_link_text}]({link})"
-                except Exception as e:
-                    logger.error(f"Error creating channel link for my_proposals {channel_id_str}, {channel_message_id}: {e}")
+                else: # Fallback if link couldn't be formed, but message_id exists
                     channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
-            elif channel_message_id:
-                 channel_display = f"Chat ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
             
             part = (
                 f"\\- *Title:* {title_escaped} \\(ID: `{prop_data['id']}`\\)\n"

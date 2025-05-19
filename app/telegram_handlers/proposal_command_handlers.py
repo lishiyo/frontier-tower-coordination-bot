@@ -200,17 +200,14 @@ async def proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             channel_message_id = prop_data.get('channel_message_id')
             
             channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}`"
-            if channel_message_id and channel_id_str.startswith("-100"):
-                try:
-                    numeric_channel_id = channel_id_str[4:]
-                    link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}" 
+            if channel_message_id:
+                link = telegram_utils.create_telegram_message_link(channel_id_str, channel_message_id)
+                if link:
                     escaped_link_text = telegram_utils.escape_markdown_v2(f"Channel: {channel_id_str}")
+                    # Link itself should not be Markdown escaped
                     channel_display = f"[{escaped_link_text}]({link})"
-                except Exception as e:
-                    logger.error(f"Error creating channel link for {channel_id_str}, {channel_message_id}: {e}")
+                else: # Fallback if link couldn't be formed, but message_id exists
                     channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
-            elif channel_message_id:
-                 channel_display = f"Chat ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
 
             part = f"\\- *ID:* `{prop_data['id']}` *Title:* {title_escaped}\n"
             part += f"  {channel_display}\n"
@@ -484,7 +481,28 @@ async def handle_confirm_edit_proposal(update: Update, context: ContextTypes.DEF
             
             if updated_proposal:
                 await session.commit() # Commit changes here as service layer doesn't
-                await query.edit_message_text(f"Proposal ID {proposal_id} has been successfully updated.")
+                
+                base_text_segment = " has been successfully updated."
+                proposal_identifier_text = f"Proposal ID {updated_proposal.id}"
+                
+                # Default message if no link can be formed
+                confirmation_message = f"{proposal_identifier_text}{base_text_segment}" # Plain text by default
+                current_parse_mode = None
+
+                if updated_proposal.target_channel_id and updated_proposal.channel_message_id:
+                    message_url = telegram_utils.create_telegram_message_link(
+                        updated_proposal.target_channel_id,
+                        updated_proposal.channel_message_id
+                    )
+                        
+                    if message_url:
+                        escaped_link_text = telegram_utils.escape_markdown_v2(proposal_identifier_text)
+                        escaped_base_text = telegram_utils.escape_markdown_v2(base_text_segment)
+                        # The URL itself (message_url) should NOT be escaped for MarkdownV2 link syntax
+                        confirmation_message = f"[{escaped_link_text}]({message_url}){escaped_base_text}"
+                        current_parse_mode = ParseMode.MARKDOWN_V2
+                
+                await query.edit_message_text(confirmation_message, parse_mode=current_parse_mode)
                 
                 # Update message in channel
                 if updated_proposal.target_channel_id and updated_proposal.channel_message_id:
