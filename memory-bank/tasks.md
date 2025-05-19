@@ -451,7 +451,9 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
-6. **Task 7.6: Implement `/my_docs` Command**
+## Phase 8: Doc Management Commands
+
+1. **Task 8.1: Implement `/my_docs` Command**
     *   [ ] In `app/persistence/repositories/document_repository.py`, add `get_documents_by_proposer_id(proposer_telegram_id: int)`:
         *   [ ] This method should retrieve documents linked to proposals created by the given `proposer_telegram_id` (i.e., documents where `document.proposal_id` links to a `proposal` whose `proposer_telegram_id` matches).
         *   [ ] This will require a join between the `documents` table and the `proposals` table on `proposal_id`.
@@ -467,7 +469,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Write unit tests for the new repository and service methods, and the command handler.
     *   [ ] Test this is working manually.
 
-7. **Task 7.7: Implement `/add_doc` Command (Proposer Only)**
+2. **Task 8.2: Implement `/add_doc` Command (Proposer Only)**
     *   [ ] If the user just says `/add_doc`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/add_doc <doc_id>`".
     *   [ ] In `ProposalRepository`, ensure `get_proposal_by_id` fetches `proposer_id`.
     *   [ ] Implement `add_doc_command` in `document_command_handlers.py`:
@@ -480,7 +482,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
-8.  **Task 7.8: Implement Proposer Document Editing and Deletion**
+3.  **Task 8.3: Implement Proposer Document Editing and Deletion**
     *   **Implement `/edit_doc <document_id>` Command (Proposer Only):**
         *   [ ] If the user just says `/edit_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_doc <doc_id>`".
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `edit_doc_command`.
@@ -511,7 +513,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
 
-9.  **Task 7.9: Implement Admin Global Document Management (List, Edit, Delete)**
+4.  **Task 8.4: Implement Admin Global Document Management (List, Edit, Delete)**
     *   **Implement `/view_global_docs` Command (Admin Only):**
         *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `view_global_docs_command`.
         *   [ ] Verify user is an admin.
@@ -542,7 +544,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
 
-10.  **Task 7.10: Implement `/view_results` Command**
+5.  **Task 8.5: Implement `/view_results` Command**
     *   [ ] If the user just says `/view_results`, the bot should ask "which proposal? use `/my_proposals` to list all your proposals, `/proposals open` for all open proposals, or `/proposals closed` for all closed proposals, then `/view_results <proposal_id>`".
     *   [ ] In `ProposalService`, implement `get_all_results_for_proposal_view(proposal_id)`:
         *   [ ] Fetch proposal. Ensure it's "closed".
@@ -553,13 +555,13 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
-11.  **Task 7.11: Implement `/privacy` Command**
+6.  **Task 8.6: Implement `/privacy` Command**
     *   [ ] Create a static privacy policy text.
     *   [ ] Implement `privacy_command` in `command_handlers.py` to send this text.
     *   [ ] Write unit tests, verify passing.
     *   [ ] Test this is working manually.
 
-## Phase 8: Multi-Channel Support Enhancements
+## Phase 9: Multi-Channel Support Enhancements
 
 **Goal:** Extend multi-channel capabilities to proposal creation, listing, and context document viewing.
 
@@ -567,7 +569,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 **Subtasks:**
 
-1.  **Task 8.1: Multi-Channel Proposal System Implementation (Core)**
+1.  **Task 9.1: Multi-Channel Proposal System Implementation (Core)**
     *   (This task might already exist or be partially done if Phase 8 was previously just about proposal multi-channel support. Adjust as needed.)
     *   [ ] Expand `ConfigService` to manage a list of authorized proposal channels beyond the default `TARGET_CHANNEL_ID`.
     *   [ ] Create a new model and repository for `AuthorizedChannel` (e.g., `app/persistence/models/authorized_channel_model.py` and `app/persistence/repositories/authorized_channel_repository.py`) if opting for DB-based management, or implement a purely configuration-based approach in `ConfigService`.
@@ -583,7 +585,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Update user-facing proposal listings (like `/proposals open/closed`) to potentially include channel information or allow filtering.
     *   [ ] Write unit tests, verify passing.
 
-2.  **Task 8.2: Enhance `/view_docs` for Multi-Channel Support**
+2.  **Task 9.2: Enhance `/view_docs` for Multi-Channel Support**
     *   [ ] **`/view_docs` (no arguments):**
         *   [ ] Modify handler to retrieve the list of *all* authorized channels from `ConfigService` (or `AuthorizedChannelRepository`).
         *   [ ] Format and DM this list (channel IDs and names if available) to the user.
@@ -595,14 +597,14 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] RAG queries via `/ask` could then also be filtered/prioritized by documents relevant to the channel a user is in or asking about.
         *   [ ] Write unit tests, verify passing.
 
-3.  **Task 8.3: Testing Multi-Channel Document Viewing**
+3.  **Task 9.3: Testing Multi-Channel Document Viewing**
     *   [ ] Configure multiple authorized channels.
     *   [ ] Test `/view_docs` (no args) lists all configured channels.
     *   [ ] Test `/view_docs <channel_id>` for different authorized channels, ensuring correct proposal listings.
     *   [ ] Ensure `/view_docs <proposal_id>` and `/view_doc <document_id>` continue to function correctly regardless of how many channels are configured.
     *   [ ] Write unit tests, verify passing.
 
-4.  **Task 8.4: Implement Intelligent Help via LLM (`/help <question>`)**
+4.  **Task 9.4: Implement Intelligent Help via LLM (`/help <question>`)**
     *   **Goal:** Allow users to ask natural language questions about bot functionality using `/help <question>` and receive LLM-generated answers based on `bot_commands.md`.
     *   **Dependencies:** `LLMService` (Phase 3.1), `ContextService` (Phase 3.3, or a new dedicated `HelpService`), completed `bot_commands.md`.
     *   **Subtasks:**
@@ -622,7 +624,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test with various questions to ensure clarity and accuracy of LLM responses.
 
-## Phase 9: Comprehensive Testing, Refinement, and Deployment Preparation
+## Phase 10: Comprehensive Testing, Refinement, and Deployment Preparation
 
 **Goal:** Ensure bot stability, reliability, and user-friendliness; prepare for deployment.
 
@@ -630,36 +632,36 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 **Subtasks:**
 
-1.  **Task 9.1: Unit & Integration Testing (`pytest`)**
+1.  **Task 10.1: Unit & Integration Testing (`pytest`)**
     *   [ ] Write unit tests for all core service methods.
     *   [ ] Write unit tests for repository methods (can use in-memory SQLite for some if PostgreSQL is complex to mock, or mock DB session).
     *   [ ] Write unit tests for utility functions.
     *   [ ] Write integration tests for key flows (e.g., proposal creation -> voting -> results).
     *   [ ] Setup `tests/conftest.py` for fixtures (e.g., mock bot, mock db session).
 
-2.  **Task 9.2: Linters and Code Quality Checks**
+2.  **Task 10.2: Linters and Code Quality Checks**
     *   [ ] Run `pylint` regularly and address issues.
     *   [ ] Ensure consistent code formatting.
 
-3.  **Task 9.3: End-to-End Testing**
+3.  **Task 10.3: End-to-End Testing**
     *   [ ] Manually test all commands and user flows as described in `projectbrief.md` testing plan.
     *   [ ] Test with multiple users if possible.
     *   [ ] Test edge cases and error conditions.
 
-4.  **Task 9.4: Logging and Error Handling Refinement**
+4.  **Task 10.4: Logging and Error Handling Refinement**
     *   [ ] Review all logging statements for clarity and usefulness.
     *   [ ] Ensure all user-facing errors are handled gracefully and provide helpful messages.
     *   [ ] Implement more specific custom exceptions where appropriate.
 
-5.  **Task 9.5: Configuration for Production**
+5.  **Task 10.5: Configuration for Production**
     *   [ ] Finalize `.env.example` for production environment variables.
     *   [ ] Prepare deployment scripts/Dockerfile if containerizing.
 
-6.  **Task 9.6: Documentation Review**
+6.  **Task 10.6: Documentation Review**
     *   [ ] Review `README.md` for setup and usage instructions.
     *   [ ] Ensure all major code components have docstrings.
 
-7.  **Task 9.7: (Future) Admin Access to Voter Info (Post-Closure)**
+7.  **Task 10.7: (Future) Admin Access to Voter Info (Post-Closure)**
     *   [ ] Design how admins access this (e.g., a new admin command `/view_proposal_voters <proposal_id>`).
     *   [ ] Implement necessary service and repository methods.
     *   [ ] Ensure clear logging of this access.

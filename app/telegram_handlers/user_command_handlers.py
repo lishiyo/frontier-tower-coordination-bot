@@ -5,8 +5,10 @@ from telegram.constants import ParseMode
 
 from app.core.user_service import UserService
 from app.core.submission_service import SubmissionService
-from app.persistence.database import get_session
+from app.persistence.database import get_session, AsyncSessionLocal
 from app.utils.telegram_utils import escape_markdown_v2
+from app.utils import telegram_utils
+from app.core.proposal_service import ProposalService
 
 logger = logging.getLogger(__name__)
 
@@ -82,3 +84,72 @@ async def my_votes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             logger.error(f"Error processing /my_votes for user {user_id}: {e}", exc_info=True)
             if update.message:
                 await update.message.reply_text("Sorry, something went wrong while fetching your history. Please try again later.")
+
+async def my_proposals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays a list of proposals created by the user."""
+    if not update.effective_user or not update.message:
+        logger.warning("my_proposals_command called without effective_user or message.")
+        if update.message:
+            await update.message.reply_text("Could not retrieve your user details.")
+        return
+
+    user_id = update.effective_user.id
+    chat_id = update.message.chat_id
+
+    async with AsyncSessionLocal() as session:
+        user_service = UserService(session)
+        await user_service.register_user_interaction(
+            telegram_id=user_id, 
+            username=update.effective_user.username, 
+            first_name=update.effective_user.first_name
+        )
+
+        proposal_service = ProposalService(session)
+        proposals_list = await proposal_service.list_proposals_by_proposer(user_id)
+
+    if not proposals_list:
+        message = "You haven't created any proposals yet."
+    else:
+        message_parts = ["*Your Proposals:*\n"]
+        for prop_data in proposals_list:
+            title_escaped = telegram_utils.escape_markdown_v2(prop_data['title'])
+            status_str = prop_data['status'].value if hasattr(prop_data['status'], 'value') else str(prop_data['status'])
+            status_escaped = telegram_utils.escape_markdown_v2(status_str)
+            
+            proposal_type_str = prop_data['proposal_type'].value if hasattr(prop_data['proposal_type'], 'value') else str(prop_data['proposal_type'])
+            type_escaped = telegram_utils.escape_markdown_v2(proposal_type_str)
+            
+            created_escaped = telegram_utils.escape_markdown_v2(str(prop_data['creation_date']))
+            deadline_escaped = telegram_utils.escape_markdown_v2(str(prop_data['deadline_date']))
+            outcome_display = prop_data.get('outcome') if prop_data.get('outcome') is not None else "N/A"
+            outcome_escaped = telegram_utils.escape_markdown_v2(outcome_display)
+
+            channel_id_str = str(prop_data['target_channel_id'])
+            channel_message_id = prop_data.get('channel_message_id')
+            
+            channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}`"
+            if channel_message_id and channel_id_str.startswith("-100"):
+                try:
+                    numeric_channel_id = channel_id_str[4:]
+                    link = f"https://t.me/c/{numeric_channel_id}/{channel_message_id}"
+                    escaped_link_text = telegram_utils.escape_markdown_v2(f"Channel: {channel_id_str}")
+                    channel_display = f"[{escaped_link_text}]({link})"
+                except Exception as e:
+                    logger.error(f"Error creating channel link for my_proposals {channel_id_str}, {channel_message_id}: {e}")
+                    channel_display = f"Channel ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
+            elif channel_message_id:
+                 channel_display = f"Chat ID: `{telegram_utils.escape_markdown_v2(channel_id_str)}` (msg: {channel_message_id})"
+            
+            part = (
+                f"\\- *Title:* {title_escaped} \\(ID: `{prop_data['id']}`\\)\n"
+                f"  Status: {status_escaped}\n"
+                f"  Type: {type_escaped}\n"
+                f"  {channel_display}\n"
+                f"  Created: {created_escaped}\n"
+                f"  Deadline: {deadline_escaped}\n"
+                f"  Outcome: {outcome_escaped}\n"
+            )
+            message_parts.append(part)
+        message = "\n".join(message_parts)
+
+    await telegram_utils.send_message_in_chunks(context, chat_id=chat_id, text=message, parse_mode=ParseMode.MARKDOWN_V2)
