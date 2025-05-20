@@ -359,3 +359,83 @@ async def handle_my_proposals_for_edit_prompt(update: Update, context: ContextTy
             await query.edit_message_text(text="Could not display your proposals due to an error\. Please try `/my_proposals` directly\.")
         except Exception as e2:
             logger.error(f"Nested error editing message in handle_my_proposals_for_edit_prompt: {e2}") 
+
+async def handle_ask_search_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handles callbacks for 'Search for Proposals' and 'Search for Documents' buttons.
+    Provides guidance on how to use the /ask command properly.
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    if not query.message:
+        logger.warning("handle_ask_search_callback called without message.")
+        return
+    
+    callback_data = query.data
+    
+    # Determine the search type based on callback data
+    if callback_data == "ask_proposal_search":
+        instructions = (
+            "To find a proposal ID, type:\n\n"
+            "/ask which proposal was about [topic]\n\n"
+            "Examples:\n"
+            " /ask which proposal was about budget changes\n"
+            " /ask which proposals were created this month\n"
+            " /ask which open proposals mention AI floor\n\n"
+            "After finding the proposal, use:\n"
+            " /edit_proposal [ID]\n"
+            " /cancel_proposal [ID]"
+        )
+        # Add a keyboard to make it easier to start typing the command
+        keyboard = [[InlineKeyboardButton("Close", callback_data="close_instructions")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+    elif callback_data == "ask_doc_search":
+        instructions = (
+            "To find a document ID, type:\n\n"
+            "/ask which doc mentioned [topic]\n\n"
+            "Examples:\n"
+            " /ask which doc mentioned event planning\n"
+            " /ask which document has information about guest polisy\n\n"
+            "After finding the document, use:\n"
+            " /view_doc [ID]"
+        )
+        # Add a keyboard to make it easier to start typing the command
+        keyboard = [[InlineKeyboardButton("Close", callback_data="close_instructions")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+    else:
+        logger.warning(f"Unknown ask search callback: {callback_data}")
+        instructions = "Please use the /ask command followed by your search query."
+        reply_markup = None
+    
+    try:
+        await query.edit_message_text(
+            text=instructions,
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.error(f"Error editing message in handle_ask_search_callback: {e}", exc_info=True)
+        try:
+            # If editing fails, try sending a new message
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=instructions,
+                reply_markup=reply_markup
+            )
+        except Exception as e2:
+            logger.error(f"Failed to send new message in handle_ask_search_callback: {e2}")
+
+async def handle_close_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the 'Close' button for search instructions."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.message:
+        try:
+            await query.message.delete()
+        except Exception as e:
+            logger.error(f"Error deleting message in handle_close_instructions: {e}", exc_info=True)
+            try:
+                await query.edit_message_text("Instructions closed.")
+            except Exception as e2:
+                logger.error(f"Error editing message in handle_close_instructions: {e2}") 

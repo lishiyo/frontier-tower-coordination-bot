@@ -97,7 +97,17 @@ async def view_document_content_command(update: Update, context: ContextTypes.DE
         return
 
     if not context.args or len(context.args) != 1:
-        await update.message.reply_text("Usage: /view_doc <document_id>")
+        ask_doc_button = InlineKeyboardButton(
+            "Search for Documents",
+            callback_data="ask_doc_search"
+        )
+        keyboard = [[ask_doc_button]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "Which doc? Use `/ask 'which doc mentioned\\.\\.\\.'` to search for the doc ID, then use `/view_doc <document_id>`\\.",
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
         return
 
     try:

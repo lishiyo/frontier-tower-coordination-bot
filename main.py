@@ -29,7 +29,9 @@ from app.telegram_handlers.callback_handlers import (
     handle_vote_callback, 
     handle_collect_proposal_type_callback,
     handle_proposal_filter_callback,
-    handle_my_proposals_for_edit_prompt 
+    handle_my_proposals_for_edit_prompt,
+    handle_ask_search_callback,
+    handle_close_instructions
     # handle_channel_selection_callback # Commented out - definition missing in callback_handlers.py
 )
 from app.telegram_handlers.admin_command_handlers import get_add_global_doc_conversation_handler # view_global_docs_command, edit_global_doc_command, delete_global_doc_command
@@ -106,6 +108,8 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_proposal_filter_callback, pattern=f"^{PROPOSAL_FILTER_CALLBACK_PREFIX}")) # New handler
     application.add_handler(CallbackQueryHandler(handle_my_proposals_for_edit_prompt, pattern=r"^my_proposals_for_edit_prompt$")) # Added
     application.add_handler(CallbackQueryHandler(view_doc_button_callback, pattern=r"^/view_doc \d+$"))
+    application.add_handler(CallbackQueryHandler(handle_ask_search_callback, pattern=r"^ask_(proposal|doc)_search$"))
+    application.add_handler(CallbackQueryHandler(handle_close_instructions, pattern=r"^close_instructions$"))
 
     # Proposal viewing commands
     application.add_handler(CommandHandler("proposals", proposals_command))

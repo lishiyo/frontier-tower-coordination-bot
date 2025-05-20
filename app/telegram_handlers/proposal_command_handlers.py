@@ -251,12 +251,23 @@ async def edit_proposal_command_entry(update: Update, context: ContextTypes.DEFA
     context.user_data[USER_DATA_EDIT_CHANGES] = {}
 
     if not context.args:
+        ask_proposal_button = InlineKeyboardButton(
+            "Search for Proposals", 
+            callback_data="ask_proposal_search"
+        )
+        my_proposals_button = InlineKeyboardButton(
+            "Show My Proposals",
+            callback_data="my_proposals_for_edit_prompt"
+        )
         keyboard = [
-            [InlineKeyboardButton("Show My Proposals", callback_data="my_proposals_for_edit_prompt")] # Use a unique callback
+            [my_proposals_button],
+            [ask_proposal_button]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            "Which proposal would you like to edit? Use `/my_proposals` to see your proposals, then use `/edit_proposal <proposal_id>`.",
+            "Which proposal would you like to edit? Use `/my_proposals` to see your proposals, "
+            "or use `/ask 'which proposal was about...'` to find a proposal ID. "
+            "Then use `/edit_proposal <proposal_id>`.",
             reply_markup=reply_markup
         )
         return ConversationHandler.END # End conversation if no ID is provided initially
@@ -618,15 +629,23 @@ async def cancel_proposal_command(update: Update, context: ContextTypes.DEFAULT_
 
     if not context.args:
         # No proposal_id provided
+        ask_proposal_button = InlineKeyboardButton(
+            "Search for Proposals", 
+            callback_data="ask_proposal_search"
+        )
+        my_proposals_button = InlineKeyboardButton(
+            "Show My Proposals",
+            callback_data="my_proposals_for_cancel_prompt"
+        )
         keyboard = [
-            [InlineKeyboardButton("Show My Proposals", callback_data="my_proposals_for_edit_prompt")]
-            # Using a unique callback to potentially handle this prompt if needed, or just for clarity.
-            # Alternatively, could be same as edit: "my_proposals_for_edit_prompt"
+            [my_proposals_button],
+            [ask_proposal_button]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            "Which proposal would you like to cancel? \n"
-            "Use `/my_proposals` to see your proposals, then use `/cancel_proposal <proposal_id>`\\.",
+            "Which proposal would you like to cancel?\n"
+            "Use `/my_proposals` to see your proposals, or use `/ask 'which proposal was about\\.\\.\\.'` to find a proposal ID. "
+            "Then use `/cancel_proposal <proposal_id>`\\.",
             reply_markup=reply_markup,
             parse_mode=ParseMode.MARKDOWN_V2
         )
@@ -636,7 +655,7 @@ async def cancel_proposal_command(update: Update, context: ContextTypes.DEFAULT_
         proposal_id_to_cancel = int(context.args[0])
     except (IndexError, ValueError):
         await update.message.reply_text(
-            "Invalid Proposal ID format. Please use `/cancel_proposal <ID>` where ID is a number."
+            "Invalid Proposal ID format\\. Please use `/cancel_proposal <ID>` where ID is a number\\."
         )
         return
 
