@@ -212,7 +212,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [x] **Implement `/view_doc <document_id>` Command:**
         *   [x] In `app/persistence/repositories/document_repository.py`, add `get_document_by_id(document_id)` method that fetches a `Document` by its ID, including the `raw_content`.
         *   [x] In `app/core/context_service.py`, add `get_document_content(document_id)` method that calls `DocumentRepository.get_document_by_id()` and returns `document.raw_content`.
-        *   [x] In `app/telegram_handlers/command_handlers.py`, implement `view_document_content_command` that takes `<document_id>`, calls `ContextService.get_document_content()`, and DMs the content to the user (handle potential long messages).
+        *   [x] In `app/telegram_handlers/command_handlers.py`, implement `view_document_content_command` that takes `<document_id>`, calls `ContextService.get_document_content()`, and DMs the content to the user (handle potential long messages). If `document_id` is missing, it should respond with: "Which doc? Use `/ask 'which doc mentioned...'` to search for the doc ID, then use `/view_doc <document_id>`." (Ensure a button to prefill `/ask which doc mentioned...` is considered).
     *   [x] **Implement `/view_docs` (no arguments - Single Channel Behavior):**
         *   [x] In `app/telegram_handlers/command_handlers.py`, implement the base `view_docs_command` (handling no arguments).
         *   [x] This handler should retrieve the `TARGET_CHANNEL_ID` from `ConfigService`.
@@ -471,7 +471,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
     *   [ ] Test this is working manually.
 
 2. **Task 8.2: Implement `/add_doc` Command (Proposer Only)**
-    *   [ ] If the user just says `/add_doc`, the bot should ask "which proposal? use `/my_proposals` to list all, then `/add_doc <doc_id>`"; then show the button for `/my_proposals`.
+    *   [ ] If the user just says `/add_doc`, the bot should ask "Which proposal? Use `/my_proposals` to list all your proposals, or search via `/ask 'which proposal was about...'` to get a proposal ID. Then use `/add_doc <proposal_id>`." (Ensure appropriate buttons for listed commands are considered).
     *   [ ] In `ProposalRepository`, ensure `get_proposal_by_id` fetches `proposer_id`.
     *   [ ] Implement `add_doc_command` in `document_command_handlers.py`:
         *   [ ] Parse `proposal_id`.
@@ -485,7 +485,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
 
 3.  **Task 8.3: Implement Proposer Document Editing and Deletion**
     *   **Implement `/edit_doc <document_id>` Command (Proposer Only):**
-        *   [ ] If the user just says `/edit_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_doc <doc_id>`"; then show the button for `/my_docs`.
+        *   [ ] If the user just says `/edit_doc`, the bot should ask "Which doc? Use `/my_docs` to list your proposal-specific documents or `/ask 'which doc mentioned...'` to search for a document ID, then use `/edit_doc <document_id>`." (Ensure appropriate buttons for listed commands, including one to prefill `/ask which doc mentioned...`, are considered).
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `edit_doc_command`.
         *   [ ] Handler parses `document_id`.
         *   [ ] In `ContextService`, add `can_user_edit_document(user_id, document_id)`: 
@@ -502,7 +502,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
     *   **Implement `/delete_doc <document_id>` Command (Proposer Only):**
-        *   [ ] If the user just says `/delete_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_doc <doc_id>`"; then show the button for `/my_docs`.
+        *   [ ] If the user just says `/delete_doc`, the bot should ask "Which doc? Use `/my_docs` to list your proposal-specific documents or `/ask 'which doc mentioned...'` to search for a document ID, then use `/delete_doc <document_id>`." (Ensure appropriate buttons for listed commands, including one to prefill `/ask which doc mentioned...`, are considered).
         *   [ ] In `app/telegram_handlers/document_command_handlers.py` (or similar), implement `delete_doc_command`.
         *   [ ] Handler parses `document_id`.
         *   [ ] Use `ContextService.can_user_edit_document()` (or a similar `can_user_delete_document`) to verify proposer.
@@ -523,7 +523,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] DM the list to the admin.
         *   [ ] Test this is working manually.
     *   **Implement `/edit_global_doc <document_id>` Command (Admin Only):**
-        *   [ ] If the admin just says `/edit_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/edit_global_doc <doc_id>`"; then show the button for `/my_docs`.
+        *   [ ] If the admin just says `/edit_global_doc`, the bot should ask "Which doc? Use `/view_global_docs` to list all global documents or `/ask 'which doc mentioned...'` to search for a document ID, then use `/edit_global_doc <document_id>`." (Ensure appropriate buttons for listed commands, including one to prefill `/ask which doc mentioned...`, are considered).
         *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `edit_global_doc_command`.
         *   [ ] Verify user is an admin.
         *   [ ] Handler parses `document_id`.
@@ -535,7 +535,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Write unit tests, verify passing.
         *   [ ] Test this is working manually.
     *   **Implement `/delete_global_doc <document_id>` Command (Admin Only):**
-        *   [ ] If the admin just says `/delete_global_doc`, the bot should ask "which doc? use `/my_docs` to list all, then `/delete_global_doc <doc_id>`"; then show the button for `/my_docs`.
+        *   [ ] If the admin just says `/delete_global_doc`, the bot should ask "Which doc? Use `/view_global_docs` to list all global documents or `/ask 'which doc mentioned...'` to search for a document ID, then use `/delete_global_doc <document_id>`." (Ensure appropriate buttons for listed commands, including one to prefill `/ask which doc mentioned...`, are considered).
         *   [ ] In `app/telegram_handlers/admin_command_handlers.py`, implement `delete_global_doc_command`.
         *   [ ] Verify user is an admin.
         *   [ ] Handler parses `document_id`.
@@ -546,7 +546,7 @@ This document breaks down the implementation of CoordinationBot into manageable 
         *   [ ] Test this is working manually.
 
 5.  **Task 8.5: Implement `/view_results` Command**
-    *   [ ] If the user just says `/view_results`, the bot should ask "which proposal? use `/my_proposals` to list all your proposals, `/proposals open` for all open proposals, or `/proposals closed` for all closed proposals, then `/view_results <proposal_id>`". Show the buttons for `/my_proposals`, `/proposals open`, and `/proposals closed`.
+    *   [ ] If the user just says `/view_results`, the bot should ask "For which proposal? Use `/my_proposals` to list your proposals, `/proposals open` for all open ones, `/proposals closed` for all closed ones, or search via `/ask 'which proposal was about...'` to get a proposal ID. Then use `/view_results <proposal_id>`." (Ensure appropriate buttons for listed commands are considered).
     *   [ ] In `ProposalService`, implement `get_all_results_for_proposal_view(proposal_id)`:
         *   [ ] Fetch proposal. Ensure it's "closed".
         *   [ ] Free "multiple_choice" results, fetch the total vote counts for each of the options.
@@ -650,36 +650,78 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [x] Clear out old proposals and manually test new ones are working.
 
         *   **Subtask 9.5.2: Implement Core `/ask` Enhancement Logic for Proposal Queries**
-            *   [ ] In `app/services/llm_service.py`:
-                *   [ ] Implement/Modify `analyze_ask_query(query_text: str) -> dict`.
-                    *   [ ] Design prompt to determine primary intent (`query_proposals` or `query_general_docs`).
-                    *   [ ] If `query_proposals`, extract `content_keywords` (for semantic search) and `structured_filters` (e.g., status, date_query, proposal_type).
-                *   [ ] (If necessary) Enhance `parse_natural_language_duration(text: str)` to reliably parse date ranges or relative queries (e.g., "last month") into start/end datetimes for filtering.
-            *   [ ] In `app/persistence/repositories/proposal_repository.py`:
-                *   [ ] Implement `find_proposals_by_dynamic_criteria(status: Optional[str] = None, date_range: Optional[tuple[datetime, datetime]] = None, proposal_type: Optional[str] = None, creation_date_range: Optional[tuple[datetime, datetime]] = None) -> list[Proposal]`.
-                    *   [ ] This method should construct and execute a dynamic SQLAlchemy query.
-            *   [ ] In `app/services/vector_db_service.py`:
-                *   [ ] Implement `search_proposal_embeddings(query_embedding: list[float], top_n: int = 5, filter_proposal_ids: Optional[list[int]] = None) -> list[dict]`.
-                    *   [ ] This method searches the `proposals_content` collection.
-                    *   [ ] It should return a list of results, each including at least `proposal_id` and `score`.
-            *   [ ] In `app/core/context_service.py`:
-                *   [ ] Implement/Refactor `handle_intelligent_ask(query_text: str, user_telegram_id: int) -> str` (this will be the main orchestrator for the `/ask` command logic):
-                    *   [ ] Call `LLMService.analyze_ask_query(query_text)`.
-                    *   [ ] If intent is `query_proposals`:
-                        *   [ ] Perform date parsing for `structured_filters.date_query` (if any) using `LLMService`.
-                        *   [ ] Perform structured filtering using `ProposalRepository.find_proposals_by_dynamic_criteria()`.
-                        *   [ ] If `content_keywords` exist, generate their embedding and search using `VectorDBService.search_proposal_embeddings()`.
-                        *   [ ] Consolidate proposal IDs from structured and semantic searches.
-                        *   [ ] Fetch full `Proposal` objects for the final list of IDs using `ProposalRepository.get_proposals_by_ids()`.
-                        *   [ ] Construct prompt for `LLMService.get_completion` to synthesize an answer. The answer should list matching proposals and guide the user to use `/my_vote <proposal_id>` to see their specific submission for any of these proposals.
-                        *   [ ] Call `LLMService.get_completion()` to get the final answer string.
+            *   [x] In `app/services/llm_service.py`:
+                *   [x] Implement/Modify `analyze_ask_query(query_text: str) -> dict`.
+                    *   [x] Design prompt to determine primary intent (`query_proposals` or `query_general_docs`).
+                    *   [x] If `query_proposals`, extract `content_keywords` (for semantic search) and `structured_filters` (e.g., status, date_query, proposal_type).
+                *   [x] (If necessary) Enhance `parse_natural_language_duration(text: str)` to reliably parse date ranges or relative queries (e.g., "last month") into start/end datetimes for filtering.
+            *   [x] In `app/persistence/repositories/proposal_repository.py`:
+                *   [x] Implement `find_proposals_by_dynamic_criteria(status: Optional[str] = None, date_range: Optional[tuple[datetime, datetime]] = None, proposal_type: Optional[str] = None, creation_date_range: Optional[tuple[datetime, datetime]] = None) -> list[Proposal]`.
+                    *   [x] This method should construct and execute a dynamic SQLAlchemy query.
+            *   [x] In `app/services/vector_db_service.py`:
+                *   [x] Implement `search_proposal_embeddings(query_embedding: list[float], top_n: int = 5, filter_proposal_ids: Optional[list[int]] = None) -> list[dict]`.
+                    *   [x] This method searches the `proposals_content` collection.
+                    *   [x] It should return a list of results, each including at least `proposal_id` and `score`.
+            *   [x] In `app/core/context_service.py`:
+                *   [x] Implement/Refactor `handle_intelligent_ask(query_text: str, user_telegram_id: int) -> str` (this will be the main orchestrator for the `/ask` command logic):
+                    *   [x] Call `LLMService.analyze_ask_query(query_text)`.
+                    *   [x] If intent is `query_proposals`:
+                        *   [x] Perform date parsing for `structured_filters.date_query` (if any) using `LLMService`.
+                        *   [x] Perform structured filtering using `ProposalRepository.find_proposals_by_dynamic_criteria()`.
+                        *   [x] If `content_keywords` exist, generate their embedding and search using `VectorDBService.search_proposal_embeddings()`.
+                        *   [x] Consolidate proposal IDs from structured and semantic searches.
+                        *   [x] Fetch full `Proposal` objects for the final list of IDs using `ProposalRepository.get_proposals_by_ids()`.
+                        *   [x] Construct prompt for `LLMService.get_completion` to synthesize an answer. The answer should list matching proposals and guide the user to use `/my_vote <proposal_id>` to see their specific submission for any of these proposals.
+                        *   [x] Call `LLMService.get_completion()` to get the final answer string.
                     *   [ ] Else (intent is `query_general_docs` or fallback):
-                        *   [ ] Proceed with the existing RAG flow for general documents.
-            *   [ ] In `app/telegram_handlers/command_handlers.py` (or wherever `ask_command` is):
-                *   [ ] Modify the `ask_command` handler to call `ContextService.handle_intelligent_ask(question_text, user_telegram_id)`.
+                        *   [x] Proceed with the existing RAG flow for general documents.
+            *   [x] In `app/telegram_handlers/command_handlers.py` (or wherever `ask_command` is):
+                *   [x] Modify the `ask_command` handler to call `ContextService.handle_intelligent_ask(question_text, user_telegram_id)`.
             *   [ ] Write unit tests for all new/modified methods in `LLMService`, `ProposalRepository`, `VectorDBService`, and `ContextService` related to the enhanced `/ask` flow.
+        
+        *   **Subtask 9.5.3: Cleanup existing command handlers to use /ask flow**
+            *   **Goal:** Update "missing ID" prompts for already implemented commands to include new /ask guidance. This covers:
+                *   Proposal-related commands: `/edit_proposal` (Task 7.4) and `/cancel_proposal` (Task 7.5) should also suggest `/ask "which proposal was about..."`. Show a button to prefill "/ask which proposal mentioned...".
+                *   Document-related commands: Any already implemented parts of `/view_doc <document_id>` (from Task 3.5) and admin document commands like `/add_global_doc` (Task 6.1, if it has a missing ID flow), `/edit_global_doc`, `/delete_global_doc` (Tasks 8.4, if partially implemented and have missing ID flows) should suggest `/ask "which doc mentioned..."`. Show a button to prefill "/ask which doc mentioned...".
 
-        *   **Subtask 9.5.3: Implement `/my_vote <proposal_id>` Command**
+        *   **Subtask 9.5.4: Implement `/view_proposal <proposal_id>` Command**
+            *   **Goal:** Allow users to get a direct link to a proposal message in its respective channel.
+            *   **Telegram Handler (`app/telegram_handlers/proposal_command_handlers.py`):**
+                *   [ ] Create `view_proposal_command(update: Update, context: ContextTypes.DEFAULT_TYPE)`.
+                *   [ ] Parse `proposal_id` from `context.args`.
+                *   [ ] If `proposal_id` is missing, send a message: "Which proposal? Use `/my_proposals` to list your own, `/proposals open` or `/proposals closed` to see all, or `/ask 'which proposal was about...'` to find a proposal ID. Then use `/view_proposal <proposal_id>`." (Ensure appropriate buttons for listed commands are considered).
+                *   [ ] Call `ProposalService.get_proposal_message_link(proposal_id)`.
+                *   [ ] If a link is returned, send it to the user: "Here's the link to proposal #{proposal_id}: {link}".
+                *   [ ] If no link (e.g., proposal not found, or `channel_message_id` is missing), send an appropriate message: "Could not find proposal #{proposal_id} or it hasn't been posted to a channel yet."
+            *   **Core Service (`app/core/proposal_service.py`):**
+                *   [ ] Create `get_proposal_message_link(proposal_id: int) -> str | None`.
+                *   [ ] Call `ProposalRepository.get_proposal_by_id(proposal_id)`.
+                *   [ ] If proposal exists and `proposal.target_channel_id` and `proposal.channel_message_id` are present:
+                    *   [ ] Call `TelegramUtils.generate_telegram_message_link(proposal.target_channel_id, proposal.channel_message_id)` to construct the link.
+                    *   [ ] Return the generated link.
+                *   [ ] Else, return `None`.
+            *   **Persistence Layer (`app/persistence/repositories/proposal_repository.py`):**
+                *   [ ] Ensure `get_proposal_by_id(proposal_id)` correctly fetches the proposal object including `target_channel_id` and `channel_message_id`. (This should already be the case if it returns the full `Proposal` model instance).
+            *   **Utilities (`app/utils/telegram_utils.py`):**
+                *   [ ] Create `generate_telegram_message_link(channel_id: Union[str, int], message_id: int) -> str`.
+                    *   [ ] If `channel_id` is an integer (e.g., `-1001234567890`), it's a private channel/supergroup. The link format is `https://t.me/c/{str(channel_id)[4:]}/{message_id}`. (The `[4:]` removes "-100").
+                    *   [ ] If `channel_id` is a string (e.g., `"mychannelusername"`), it's a public channel/supergroup with a username. The link format is `https://t.me/{channel_id.lstrip('@')}/{message_id}`.
+            *   **Registration (`main.py`):**
+                *   [ ] Register the `view_proposal_command` handler with the application dispatcher, ensuring it's correctly imported from `proposal_command_handlers.py`.
+            *   **Documentation (`memory-bank/bot_commands.md`):**
+                *   [x] User has already updated this.
+            *   **Testing:**
+                *   [ ] Write unit tests for `TelegramUtils.generate_telegram_message_link`.
+                *   [ ] Write unit tests for `ProposalService.get_proposal_message_link`.
+                *   [ ] Write unit tests for the `view_proposal_command` handler (mocking service calls).
+                *   [ ] Perform manual end-to-end testing:
+                    *   [ ] Test with a valid proposal ID for a proposal in a private supergroup.
+                    *   [ ] Test with a valid proposal ID for a proposal in a public channel (if applicable).
+                    *   [ ] Test with an invalid/non-existent proposal ID.
+                    *   [ ] Test with a proposal ID that exists but for some reason lacks `channel_message_id`.
+                    *   [ ] Test calling the command without a proposal ID.
+
+        *   **Subtask 9.5.5: Implement `/my_vote <proposal_id>` Command**
             *   [ ] In `app/persistence/repositories/submission_repository.py`:
                 *   [ ] Implement `get_submission_by_proposal_and_user(proposal_id: int, submitter_id: int) -> Submission | None`.
             *   [ ] In `app/core/submission_service.py`:
@@ -690,13 +732,13 @@ This document breaks down the implementation of CoordinationBot into manageable 
             *   [ ] In `app/telegram_handlers/user_command_handlers.py` (or similar):
                 *   [ ] Implement `my_vote_command(update: Update, context: ContextTypes.DEFAULT_TYPE)`:
                     *   [ ] Parses `proposal_id` from command arguments.
-                    *   [ ] If `proposal_id` is missing: Send a message asking "Which proposal? Use /my_vote <proposal_id>. You can see all open and closed proposals for their IDs." with inline buttons for `/proposals open` and `/proposals closed`.
+                    *   [ ] If `proposal_id` is missing: Send a message: "Which proposal? Use `/my_vote <proposal_id>`. You can use `/proposals open`, `/proposals closed`, or `/ask 'which proposal was about...'` to find proposal IDs." (Ensure appropriate buttons for listed commands are considered).
                     *   [ ] If `proposal_id` is present, call `SubmissionService.get_user_submission_for_proposal()`.
                     *   [ ] Send the formatted response string to the user via DM.
             *   [ ] Register the `/my_vote` command handler in `main.py`.
             *   [ ] Write unit tests for the new handler in `user_command_handlers.py`, and new methods in `SubmissionService` and `SubmissionRepository`.
 
-        *   **Subtask 9.5.4: Final Documentation Review & End-to-End Testing**
+        *   **Subtask 9.5.6: Final Documentation Review & End-to-End Testing**
             *   [ ] Review `intelligentAsks.md`, `projectbrief.md`, `systemPatterns.md`, and `bot_commands.md` to ensure consistency with the implemented features.
             *   [ ] Perform thorough end-to-end manual testing of the enhanced `/ask` flow with various types of natural language queries (testing structured filters, content search, and combined queries).
             *   [ ] Perform thorough end-to-end manual testing of the `/my_vote` command, including the case where no `proposal_id` is provided.

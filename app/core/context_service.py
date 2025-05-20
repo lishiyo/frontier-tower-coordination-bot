@@ -600,7 +600,7 @@ class ContextService:
                 f"provide a concise answer to the user's query. "
                 f"List the relevant proposals clearly. "
                 f"If you use information from the document contexts, clearly indicate which document source supports which part of your answer, referencing them by their title and ID as provided in the context. "
-                f"Also, remind the user that they can use '/my_vote <proposal_id>' to see their specific submission for any of these proposals."
+                f"Also, if the user is asking about results for a proposal, remind the user that they can use `/my_vote <proposal_id>` to see their specific vote or submission for any of these proposals, or if they are asking about a proposal, remind the user that they can use `/view_proposal <proposal_id>` to see the proposal details."
             )
 
             final_answer = await self.llm_service.get_completion(synthesis_prompt)
