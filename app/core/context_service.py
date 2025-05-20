@@ -469,12 +469,25 @@ class ContextService:
             # 1. Get proposals based on structured filters (SQL query)
             candidate_proposals_sql: List[Proposal] = []
             if status_filter or type_filter or deadline_range:
-                candidate_proposals_sql = await proposal_repo.find_proposals_by_dynamic_criteria(
-                    status=status_filter,
-                    proposal_type=type_filter,
-                    deadline_date_range=deadline_range # Assuming this targets deadline_date
-                    # Add creation_date_range if LLM also extracts it for "created last week"
-                )
+                # Check if this is a creation date query or deadline date query
+                date_query_type = analysis.get("date_query_type", "deadline")
+                logger.info(f"Date query type for '{date_query_filter}': {date_query_type}")
+                
+                # Apply the date range to the appropriate parameter based on the query type
+                if date_query_type == "creation" and deadline_range:
+                    logger.info(f"Applying date range {deadline_range} to creation_date_range parameter")
+                    candidate_proposals_sql = await proposal_repo.find_proposals_by_dynamic_criteria(
+                        status=status_filter,
+                        proposal_type=type_filter,
+                        creation_date_range=deadline_range  # Use creation_date_range for "creation" date queries
+                    )
+                else:
+                    logger.info(f"Applying date range {deadline_range} to deadline_date_range parameter")
+                    candidate_proposals_sql = await proposal_repo.find_proposals_by_dynamic_criteria(
+                        status=status_filter,
+                        proposal_type=type_filter,
+                        deadline_date_range=deadline_range  # Use deadline_date_range for "deadline" date queries (default)
+                    )
                 logger.info(f"Found {len(candidate_proposals_sql)} candidates via SQL filters.")
             
             sql_filtered_proposal_ids = [p.id for p in candidate_proposals_sql]
@@ -546,6 +559,8 @@ class ContextService:
             proposal_summaries = []
             for prop in final_proposals:
                 summary = f"Proposal ID: {prop.id}\nTitle: {prop.title}\nStatus: {prop.status}\nType: {prop.proposal_type}"
+                if prop.creation_date:
+                    summary += f"\nCreated: {prop.creation_date.strftime('%Y-%m-%d %H:%M UTC')}"
                 if prop.deadline_date:
                     summary += f"\nDeadline: {prop.deadline_date.strftime('%Y-%m-%d %H:%M UTC')}"
                 proposal_summaries.append(summary)

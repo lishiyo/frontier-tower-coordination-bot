@@ -184,6 +184,7 @@ class LLMService:
             - "intent": "query_proposals" or "query_general_docs"
             - "content_keywords": Extracted keywords for semantic search (if intent is query_proposals).
             - "structured_filters": A dict with keys like "status", "proposal_type", "date_query" (if intent is query_proposals).
+            - "date_query_type": "creation" or "deadline" to indicate which field the date query applies to.
             - "error": An error message if parsing failed.
         """
         if not self.client:
@@ -215,8 +216,14 @@ class LLMService:
             "status": "string (one of the allowed statuses, or null if not specified)",
             "proposal_type": "string (one of the allowed types, or null if not specified)",
             "date_query": "string (natural language date phrase like 'last week', 'July 2024', 'before May 10th', or null if not specified)"
-          }} (This whole dict is null if intent is query_general_docs)
+          }} (This whole dict is null if intent is query_general_docs),
+          "date_query_type": "creation" | "deadline" (Identify if date query refers to when proposals were created or when they are due/deadline)
         }}
+
+        IMPORTANT ABOUT DATE QUERIES:
+        - If the user asks about when proposals were "created", "made", "started", "proposed", etc., set date_query_type to "creation".
+        - If the user asks about proposals that are "due", "expire", "end", "close", "deadline", etc., set date_query_type to "deadline".
+        - If there's no date query or it's ambiguous, set date_query_type to "deadline" by default.
 
         Examples:
         1. User Query: "what proposals closed last week?"
@@ -228,7 +235,8 @@ class LLMService:
                "status": "closed",
                "proposal_type": null,
                "date_query": "last week"
-             }}
+             }},
+             "date_query_type": "deadline"
            }}
         2. User Query: "tell me about the pizza party proposal"
            Output:
@@ -239,14 +247,16 @@ class LLMService:
                "status": null,
                "proposal_type": null,
                "date_query": null
-             }}
+             }},
+             "date_query_type": "deadline"
            }}
         3. User Query: "how does the budget work?"
            Output:
            {{
              "intent": "query_general_docs",
              "content_keywords": null,
-             "structured_filters": null
+             "structured_filters": null,
+             "date_query_type": null
            }}
         4. User Query: "any open multiple choice proposals about funding from this month?"
            Output:
@@ -257,18 +267,32 @@ class LLMService:
                "status": "open",
                "proposal_type": "multiple_choice",
                "date_query": "this month"
-             }}
+             }},
+             "date_query_type": "deadline"
            }}
-        5. User Query: "what are the active proposals?"
+        5. User Query: "what proposals were created last week?"
            Output:
            {{
              "intent": "query_proposals",
-             "content_keywords": "active proposals",
+             "content_keywords": "proposals created last week",
              "structured_filters": {{
-               "status": "open",
+               "status": null,
                "proposal_type": null,
-               "date_query": null
-             }}
+               "date_query": "last week"
+             }},
+             "date_query_type": "creation"
+           }}
+        6. User Query: "which proposals were proposed this month?"
+           Output:
+           {{
+             "intent": "query_proposals",
+             "content_keywords": "proposals proposed this month",
+             "structured_filters": {{
+               "status": null,
+               "proposal_type": null,
+               "date_query": "this month"
+             }},
+             "date_query_type": "creation"
            }}
         
         VERY IMPORTANT: Respond with ONLY the JSON object. Do NOT include any other text, explanations, or conversational phrases.
@@ -301,6 +325,7 @@ class LLMService:
                     "intent": "query_general_docs",  # Fallback intent
                     "content_keywords": None,
                     "structured_filters": None,
+                    "date_query_type": None,
                     "error": "LLM provided no response."
                 }
 
@@ -324,6 +349,7 @@ class LLMService:
                     "intent": "query_general_docs", 
                     "content_keywords": None,
                     "structured_filters": None,
+                    "date_query_type": None,
                     "error": "LLM response was not in the expected format."
                 }
             
@@ -333,12 +359,17 @@ class LLMService:
                     parsed_response["structured_filters"] = {"status": None, "proposal_type": None, "date_query": None} # Default if missing/malformed
                 if "content_keywords" not in parsed_response:
                      parsed_response["content_keywords"] = query_text # Fallback if keywords are missing
+                # Ensure date_query_type has a valid value
+                if "date_query_type" not in parsed_response or parsed_response["date_query_type"] not in ["creation", "deadline"]:
+                    # Default to "deadline" if it's not specified or invalid value
+                    has_date_query = parsed_response.get("structured_filters", {}).get("date_query") is not None
+                    parsed_response["date_query_type"] = "deadline" if has_date_query else None
             else: # For query_general_docs
                 parsed_response["content_keywords"] = None
                 parsed_response["structured_filters"] = None
+                parsed_response["date_query_type"] = None
 
-
-            logger.info(f"Successfully analyzed ask query: '{query_text}'. Intent: {parsed_response.get('intent')}")
+            logger.info(f"Successfully analyzed ask query: '{query_text}'. Intent: {parsed_response.get('intent')}, Date query type: {parsed_response.get('date_query_type')}")
             return parsed_response
 
         except json.JSONDecodeError as e:
@@ -347,6 +378,7 @@ class LLMService:
                 "intent": "query_general_docs", 
                 "content_keywords": None,
                 "structured_filters": None,
+                "date_query_type": None,
                 "error": "Failed to parse LLM JSON response."
             }
         except Exception as e:
@@ -355,6 +387,7 @@ class LLMService:
                 "intent": "query_general_docs",
                 "content_keywords": None,
                 "structured_filters": None,
+                "date_query_type": None,
                 "error": f"An unexpected error occurred: {str(e)}"
             }
 
