@@ -1,8 +1,8 @@
-# CoordinationBot Commands
+# CoordinationBot Commands (v0)
 
 This file lists all user-facing commands for CoordinationBot, ordered roughly by criticality for core functionality.
 
-## Core User Commands (v0)
+## Core User Commands
 
 *   `/start`
     *   **Description:** Displays a welcome message and implicitly registers the user with the bot.
