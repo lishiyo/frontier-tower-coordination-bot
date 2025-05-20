@@ -1,5 +1,25 @@
 # Progress Log
 
+## Mon May 19 18:45:13 PDT 2025
+
+**Completed:**
+- Implemented Subtask 9.5.3: Improved "missing ID" guidance for commands requiring document or proposal IDs:
+  - Updated command handlers for `/edit_proposal`, `/cancel_proposal`, and `/view_doc` to provide clear instructions when used without an ID parameter.
+  - Created callback handlers in `app/telegram_handlers/callback_handlers.py` for "Search for Proposals" and "Search for Documents" buttons that show detailed guidance.
+  - Implemented `handle_close_instructions` to dismiss help text when users are done reading it.
+  - Modified command handlers to suggest using `/ask` to search for relevant IDs.
+
+**Learnings & Fixes:**
+- Attempted to use `switch_inline_query_current_chat` for prefilling the command input, but discovered a limitation: Telegram always prepends the bot username to the query text, breaking the command syntax when a leading slash is required.
+- Reverted to a callback-based approach that provides detailed instruction text with examples, ensuring users understand how to use the `/ask` command correctly.
+- Found a bug in intelligent search: when users ask about "proposals created this month", the system correctly parses the date range but applies it only to `deadline_date_range` instead of `creation_date_range` in the SQL filtering.
+- The callback-based approach with examples and a "Close" button provides a cleaner user experience than attempting to directly prefill commands.
+
+**Next Steps:**
+- Fix the creation date filtering bug in `app/core/context_service.py` by adding support for `creation_date_range` parameter in the SQL filtering when date queries relate to creation dates.
+- Address pending Task 5.2 follow-ups:
+  - Ensure timezone consistency in user-facing datetimes (PST).
+  - Update results message copy in channel announcements to use "(DM @botname)" instead of "(DM the bot)".
 
 ## Mon May 19 17:16:10 PDT 2025
 

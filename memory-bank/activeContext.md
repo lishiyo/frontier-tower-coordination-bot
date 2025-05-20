@@ -1,36 +1,40 @@
-# Active Context - Mon May 19 17:16:10 PDT 2025
+# Active Context - Mon May 19 18:45:13 PDT 2025
 
 ## Current Work Focus
-- Successfully enhanced the `/ask` command by implementing interactive "View Source" buttons for displayed document references.
-- This improves user experience by allowing direct access to source documents through clickable buttons rather than having to type document IDs manually.
-- Implemented callback handling for these buttons using `CallbackQueryHandler` in `main.py` and a `view_doc_button_callback` function.
-- Refactored document viewing functionality to reduce code duplication by creating a shared `_display_document_content` helper function used by both the `/view_doc` command and button callbacks.
+- Implemented Task 9.5.3: Improved "missing ID" handling for commands requiring document or proposal IDs
+- Enhanced the UI for commands like `/edit_proposal`, `/cancel_proposal`, and `/view_doc` to provide clear guidance to users on using `/ask` to find relevant IDs
+- Used callback-based approach for search instructions rather than prefilling input, as Telegram always prepends bot username which breaks command syntax
 
 ## What's Working
-- The `/ask` command now returns answers with interactive "View Source" buttons for each referenced document.
-- Both the `/view_doc` command and the new "View Source" buttons use the same core logic through the shared `_display_document_content` helper function.
-- The document management system is properly organized with document-related handlers moved to `app/telegram_handlers/document_command_handlers.py`.
+- Commands requiring proposal IDs or document IDs now provide helpful, clear instructions when used without an ID
+- Users can tap "Search for Proposals" or "Search for Documents" buttons to receive detailed guidance on using the `/ask` command
+- The "Close" button removes the instructions when the user is done reading them
+- The callback-based approach avoids issues with Telegram's bot username prefixing when using `switch_inline_query_current_chat`
+- The system correctly recommends using `/ask which proposal was about...` or `/ask which doc mentioned...` to find relevant IDs
 
 ## What's Broken or Pending
+- **Bug in Proposal Creation Date Filtering**:
+  - When users search with `/ask which proposals were created this month`, the system correctly parses the date range but only applies it to `deadline_date_range` instead of `creation_date_range`
+  - This causes the system to match proposals with deadlines in May, but not necessarily proposals created in May
+  - Code comment in `handle_intelligent_ask` indicates this is a known limitation: "Add creation_date_range if LLM also extracts it for 'created last week'"
 - **Task 5.2 Follow-ups (Still Pending from previous context):**
-    - **Timezone Consistency:** Review and ensure all *other* user-facing datetimes are consistently displayed in PST.
-    - **Results Message Copy:** Tweak results message copy in `ProposalService` for channel announcements from "(DM the bot)" to "(DM @botname)".
-- **Current Enhancements Needed:**
-    - When viewing a document from a URL source, the source URL should be displayed in the header.
-    - Source buttons for URL documents should link directly to the original URL rather than showing stored content.
+  - **Timezone Consistency:** Review and ensure all *other* user-facing datetimes are consistently displayed in PST.
+  - **Results Message Copy:** Tweak results message copy in `ProposalService` for channel announcements from "(DM the bot)" to "(DM @botname)".
 
 ## Active Decisions and Considerations
-- We're continuing to improve user experience by making document sources more accessible and enhancing the intuitiveness of the interface.
-- For documents sourced from URLs, we're considering adding direct linking to maintain proper attribution and allow users to access the original source easily.
+- For prefilled input situations, found that Telegram buttons using `switch_inline_query_current_chat` always prepend the bot username, which breaks command syntax
+- Decided to use a callback approach that shows detailed instructions with examples instead, maintaining a cleaner and more reliable user experience
+- For `/ask` queries about "created" proposals, the SQL filtering logic should use `creation_date_range` parameter instead of (or in addition to) `deadline_date_range`
 
 ## Important Patterns and Preferences
-- Shared helper functions for common functionality (like `_display_document_content`) help maintain code consistency and reduce duplication.
-- Callback handlers are organized based on functionality, with document-related handlers in the document handlers file.
+- Using callbacks with detailed instructions instead of prefilled commands allows for better control over the user experience
+- Including multiple examples in the search instructions helps users understand the command pattern
+- The "Close" button provides a clean way to dismiss instructions when the user is done
 
 ## Learnings and Project Insights
-- Telegram's callback query system provides a powerful way to create interactive elements in bot messages.
-- Proper refactoring and organization of command handlers improves maintainability as the bot's functionality grows.
-- For document sources from URLs, providing direct attribution and access to original sources enhances transparency and usability.
+- Telegram's `switch_inline_query_current_chat` mechanism always prepends the bot username, which can break command syntax for commands expecting a leading "/"
+- Callback-based approaches provide more control over the UX compared to prefilling, at the cost of requiring users to manually type commands
+- Date filtering logic should properly match the user's intent - if they ask about creation dates, we should filter by creation dates
 
 ## Current Database/Model State
 - No database schema changes were made in this iteration. The improvements focused on enhancing the user interface and interaction patterns for existing functionality.
