@@ -251,10 +251,11 @@ class ContextService:
         """Lists all documents associated with a given proposal_id."""
         return await self.document_repository.get_documents_by_proposal_id(proposal_id)
 
-    async def _get_raw_document_context_for_query(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> Tuple[str, List[str]]:
+    async def _get_raw_document_context_for_query(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Fetches relevant raw document chunks and their sources for a given question.
-        Returns a tuple: (formatted_context_string, list_of_source_citations_display_names).
+        Returns a tuple: (formatted_context_string, list_of_source_details_dicts).
+        Each dict in list_of_source_details_dicts is like: {"id": 123, "title": "Document Title"}
         """
         logger.info(f"_get_raw_document_context_for_query: question='{question_text}', proposal_id_filter={proposal_id_filter}")
         query_embedding = await self.llm_service.generate_embedding(question_text)
@@ -274,12 +275,12 @@ class ContextService:
             return "", []
         
         context_str_parts = []
-        sources_cited_display = [] # Using a list to maintain order and allow duplicates if different chunks from same doc
+        source_details_list: List[Dict[str, Any]] = [] # New: list of dicts
 
         for chunk_info in similar_chunks_results:
             text_chunk = chunk_info.get('document_content', '')
             metadata = chunk_info.get('metadata', {})
-            doc_id = metadata.get('document_sql_id')
+            doc_id_str = metadata.get('document_sql_id') # Changed variable name to avoid conflict
             chunk_preview = metadata.get('chunk_text_preview', '')
             actual_title = metadata.get('title')
             linked_proposal_id = metadata.get('proposal_id')
@@ -292,15 +293,23 @@ class ContextService:
                 doc_title_display = actual_title
             elif chunk_preview:
                 doc_title_display = f"Preview: {chunk_preview[:30]}..."
+            elif doc_id_str: # Check doc_id_str before defaulting to "Unknown document"
+                doc_title_display = f"Document ID {doc_id_str}"
             else:
-                doc_title_display = f"Document ID {doc_id}" if doc_id else "Unknown document"
+                doc_title_display = "Unknown document"
 
             if text_chunk:
                 context_str_parts.append(f"- {text_chunk}") # Store raw chunk
-                source_citation_display = f"'{doc_title_display}'"
-                if doc_id:
-                    source_citation_display += f" (Doc ID: {doc_id})"
-                sources_cited_display.append(source_citation_display) # Add to list of sources
+                if doc_id_str: # Only add to sources if there's a doc_id to link to
+                    try:
+                        doc_id_int = int(doc_id_str) # Ensure it's an int for the /view_doc command
+                        # Add to list of source details for buttons
+                        # To avoid duplicates for buttons if multiple chunks from same doc,
+                        # this could be turned into a set of tuples (id, title) then converted back,
+                        # or handled by the caller. For now, allow duplicates, caller can refine.
+                        source_details_list.append({"id": doc_id_int, "title": doc_title_display})
+                    except ValueError:
+                        logger.warning(f"_get_raw_document_context_for_query: Could not parse doc_id '{doc_id_str}' to int for source button.")
         
         if not context_str_parts:
             logger.info("_get_raw_document_context_for_query: No text content found in similar chunks.")
@@ -309,16 +318,26 @@ class ContextService:
         # Construct the full context string
         # We don't add "Context from documents..." here, the caller can do that if needed.
         full_context_str = "\n".join(context_str_parts)
-        return full_context_str, list(set(sources_cited_display)) # Return unique source display names
+        # Deduplicate source_details_list based on 'id' before returning to avoid redundant buttons for the same document.
+        # Title might vary slightly if it's chunk-derived, so prioritize ID for uniqueness.
+        unique_source_details = []
+        seen_doc_ids = set()
+        for detail in source_details_list:
+            if detail['id'] not in seen_doc_ids:
+                unique_source_details.append(detail)
+                seen_doc_ids.add(detail['id'])
+        
+        return full_context_str, unique_source_details
 
-    async def get_answer_for_question(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> str:
+    async def get_answer_for_question(self, question_text: str, proposal_id_filter: Optional[int] = None, top_n_chunks: int = 3) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Answers a question using RAG by fetching relevant document chunks and synthesizing an answer.
+        Returns a tuple: (answer_string, list_of_source_details_for_buttons)
         """
         logger.info(f"get_answer_for_question: question='{question_text}', proposal_id_filter={proposal_id_filter}")
 
         try:
-            raw_context, sources_cited_display = await self._get_raw_document_context_for_query(
+            raw_context, source_details = await self._get_raw_document_context_for_query(
                 question_text=question_text,
                 proposal_id_filter=proposal_id_filter,
                 top_n_chunks=top_n_chunks
@@ -328,21 +347,30 @@ class ContextService:
                 # If initial search (e.g., with proposal_id_filter) found nothing, try a broader search only if a filter was active.
                 if proposal_id_filter is not None:
                     logger.info(f"get_answer_for_question: No context found with proposal_id_filter {proposal_id_filter}. Retrying without filter.")
-                    raw_context, sources_cited_display = await self._get_raw_document_context_for_query(
+                    raw_context, source_details = await self._get_raw_document_context_for_query(
                         question_text=question_text,
                         proposal_id_filter=None, # Broader search
                         top_n_chunks=top_n_chunks
                     )
                     if not raw_context:
-                        return "I couldn't find any relevant information for your question even after a broader search."
+                        return "I couldn't find any relevant information for your question even after a broader search.", []
                 else:
-                    return "I couldn't find any relevant information for your question."
+                    return "I couldn't find any relevant information for your question.", []
             
-            # Now, raw_context contains the chunks and sources_cited_display has the source names.
+            # Now, raw_context contains the chunks and source_details has the structured source info.
             # We need to format the prompt for the LLM.
             context_header = ""
-            if sources_cited_display:
-                context_header = f"Context from documents ({', '.join(sources_cited_display)}):\n"
+            # Create display names from source_details for the prompt
+            source_display_names_for_prompt = []
+            if source_details:
+                for detail in source_details:
+                    display_name = f"'{detail['title']}'"
+                    if 'id' in detail: # Should always be there if it's a valid source for a button
+                        display_name += f" (Doc ID: {detail['id']})"
+                    source_display_names_for_prompt.append(display_name)
+
+            if source_display_names_for_prompt:
+                context_header = f"Context from documents ({', '.join(source_display_names_for_prompt)}):\n"
             
             prompt = (
                 f"You are a helpful assistant. Based on the following context, please answer the user's question.\n"
@@ -355,15 +383,11 @@ class ContextService:
 
             answer = await self.llm_service.get_completion(prompt)
 
-            # Append source citation to the answer, using the unique list from _get_raw_document_context_for_query
-            if sources_cited_display and answer and not answer.startswith("I couldn't find any relevant information") and not answer.startswith("I don't have enough information") :
-                answer += f"\n\nSources: {', '.join(sources_cited_display)}."
-            
-            return answer
+            return answer, source_details # Return the answer and the structured source details
 
         except Exception as e:
             logger.error(f"Error getting answer for question '{question_text}': {e}", exc_info=True)
-            return "Sorry, I encountered an error while trying to answer your question. Please try again later."
+            return "Sorry, I encountered an error while trying to answer your question. Please try again later.", []
 
     async def _parse_date_query_to_range(self, date_query: Optional[str]) -> Optional[Tuple[Optional[datetime], Optional[datetime]]]:
         """
@@ -416,13 +440,13 @@ class ContextService:
             logger.error(f"Unexpected error in _parse_date_query_to_range for '{date_query}': {e}", exc_info=True)
             return None
 
-    async def handle_intelligent_ask(self, query_text: str, user_telegram_id: int) -> str:
+    async def handle_intelligent_ask(self, query_text: str, user_telegram_id: int) -> Tuple[str, List[Dict[str, Any]]]:
         logger.info(f"Handling intelligent ask from user {user_telegram_id}: '{query_text}'")
         
         analysis = await self.llm_service.analyze_ask_query(query_text)
         if analysis.get("error"):
             logger.error(f"Error analyzing ask query: {analysis.get('error')}")
-            return "Sorry, I had trouble understanding your question. Please try rephrasing."
+            return "Sorry, I had trouble understanding your question. Please try rephrasing.", []
 
         intent = analysis.get("intent", "query_general_docs")
         logger.info(f"Determined intent: {intent}")
@@ -510,13 +534,13 @@ class ContextService:
 
             if not final_proposal_ids:
                 logger.info("No proposals found matching the combined criteria.")
-                return "I couldn't find any proposals matching your query. You could try rephrasing or broadening your search."
+                return "I couldn't find any proposals matching your query. You could try rephrasing or broadening your search.", []
 
             # Fetch full proposal objects
             final_proposals = await proposal_repo.get_proposals_by_ids(list(final_proposal_ids))
             
             if not final_proposals:
-                return "I found some potential matches by ID, but couldn't retrieve their full details. Please try again."
+                return "I found some potential matches by ID, but couldn't retrieve their full details. Please try again.", []
 
             # 4. Synthesize answer with LLM
             proposal_summaries = []
@@ -527,18 +551,17 @@ class ContextService:
                 proposal_summaries.append(summary)
             
             if not proposal_summaries: # Should not happen if final_proposals is not empty
-                 return "I couldn't find any proposals matching your query criteria."
+                 return "I couldn't find any proposals matching your query criteria.", []
 
             # --- New: Gather context from documents attached to these proposals ---
-            additional_document_contexts = []
-            all_doc_sources_cited = set() # To collect unique sources from documents
+            all_doc_source_details: List[Dict[str, Any]] = [] # New: collect structured source details
+            additional_document_contexts_for_prompt = [] # For constructing the prompt
 
             if len(query_text.split()) > 3: # Arbitrary threshold
                 logger.info(f"Query '{query_text}' seems detailed enough to search attached documents for {len(final_proposals)} proposals.")
                 for prop in final_proposals:
                     logger.info(f"Searching documents attached to proposal ID {prop.id} for query: '{query_text}'")
-                    # Call the new method to get raw context and sources
-                    raw_doc_context, doc_sources = await self._get_raw_document_context_for_query(
+                    raw_doc_context, current_prop_doc_source_details = await self._get_raw_document_context_for_query(
                         question_text=query_text, 
                         proposal_id_filter=prop.id,
                         top_n_chunks=3
@@ -547,50 +570,49 @@ class ContextService:
                     if raw_doc_context:
                         # We want to provide the raw context directly to the final LLM
                         # Construct a header for this proposal's document context
-                        context_header = f"From documents related to Proposal {prop.id} ('{prop.title}'):"
-                        additional_document_contexts.append(f"{context_header}\n{raw_doc_context}")
-                        all_doc_sources_cited.update(doc_sources) # Add sources from this proposal's docs
+                        context_header_for_prompt = f"From documents related to Proposal {prop.id} ('{prop.title}'):"
+                        additional_document_contexts_for_prompt.append(f"{context_header_for_prompt}\n{raw_doc_context}")
+                        all_doc_source_details.extend(current_prop_doc_source_details) # Add sources from this proposal's docs
                         logger.info(f"Added raw context from documents of proposal {prop.id}. Context length: {len(raw_doc_context)}")
                     else:
                         logger.info(f"No significant additional context found in documents for proposal {prop.id} regarding query: '{query_text}'")
             # --- End new section ---
-
             context_for_llm = "Here are the proposals I found matching your query:\n\n" + "\n\n---\n\n".join(proposal_summaries)
             
-            if additional_document_contexts:
-                context_for_llm += "\n\n---\n\nAdditionally, here is some context from documents related to these proposals:\n\n" + "\n\n---\n\n".join(additional_document_contexts)
+            if additional_document_contexts_for_prompt:
+                context_for_llm += "\n\n---\n\nAdditionally, here is some context from documents related to these proposals:\n\n" + "\n\n---\n\n".join(additional_document_contexts_for_prompt)
 
             logger.info(f"=== Context for LLM: {context_for_llm} ===\n\n")
             
-            # Prepare a list of all unique sources (proposal summaries don't have explicit 'sources' in this string)
-            final_sources_to_cite = list(all_doc_sources_cited)
-
+            # The actual source details for buttons will be `all_doc_source_details`
+            # We might want to de-duplicate `all_doc_source_details` before returning if not already handled by _get_raw_document_context_for_query
+            # _get_raw_document_context_for_query now de-duplicates, so all_doc_source_details might have duplicates if same doc linked to multiple relevant proposals.
+            # For buttons, we want a unique list.
+            final_unique_doc_source_details_for_buttons: List[Dict[str, Any]] = []
+            seen_button_doc_ids = set()
+            for detail in all_doc_source_details:
+                if detail['id'] not in seen_button_doc_ids:
+                    final_unique_doc_source_details_for_buttons.append(detail)
+                    seen_button_doc_ids.add(detail['id'])
+            
             synthesis_prompt = (
                 f"{context_for_llm}\n\nUser's original query: '{query_text}'\n\nBased on all the proposal information and any additional document context provided above, "
                 f"provide a concise answer to the user's query. "
                 f"List the relevant proposals clearly. "
-                # f"If you use information from the document contexts, mention their sources if distinct. " # LLM should handle this if sources are in the context
+                f"If you use information from the document contexts, clearly indicate which document source supports which part of your answer, referencing them by their title and ID as provided in the context. "
                 f"Also, remind the user that they can use '/my_vote <proposal_id>' to see their specific submission for any of these proposals."
             )
 
             final_answer = await self.llm_service.get_completion(synthesis_prompt)
             if not final_answer:
-                return "I found some proposals, but I had trouble summarizing them. You can try viewing them individually."
+                return "I found some proposals, but I had trouble summarizing them. You can try viewing them individually.", []
             
-            # Append document sources if they were used and the LLM didn't naturally include them
-            # This is tricky; the LLM should ideally incorporate source hints from the context_for_llm.
-            # For now, let's rely on the LLM to use the source info embedded in context_for_llm.
-            # If all_doc_sources_cited is not empty and the answer is positive, we could append them.
-            if final_sources_to_cite and final_answer and not final_answer.startswith("I couldn't find any proposals") and not final_answer.startswith("I couldn't find any relevant information"):
-                # Check if sources are already mentioned. This is complex. 
-                # A simpler approach: if doc context was added, always append sources used for that context.
-                final_answer += f"\n\nDocument data considered from: {', '.join(final_sources_to_cite)}."
-            
-            return final_answer
+            return final_answer, final_unique_doc_source_details_for_buttons # Return structured details for buttons
 
         else: # Fallback to general document RAG
             logger.info("Intent is query_general_docs, falling back to standard RAG.")
             # Assuming no specific proposal_id is relevant for a general query fallback
+            # This call now correctly returns a tuple (answer_text, source_details_list)
             return await self.get_answer_for_question(query_text, proposal_id_filter=None)
 
     async def link_document_to_proposal_in_vector_store(

@@ -9,11 +9,12 @@ from app.config import ConfigService
 # Import command handlers from their new locations
 from app.telegram_handlers.command_handlers import (
     start_command, help_command, unknown_command, ask_command
+    # view_doc_button_callback will be imported from document_command_handlers
 )
 from app.telegram_handlers.user_command_handlers import my_votes_command, my_proposals_command
 from app.telegram_handlers.document_command_handlers import (
-    view_document_content_command, view_docs_command
-    # edit_doc_command, delete_doc_command, view_global_docs_command, edit_global_doc_command, delete_global_doc_command, add_global_doc_command, add_doc_command, edit_proposal_command # Commented out
+    view_document_content_command, view_docs_command,
+    view_doc_button_callback    # edit_doc_command, delete_doc_command, view_global_docs_command, edit_global_doc_command, delete_global_doc_command, add_global_doc_command, add_doc_command, edit_proposal_command # Commented out
 )
 from app.telegram_handlers.proposal_command_handlers import (
     proposal_conv_handler, 
@@ -104,6 +105,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_vote_callback, pattern=r"^vote_.*$")) # Task 4.2
     application.add_handler(CallbackQueryHandler(handle_proposal_filter_callback, pattern=f"^{PROPOSAL_FILTER_CALLBACK_PREFIX}")) # New handler
     application.add_handler(CallbackQueryHandler(handle_my_proposals_for_edit_prompt, pattern=r"^my_proposals_for_edit_prompt$")) # Added
+    application.add_handler(CallbackQueryHandler(view_doc_button_callback, pattern=r"^/view_doc \d+$"))
 
     # Proposal viewing commands
     application.add_handler(CommandHandler("proposals", proposals_command))

@@ -592,9 +592,11 @@ This document breaks down the implementation of CoordinationBot into manageable 
 2.  **Task 9.2: Enhance `/view_docs` for Multi-Channel Support**
     *   [ ] **`/view_docs` (no arguments):**
         *   [ ] Modify handler to retrieve the list of *all* authorized channels from `ConfigService` (or `AuthorizedChannelRepository`).
-        *   [ ] Format and DM this list (channel IDs and names if available) to the user.
+        *   [ ] Format and DM this list (channel IDs and names if available) to the user. These should be rendered as list of buttons the user can tap to immediately call `/view_docs <channel_id>`.
     *   [ ] **`/view_docs <channel_id>`:**
         *   [ ] Ensure this command correctly lists proposals for *any* valid authorized `channel_id` (not just the old single `TARGET_CHANNEL_ID`). No significant change if `ProposalService.list_proposals_by_channel` already just takes a `channel_id`.
+        *   [ ] Make sure this list of proposals also renders a list of buttons the user can tap to immediately call `/view_docs <proposal_id>`.
+        *   [ ] Then in the documents listed in `/view_docs <proposal_id>`, these should also render list of buttons for each document id, so the user can tap to immediately call `/view_doc <doc_id>`.
     *   [ ] **General Document Association (Future Consideration for RAG):**
         *   [ ] Consider if general documents (added via `/add_global_doc`) should be associable with specific authorized channels (new `associated_channel_id` field in `Document` model).
         *   [ ] If so, `/view_docs <channel_id>` could also list general documents associated with that channel.

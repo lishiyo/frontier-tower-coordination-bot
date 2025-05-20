@@ -2,7 +2,7 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.constants import ParseMode, ChatType
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from app.core.user_service import UserService
 from app.persistence.database import AsyncSessionLocal, get_session
@@ -183,28 +183,55 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 vector_db_service=vector_db_service
             )
             
-            answer: str
+            answer_text: str
+            source_details: List[Dict[str, Any]] = [] # Default to empty list
+
             if proposal_id_filter is not None:
                 # Case 1: /ask <proposal_id> <question> - RAG on specific proposal's documents
                 logger.info(f"Calling get_answer_for_question for prop ID {proposal_id_filter} and question '{question_text_for_service}'")
-                answer = await context_service.get_answer_for_question(
+                answer_text, source_details = await context_service.get_answer_for_question(
                     question_text=question_text_for_service,
                     proposal_id_filter=proposal_id_filter
                 )
             else:
                 # Case 2: /ask <general_question_about_proposals_or_docs> - Intelligent ask
                 logger.info(f"Calling handle_intelligent_ask for query '{question_text_for_service}'")
-                answer = await context_service.handle_intelligent_ask(
+                answer_text, source_details = await context_service.handle_intelligent_ask(
                     query_text=question_text_for_service, 
                     user_telegram_id=update.effective_user.id
                 )
             
-            # MarkdownV2 escaping should be done carefully, especially if LLM already formats some markdown.
-            # For now, let's assume the answer from handle_intelligent_ask is plain text or simple markdown that needs escaping.
-            escaped_answer = escape_markdown_v2(answer)
+            escaped_answer = escape_markdown_v2(answer_text)
+            reply_markup: Optional[InlineKeyboardMarkup] = None
+
+            if source_details: # source_details is List[Dict[str, Any]]
+                keyboard_rows = []
+                for detail in source_details:
+                    # Ensure title and id exist, and id is an int
+                    doc_title = detail.get('title', 'Unknown Source')
+                    doc_id = detail.get('id')
+
+                    if doc_id is not None:
+                        try:
+                            # Ensure title is escaped for button text and truncated
+                            # Max button text length is 64 bytes, be conservative
+                            button_title_part = escape_markdown_v2(str(doc_title)) 
+                            max_len_title = 35 # Adjusted for "View Source: '' (ID )"
+                            if len(button_title_part) > max_len_title:
+                                button_title_part = button_title_part[:max_len_title-3] + "..."
+                            
+                            button_text = f"Source: '{button_title_part}' (ID {doc_id})"
+                            callback_data = f"/view_doc {doc_id}"
+                            keyboard_rows.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+                        except Exception as e:
+                            logger.error(f"Error creating button for source detail {detail}: {e}", exc_info=True)
+                
+                if keyboard_rows:
+                    reply_markup = InlineKeyboardMarkup(keyboard_rows)
+
         # Ensure the message object exists before replying
         if update.message:
-            await update.message.reply_text(escaped_answer, parse_mode='MarkdownV2')
+            await update.message.reply_text(escaped_answer, reply_markup=reply_markup, parse_mode='MarkdownV2')
     except Exception as e:
         logger.error(f"Error in ask_command: {e}", exc_info=True)
         if update.message: # Ensure message object exists for error reply

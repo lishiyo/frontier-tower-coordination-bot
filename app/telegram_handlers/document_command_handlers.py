@@ -1,17 +1,86 @@
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.error import BadRequest
+from telegram.constants import ParseMode
 
 from app.persistence.database import AsyncSessionLocal
 from app.core.proposal_service import ProposalService
 from app.core.context_service import ContextService
 from app.config import ConfigService
+from app.utils.telegram_utils import escape_markdown_v2
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional, Tuple, Any
 # Add any other necessary imports from the original command_handlers.py, like services or models if directly used.
 
 logger = logging.getLogger(__name__)
 
+# Helper Function for fetching document content
+async def _get_and_format_document_for_display(document_id: int, session: AsyncSession) -> Tuple[Optional[str], bool]:
+    """
+    Fetches document content and indicates if found.
+    Returns a tuple: (raw_content_string_or_none, found_boolean).
+    """
+    # ContextService needs to be initialized.
+    # Since get_document_content doesn't use LLM or VectorDB services, we can pass None.
+    context_service = ContextService(
+        db_session=session,
+        llm_service=None, 
+        vector_db_service=None
+    )
+    
+    raw_content = await context_service.get_document_content(document_id)
+    
+    if raw_content:
+        return raw_content, True
+    return None, False
+
+# New Helper Function for displaying document content
+async def _display_document_content(doc_id: int, message_destination: Any, log_prefix: str = "", user_id: Optional[int] = None) -> bool:
+    """
+    Shared helper to fetch and display document content to a given message destination.
+    
+    Args:
+        doc_id: The document ID to display
+        message_destination: An object with reply_text method (like update.message or query.message)
+        log_prefix: Optional prefix for log messages
+        user_id: Optional user ID for logging purposes
+        
+    Returns:
+        bool: True if document was found and displayed, False otherwise
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            raw_content, found = await _get_and_format_document_for_display(doc_id, session)
+
+        if found and raw_content:
+            display_content = escape_markdown_v2(raw_content)
+            max_length = 4096
+            
+            message_header = f"Content for Document ID {doc_id}:\n\n"
+            
+            if len(display_content) <= (max_length - len(message_header)):
+                await message_destination.reply_text(f"{message_header}{display_content}", parse_mode=ParseMode.MARKDOWN_V2)
+            else:
+                await message_destination.reply_text(f"Displaying content for Document ID {doc_id} \\(truncated due to length\\):", parse_mode=ParseMode.MARKDOWN_V2)
+                for i in range(0, len(display_content), max_length):
+                    chunk = display_content[i:i + max_length]
+                    await message_destination.reply_text(chunk, parse_mode=ParseMode.MARKDOWN_V2)
+            if user_id:
+                logger.info(f"{log_prefix} User {user_id} viewed content of document {doc_id}.")
+            return True
+        else:
+            await message_destination.reply_text(f"Could not retrieve content for Document ID {doc_id}\\. It might not exist or have no content\\.")
+            if user_id:
+                logger.warning(f"{log_prefix} User {user_id} failed to view content for document {doc_id}.")
+            return False
+    except Exception as e:
+        logger.error(f"{log_prefix} Error processing doc_id {doc_id}: {e}", exc_info=True)
+        await message_destination.reply_text("Sorry, I couldn't retrieve the document at the moment.")
+        return False
+
 async def view_document_content_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the raw content of a specific document."""
+    """Displays the raw content of a specific document using the helper function."""
     if not update.effective_user or not update.message:
         logger.warning("view_document_content_command called without effective_user or message.")
         return
@@ -26,47 +95,13 @@ async def view_document_content_command(update: Update, context: ContextTypes.DE
         await update.message.reply_text("Invalid Document ID. It must be a number.")
         return
 
-    async with AsyncSessionLocal() as session:
-        # Assuming LLMService and VectorDBService are not directly needed for this command's core logic
-        # but ContextService might require them for its full initialization.
-        # If ContextService can be initialized with only db_session for this specific path, adjust accordingly.
-        # For now, passing None for services not strictly used by get_document_content.
-        # This is a simplification and might need a more robust DI or service locator pattern.
-        
-        # A better approach would be to have a way to get services from context or a factory
-        # For now, let's assume ContextService can be partially initialized or these are available
-        # This part might need adjustment based on how services are typically instantiated and passed around.
-        # Simplification: Directly instantiating services here - NOT ideal for production.
-        # config_service = ConfigService() # This should be available globally or passed in.
-        # llm_service = LLMService(api_key=config_service.get_openai_api_key())
-        # vector_db_service = VectorDBService(host="localhost", port=8000) # Example, needs proper config
-        
-        # The services below are not used by get_document_content directly.
-        # If ContextService.__init__ requires them, they'd need to be instantiated.
-        # For now, let's assume they are not strictly needed for this specific method or ContextService handles their optionality.
-        context_service = ContextService(
-            db_session=session, 
-            llm_service=None, # Not used by get_document_content
-            vector_db_service=None # Not used by get_document_content
-        )
-        
-        raw_content = await context_service.get_document_content(document_id)
-
-    if raw_content:
-        max_length = 4000 # Telegram message length limit
-        if len(raw_content) <= max_length:
-            await update.message.reply_text(f"Content for Document ID {document_id}:\n\n{raw_content}")
-        else:
-            await update.message.reply_text(f"Content for Document ID {document_id} (part 1):\n\n")
-            for i in range(0, len(raw_content), max_length):
-                chunk = raw_content[i:i + max_length]
-                await update.message.reply_text(chunk)
-                if i + max_length < len(raw_content):
-                    await update.message.reply_text(f"Content for Document ID {document_id} (part {i // max_length + 2}):\n\n")
-        logger.info(f"User {update.effective_user.id} viewed content of document {document_id}.")
-    else:
-        await update.message.reply_text(f"Could not retrieve content for Document ID {document_id}. It might not exist or have no content.")
-        logger.warning(f"User {update.effective_user.id} failed to view content for document {document_id}.")
+    # Use shared helper function
+    await _display_document_content(
+        doc_id=document_id,
+        message_destination=update.message,
+        log_prefix="view_document_content_command:",
+        user_id=update.effective_user.id
+    )
 
 async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /view_docs command with various arguments."""
@@ -156,8 +191,39 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         else:
             await update.message.reply_text(f"No proposals found for channel/identifier '{channel_id_arg_str}', or it's not a recognized proposal ID or channel. Use `/view_docs` to list all channel ids.")
 
+async def view_doc_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the callback query from 'View Source' buttons by using the shared helper function."""
+    query = update.callback_query
+    await query.answer() # Acknowledge the callback
+
+    callback_data = query.data
+    logger.info(f"view_doc_button_callback received callback_data: {callback_data}")
+
+    if not callback_data or not callback_data.startswith("/view_doc "):
+        logger.warning(f"Invalid callback_data received: {callback_data}")
+        if query.message: 
+            await query.message.reply_text("Sorry, there was an error processing this action.")
+        return
+
+    try:
+        doc_id_str = callback_data.split("/view_doc ")[1]
+        doc_id = int(doc_id_str)
+    except (IndexError, ValueError) as e:
+        logger.error(f"Error parsing doc_id from callback_data '{callback_data}': {e}")
+        if query.message:
+            await query.message.reply_text("Sorry, there was an error processing this action (invalid document ID format).")
+        return
+
+    # Use shared helper function if message exists
+    if query.message:
+        await _display_document_content(
+            doc_id=doc_id,
+            message_destination=query.message,
+            log_prefix="view_doc_button_callback:"
+        )
+
 # TODO: Move other document-related commands here:
 # - add_doc_command
 # - edit_doc_command
 # - delete_doc_command
-# - ask_command 
+# - ask_command (parts of it, or if it becomes too document-centric) 
