@@ -81,6 +81,11 @@ class ProposalService:
             # Concatenate title and description for indexing
             proposal_text_to_index = new_proposal.title + " " + new_proposal.description
             
+            # For multiple-choice proposals, include the options in the indexed text
+            if new_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value and new_proposal.options:
+                options_text = " Options: " + ", ".join(new_proposal.options)
+                proposal_text_to_index += options_text
+            
             # Generate embedding using LLMService
             embedding = await self.llm_service.generate_embedding(proposal_text_to_index)
             
@@ -238,9 +243,15 @@ class ProposalService:
         # and for updating the message in the channel.
         
         # Re-index proposal for semantic search if title or description changed
-        if new_title or new_description:
+        if new_title or new_description or new_options:
             try:
                 proposal_text_to_index = updated_proposal.title + " " + updated_proposal.description
+                
+                # For multiple-choice proposals, include the options in the indexed text
+                if updated_proposal.proposal_type == ProposalType.MULTIPLE_CHOICE.value and updated_proposal.options:
+                    options_text = " Options: " + ", ".join(updated_proposal.options)
+                    proposal_text_to_index += options_text
+                
                 embedding = await self.llm_service.generate_embedding(proposal_text_to_index)
                 
                 if embedding:

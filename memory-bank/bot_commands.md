@@ -35,15 +35,21 @@ This file lists all user-facing commands for CoordinationBot, ordered roughly by
         *   `<Title>`: The title of the proposal.
         *   `<Description>`: A detailed description of the proposal.
         *   `[Option1, Option2, ... OR "FREEFORM"]`: For multiple-choice, a comma-separated list of options. For idea generation, the keyword `FREEFORM`.
-    *   **Context:** DM with the bot.
+    *   **Context:** DM with the bot or in the public channel.
 
 *   `/proposals open`
     *   **Description:** Lists all currently open proposals (both multiple-choice and free-form) with their titles and deadlines.
-    *   **Context:** DM with the bot.
+    *   **Context:** DM with the bot or in the public channel.
 
 *   `/proposals closed`
     *   **Description:** Lists all closed proposals with their titles and final outcomes.
-    *   **Context:** DM with the bot.
+    *   **Context:** DM with the bot or in the public channel.
+
+*   `/view_proposal <proposal_id>`
+    *   **Description:** Shows the link to the proposal, tapping it should take you to the proposal message in the channel.
+    *   **Parameters:**
+        *   `<proposal_id>`: The ID of the proposal to edit.
+    *   **Context:** DM with the bot or in the public channel.
 
 *   `/edit_proposal` or `/edit_proposal <proposal_id>`
     *   **Description:** Allows the original proposer to edit the title, description, or options of their proposal, but only if no votes or submissions have been cast yet. If the user just says `/edit_proposal`, the bot should ask "which proposal? Use `/my_proposals` to list all, then `/edit_proposal <proposal_id>`.
