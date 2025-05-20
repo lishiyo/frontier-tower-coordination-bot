@@ -1,5 +1,5 @@
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 from telegram.constants import ParseMode
@@ -16,10 +16,10 @@ from typing import Optional, Tuple, Any
 logger = logging.getLogger(__name__)
 
 # Helper Function for fetching document content
-async def _get_and_format_document_for_display(document_id: int, session: AsyncSession) -> Tuple[Optional[str], bool]:
+async def _get_and_format_document_for_display(document_id: int, session: AsyncSession) -> Tuple[Optional[str], bool, Optional[str]]:
     """
     Fetches document content and indicates if found.
-    Returns a tuple: (raw_content_string_or_none, found_boolean).
+    Returns a tuple: (raw_content_string_or_none, found_boolean, source_url_or_none).
     """
     # ContextService needs to be initialized.
     # Since get_document_content doesn't use LLM or VectorDB services, we can pass None.
@@ -29,11 +29,12 @@ async def _get_and_format_document_for_display(document_id: int, session: AsyncS
         vector_db_service=None
     )
     
-    raw_content = await context_service.get_document_content(document_id)
+    # Get the document to access both content and source_url
+    document = await context_service.document_repository.get_document_by_id(document_id)
     
-    if raw_content:
-        return raw_content, True
-    return None, False
+    if document:
+        return document.raw_content, True, document.source_url
+    return None, False, None
 
 # New Helper Function for displaying document content
 async def _display_document_content(doc_id: int, message_destination: Any, log_prefix: str = "", user_id: Optional[int] = None) -> bool:
@@ -51,18 +52,28 @@ async def _display_document_content(doc_id: int, message_destination: Any, log_p
     """
     try:
         async with AsyncSessionLocal() as session:
-            raw_content, found = await _get_and_format_document_for_display(doc_id, session)
+            raw_content, found, source_url = await _get_and_format_document_for_display(doc_id, session)
 
         if found and raw_content:
             display_content = escape_markdown_v2(raw_content)
             max_length = 4096
             
-            message_header = f"Content for Document ID {doc_id}:\n\n"
+            # Include source URL in header if available
+            if source_url:
+                message_header = f"Content for Document ID {doc_id}: {escape_markdown_v2(source_url)}\n\n"
+            else:
+                message_header = f"Content for Document ID {doc_id}:\n\n"
             
             if len(display_content) <= (max_length - len(message_header)):
                 await message_destination.reply_text(f"{message_header}{display_content}", parse_mode=ParseMode.MARKDOWN_V2)
             else:
-                await message_destination.reply_text(f"Displaying content for Document ID {doc_id} \\(truncated due to length\\):", parse_mode=ParseMode.MARKDOWN_V2)
+                # For truncated content, still include the source URL in the header
+                header_text = f"Displaying content for Document ID {doc_id}"
+                if source_url:
+                    header_text += f": {escape_markdown_v2(source_url)}"
+                header_text += " \\(truncated due to length\\):"
+                
+                await message_destination.reply_text(header_text, parse_mode=ParseMode.MARKDOWN_V2)
                 for i in range(0, len(display_content), max_length):
                     chunk = display_content[i:i + max_length]
                     await message_destination.reply_text(chunk, parse_mode=ParseMode.MARKDOWN_V2)
@@ -192,7 +203,7 @@ async def view_docs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await update.message.reply_text(f"No proposals found for channel/identifier '{channel_id_arg_str}', or it's not a recognized proposal ID or channel. Use `/view_docs` to list all channel ids.")
 
 async def view_doc_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the callback query from 'View Source' buttons by using the shared helper function."""
+    """Handles the callback query from 'View Source' buttons by redirecting to URL or showing content."""
     query = update.callback_query
     await query.answer() # Acknowledge the callback
 
@@ -214,7 +225,31 @@ async def view_doc_button_callback(update: Update, context: ContextTypes.DEFAULT
             await query.message.reply_text("Sorry, there was an error processing this action (invalid document ID format).")
         return
 
-    # Use shared helper function if message exists
+    # Check if the document has a source_url and handle accordingly
+    async with AsyncSessionLocal() as session:
+        context_service = ContextService(
+            db_session=session,
+            llm_service=None,
+            vector_db_service=None
+        )
+        document = await context_service.document_repository.get_document_by_id(doc_id)
+        
+        if document and document.source_url:
+            # For URL documents, provide a clickable button to the original source
+            escaped_url = escape_markdown_v2(document.source_url)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(text="Open Original URL", url=document.source_url)]
+            ])
+            
+            if query.message:
+                await query.message.reply_text(
+                    f"This document was sourced from: {escaped_url}\n\nClick the button below to open the original source:",
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=keyboard
+                )
+            return
+    
+    # If no source_url or document not found, fall back to displaying content
     if query.message:
         await _display_document_content(
             doc_id=doc_id,

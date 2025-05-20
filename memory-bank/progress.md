@@ -1,6 +1,31 @@
 # Progress Log
 
 
+## Mon May 19 17:16:10 PDT 2025
+
+**Completed:**
+- Enhanced the `/ask` command with interactive "View Source" buttons to improve user experience:
+  - Modified `ContextService` methods to return structured source data along with answers, including document IDs and titles.
+  - Updated `ask_command` handler to create inline buttons for each document source, allowing users to view documents with a single click.
+  - Implemented `view_doc_button_callback` in `document_command_handlers.py` to handle button press events from source references.
+- Refactored document viewing functionality for improved code organization and reuse:
+  - Created a shared `_display_document_content` helper function in `document_command_handlers.py`.
+  - Both `/view_doc` command and the new "View Source" buttons now use this shared logic.
+  - Eliminated code duplication while ensuring consistent document content display.
+
+**Learnings & Fixes:**
+- When implementing callback handlers for inline buttons, it's important to clearly structure the callback data format to make parsing reliable.
+- Shared helper functions can significantly improve code maintainability, especially when similar functionality is needed in multiple handler contexts.
+- Moving related functionality to dedicated handler files (like `document_command_handlers.py`) helps keep the codebase organized as it grows.
+
+**Next Steps:**
+- Enhance document viewing further with two improvements:
+  - Display the source URL in the header when viewing documents sourced from URLs.
+  - Implement direct URL opening for "View Source" buttons when the document source is a URL.
+- Address the pending Task 5.2 follow-ups:
+  - Ensure timezone consistency in user-facing datetimes (PST).
+  - Update results message copy in channel announcements.
+
 ## Mon May 19 16:36:24 PDT 2025
 
 **Completed:**
