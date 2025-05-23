@@ -6,7 +6,7 @@ A Telegram bot for proposals, voting, and knowledge base searching at Frontier T
 
 proposal example | ask example
 --- | ---
-![alt text](./assets/v0_proposal.png "Logo Title Text 1") | ![alt text](./assets/v0_ask.png)
+![alt text](./assets/v0_proposal_flow.png "Logo Title Text 1") | ![alt text](./assets/v0_ask.png)
 
 CoordinationBot helps members coordinate across their floors or the whole tower via:
 - Ability to create proposals/polls/questionnaires with optional added context any user can query later
