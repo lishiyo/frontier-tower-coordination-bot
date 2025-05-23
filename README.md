@@ -1,18 +1,29 @@
 # CoordinationBot
 
-A Telegram bot for policy proposals, voting, and knowledge base searching at Frontier Tower.
+A Telegram bot for proposals, voting, and knowledge base searching at Frontier Tower!
 
 ## Overview
 
-CoordinationBot is designed to facilitate community engagement through:
-- Policy proposals (multiple-choice and free-form idea generation).
-- Anonymous voting and submissions.
-- **Intelligent Information Retrieval:**
-    - **Semantic Search for Proposals:** Users can ask natural language questions like "what proposals closed last week?" or "which proposals are about funding?" The bot uses LLMs to understand intent, extract keywords and structured filters (dates, statuses), and then queries its database and vector store (ChromaDB) to find relevant proposals.
-    - **Contextual Q&A (RAG):** Users can ask questions about general policies or specific proposal contexts. The bot retrieves relevant information from uploaded documents (global or proposal-specific) to provide informed answers.
-- A conversational interface for creating proposals and adding contextual documents.
-- Automated deadline management and results announcement.
-- Future personalized voting recommendations.
+proposal example | ask example
+--- | ---
+![alt text](./assets/v0_proposal.png "Logo Title Text 1") | ![alt text](./assets/v0_ask.png)
+
+CoordinationBot helps members coordinate across their floors or the whole tower via:
+- Ability to create proposals/polls/questionnaires with optional added context any user can query later
+- Anonymous multiple-choice voting and free-form submissions
+- Intelligent Information Retrieval through `/ask`:
+    - **Semantic Search for Proposals:** Users can ask natural language questions like "what proposals closed last week?" or "which proposals are about funding?"
+    - **Contextual Q&A (RAG):** Users can ask questions about general policies, specific proposal contexts, or anything in the knowledge base (e.g. "how does parking work at the tower?"). The bot searches through both global and proposal-specific docs.
+- A conversational, natural-language interface for creating proposals, adding context, viewing results, question asking and more
+- Automated deadline management and results announcement
+
+Future features:
+- users can upload or connect their own context to create a "digital twin" that introduces them to other members, projects, events, and surface relevant proposals
+- personalized voting recommendations based on history and user preferences
+- multi-modal context 🌟
+- **I am very open to suggestions**, please make an issue or DM me at `@lishiyo` on Telegram! <3
+
+**NOTE**: **This is still in progress!** Fleshing out [full list of commands](./memory-bank/bot_commands.md) and multi-channel support.
 
 ## Tech Stack
 
@@ -46,11 +57,11 @@ CoordinationBot offers a range of features to streamline proposal management, vo
     *   `/view_docs <proposal_id>`: Lists context documents attached to a specific proposal.
     *   `/view_doc <document_id>`: Displays the content of a specific document.
 
-This is just a preview. For a comprehensive list of all commands and their detailed descriptions, please refer to [`bot_commands.md`](./memory-bank/bot_commands.md).
+This is just a preview. For a comprehensive list of all commands and their detailed descriptions, please refer to [bot_commands.md](./memory-bank/bot_commands.md).
 
 ## Project Structure
 
-(Refer to `memory-bank/systemPatterns.md` for a detailed architecture overview and directory structure.)
+Refer to [systemPatterns.md](`memory-bank/systemPatterns.md`) for a detailed architecture overview and directory structure.
 
 ## Setup & Installation
 
@@ -102,7 +113,7 @@ This is just a preview. For a comprehensive list of all commands and their detai
     ```
     You should see log messages indicating the bot has started polling for updates.
 
-Refer to [`bot_commands.md`](./memory-bank/bot_commands.md) for a list of all commands.
+Refer to [bot_commands.md](./memory-bank/bot_commands.md) for a list of all commands.
 
 ## Development
 
@@ -123,4 +134,6 @@ A script is provided to clear all data from the `documents` and `proposals` tabl
     ```
 3.  The script will ask for confirmation before deleting any data. Type `yes` to proceed.
 
-    **WARNING:** This operation is irreversible and will delete all data in the specified tables. 
+    **WARNING:** This operation is irreversible and will delete all data in the specified tables.
+    
+     
